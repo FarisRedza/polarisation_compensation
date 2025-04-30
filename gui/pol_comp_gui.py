@@ -1,5 +1,6 @@
 import sys
 import os
+import enum
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -25,6 +26,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_default_size(width=1200, height=800)
         self.set_size_request(width=500, height=150)
         self.connect("close-request", self.on_close_request)
+
+        self.motor_1_direction = '+'
+        self.motor_2_direction = '+'
 
         # main box
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -57,21 +61,75 @@ class MainWindow(Adw.ApplicationWindow):
                 child=self.motor_controllers[i]
             )
 
-        GLib.timeout_add(1000, self.pol_comp)
+        GLib.timeout_add(100, self.pol_comp)
 
     def on_close_request(self, window) -> bool:
         self.polarimeter_box.pax.disconnect()
+        for i in self.motor_controllers:
+            i.motor_controls_group.motor._motor.stop()
         return False
     
     def pol_comp(self) -> bool:
-        print(self.polarimeter_box.data)
-        angle = 5
-        for i in self.motor_controllers:
-            if i.motor_controls_group.motor_control_enabled == False:
-                if self.polarimeter_box.data.azimuth > 0:
-                    i.motor_controls_group.motor.threaded_move_by(angle=-angle)
+        class MotorWP(enum.Enum):
+            QWP = 0  # azimuth
+            HWP = 1  # ellipticity
+
+        target_azimuth = 0
+        target_ellipticity = 0
+
+        def adjust_motor(motor_index: int, current_value: float, target_value: float, direction_attr: str, threshold_small: float, threshold_large: float):
+            mcg = self.motor_controllers[motor_index].motor_controls_group
+            if mcg.motor_control_enabled == False:
+                mcg.motor.position = mcg.motor._motor.get_position()
+                if current_value > target_value + threshold_small:
+                    if getattr(self, direction_attr) == '-':
+                        mcg.motor._motor.stop()
+                        setattr(self, direction_attr, '+')
+                    if current_value > target_value + threshold_large:
+                        mcg.motor._motor.jog(
+                            direction='+',
+                            kind='continuous'
+                        )
+                    else:
+                        mcg.motor._motor.jog(
+                            direction='+',
+                            kind='builtin'
+                        )
+                elif current_value < target_value - threshold_small:
+                    if getattr(self, direction_attr) == '+':
+                        mcg.motor._motor.stop()
+                        setattr(self, direction_attr, '-')
+                    if current_value < target_value - threshold_large:
+                        mcg.motor._motor.jog(
+                            direction='-',
+                            kind='continuous'
+                        )
+                    else:
+                        mcg.motor._motor.jog(
+                            direction='-',
+                            kind='builtin'
+                        )
                 else:
-                    i.motor_controls_group.motor.threaded_move_by(angle=angle)
+                    mcg.motor._motor.stop()
+
+        adjust_motor(
+            motor_index=MotorWP.QWP.value,
+            current_value=self.polarimeter_box.data.azimuth,
+            target_value=target_azimuth,
+            direction_attr='motor_1_direction',
+            threshold_small=0.2,
+            threshold_large=10
+        )
+
+        adjust_motor(
+            motor_index=MotorWP.HWP.value,
+            current_value=self.polarimeter_box.data.ellipticity,
+            target_value=target_ellipticity,
+            direction_attr='motor_2_direction',
+            threshold_small=0.2,
+            threshold_large=5
+        )
+
         return True
 
 class App(Adw.Application):

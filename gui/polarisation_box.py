@@ -7,6 +7,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 import matplotlib.backends.backend_gtk4agg
+import matplotlib.figure
 import matplotlib.pyplot
 import numpy
 
@@ -18,12 +19,19 @@ sys.path.append(
 )
 import polarimeter.polarimeter as polarimeter
 
-class PolEllipsePage(Adw.PreferencesPage):
+class PolPage(Adw.PreferencesPage):
     def __init__(self):
         super().__init__()
 
-        plot_group = Adw.PreferencesGroup(title='Polarisation Ellipse')
-        self.add(plot_group)
+        self.plot_ellipse_group = PolEllipseGroup()
+        self.add(self.plot_ellipse_group)
+
+        self.plot_bloch_group = BlochSphere3D()
+        self.add(self.plot_bloch_group)
+
+class PolEllipseGroup(Adw.PreferencesGroup):
+    def __init__(self):
+        super().__init__(title='Polarisation Ellipse')
 
         self.fig, self.ax = matplotlib.pyplot.subplots()
         self.ax.set_aspect('equal')
@@ -43,13 +51,12 @@ class PolEllipsePage(Adw.PreferencesPage):
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
         self.canvas.set_size_request(200, 200)
-        plot_group.add(self.canvas)
+        self.add(self.canvas)
 
     def update_plot(self, data: polarimeter.Data):
         theta = numpy.radians(data.azimuth)
         eta = numpy.radians(data.ellipticity)
 
-        # polarisation ellipse
         ## parametric angle
         t = numpy.linspace(0, 2 * numpy.pi, 500)
         
@@ -86,6 +93,142 @@ class PolEllipsePage(Adw.PreferencesPage):
         self.minor_axis.set_data(x_minor_rotated, y_minor_rotated)
 
         self.canvas.draw_idle()
+
+class BlochSphere2D(Gtk.Box):
+    def __init__(self, max_trail_length=30):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        self.max_trail_length = max_trail_length
+        self.history = []  # Stores (x, y, z)
+
+        self.fig, self.ax = matplotlib.pyplot.subplots()
+        self.ax.set_title('Bloch Sphere (2D projection)')
+        self.ax.set_aspect('equal')
+        self.ax.axis('off')
+
+        # circle
+        circle = matplotlib.pyplot.Circle((0, 0), 1.0, color='gray', fill=False)
+        self.ax.add_patch(circle)
+        self.ax.plot([-1, 1], [0, 0], color='gray', linewidth=1)
+        self.ax.plot([0, 0], [-1, 1], color='gray', linewidth=1)
+
+        # dot
+        self.point = self.ax.plot(0, 0, 'o', color='blue', markersize=10)[0]
+
+        # trail dots
+        self.trail_points = [
+            self.ax.plot([], [], 'o', color='blue', markersize=4, alpha=0)[0]
+            for _ in range(self.max_trail_length)
+        ]
+
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
+        self.canvas.set_size_request(300, 300)
+        self.append(self.canvas)
+
+    def update_point(self, data: polarimeter.Data):
+        x = data.normalised_s1
+        y = data.normalised_s2
+        z = data.normalised_s3
+
+        norm = numpy.sqrt(x**2 + y**2 + z**2)
+        if norm > 1e-6:
+            x, y, z = x / norm, y / norm, z / norm
+
+        # dot history
+        self.history.append((x, y, z))
+        if len(self.history) > self.max_trail_length:
+            self.history.pop(0)
+
+        # dot
+        self.point.set_data([x], [y])
+        self.point.set_alpha(1.0 if z >= 0 else 0.3 + 0.7 * (1 + z))
+
+        # update trail points
+        for i, (tx, ty, tz) in enumerate(self.history[:-1]):
+            age = i / self.max_trail_length
+            alpha = (1 - age) * (1.0 if tz >= 0 else 0.3 + 0.7 * (1 + tz))
+            self.trail_points[i].set_data([tx], [ty])
+            self.trail_points[i].set_alpha(alpha)
+
+        # clear unused trail points
+        for i in range(len(self.history) - 1, self.max_trail_length):
+            self.trail_points[i].set_alpha(0)
+
+        self.canvas.draw_idle()
+
+
+class BlochSphere3D(Adw.PreferencesGroup):
+    def __init__(self):
+        super().__init__(title='Bloch Sphere')
+        
+        self.fig = matplotlib.figure.Figure(figsize=(4, 4))
+        self.ax = self.fig.add_subplot(111, projection='3d')
+        self.ax.axis('off')
+        self.ax.set_box_aspect([1, 1, 1])
+
+        # sphere surface
+        u = numpy.linspace(0, 2 * numpy.pi, 50)
+        v = numpy.linspace(0, numpy.pi, 50)
+        x = numpy.outer(numpy.cos(u), numpy.sin(v))
+        y = numpy.outer(numpy.sin(u), numpy.sin(v))
+        z = numpy.outer(numpy.ones_like(u), numpy.cos(v))
+        self.ax.plot_wireframe(x, y, z, color='lightgray', linewidth=0.5, alpha=0.3)
+
+        self.ax.plot3D([-1, 1], [0, 0], [0, 0], color='gray', linestyle='--', linewidth=1)
+
+        # D–A axis s2
+        self.ax.plot3D([0, 0], [-1, 1], [0, 0], color='gray', linestyle='--', linewidth=1)
+
+        # R–L axis s3
+        self.ax.plot3D([0, 0], [0, 0], [-1, 1], color='gray', linestyle='--', linewidth=1)
+
+        # polarisation basis labels
+        self.ax.text(1.05, 0, 0, 'H', ha='center', va='center', fontsize=10)
+        self.ax.text(-1.05, 0, 0, 'V', ha='center', va='center', fontsize=10)
+
+        self.ax.text(0, 1.05, 0, 'D', ha='center', va='center', fontsize=10)
+        self.ax.text(0, -1.05, 0, 'A', ha='center', va='center', fontsize=10)
+
+        self.ax.text(0, 0, 1.05, 'R', ha='center', va='center', fontsize=10)
+        self.ax.text(0, 0, -1.05, 'L', ha='center', va='center', fontsize=10)
+
+        # dot
+        self.point = self.ax.plot([0], [0], [0], 'o', color='blue', markersize=6)[0]
+
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
+        self.canvas.set_size_request(200, 200)
+        self.add(self.canvas)
+
+    def is_behind_camera(self, x, y, z):
+        # Get current 3D projection matrix
+        proj = self.ax.get_proj()
+
+        vec = numpy.array([x, y, z, 1.0])
+
+        transformed = proj @ vec
+
+        # if z < 0, it's behind the viewer
+        return transformed[2] < 0
+
+
+    def update_point(self, data: polarimeter.Data):
+        x = data.normalised_s1
+        y = data.normalised_s2
+        z = data.normalised_s3
+
+        norm = numpy.sqrt(x**2 + y**2 + z**2)
+        if norm > 1e-6:
+            x, y, z = x / norm, y / norm, z / norm
+
+        self.point.set_data([x], [y])
+        self.point.set_3d_properties([z])
+
+        is_behind = self.is_behind_camera(x, y, z)
+
+        # add transparency if dot behind sphere
+        self.point.set_alpha(0.3 if is_behind else 1.0)
+
+        self.canvas.draw_idle()
+
 
 class DataViewPage(Adw.PreferencesPage):
     def __init__(self, data: polarimeter.Data):
@@ -341,10 +484,10 @@ class DataViewPage(Adw.PreferencesPage):
         self.normalised_s1_label.set_text(f's1: {data.normalised_s1:.2f}')
         self.normalised_s2_label.set_text(f's2: {data.normalised_s2:.2f}')
         self.normalised_s3_label.set_text(f's3: {data.normalised_s3:.2f}')
-        self.S0_label.set_text(f'S0: {data.S0:.2f} W')
-        self.S1_label.set_text(f'S1: {data.S1:.2f} W')
-        self.S2_label.set_text(f'S2: {data.S2:.2f} W')
-        self.S3_label.set_text(f'S3: {data.S3:.2f} W')
+        self.S0_label.set_text(f'S0: {data.S0:.2} W')
+        self.S1_label.set_text(f'S1: {data.S1:.2} W')
+        self.S2_label.set_text(f'S2: {data.S2:.2} W')
+        self.S3_label.set_text(f'S3: {data.S3:.2} W')
         self.power_split_ratio_label.set_text(f'Power-split-ratio: {data.power_split_ratio:.2f}')
         self.phase_difference_label.set_text(f'Phase-difference: {data.phase_difference:.2f}')
         self.circularity_label.set_text(f'Circularity: {data.circularity:.2f} %')
@@ -357,9 +500,10 @@ class PolarimeterBox(Gtk.Box):
             id='1313:8031',
             serial_number='M00910360'
         )
+        self.pax.set_wavelength(wavelength=7e-7)
         self.data = polarimeter.Data()
 
-        self.plot_box = PolEllipsePage()
+        self.plot_box = PolPage()
         self.append(self.plot_box)
 
         self.data_view_page = DataViewPage(data=self.data)
@@ -373,5 +517,6 @@ class PolarimeterBox(Gtk.Box):
         return True
 
     def set_polarimeter_data(self, data: polarimeter.Data):
-        self.plot_box.update_plot(data=data)
+        self.plot_box.plot_ellipse_group.update_plot(data=data)
+        self.plot_box.plot_bloch_group.update_point(data=data)
         self.data_view_page.update_polarimeter_info(data=self.data)
