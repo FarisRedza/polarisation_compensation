@@ -20,7 +20,7 @@ class MotorControls(Adw.PreferencesGroup):
         super().__init__()
         self.set_title(title='Motor Controls')
         self.motor = motor
-        self.motor_control_enabled = False
+        self.manual_motor_control = False
         self.motor_step_size = 5
         self.motor_acceleration = 20
         self.motor_max_velocity = 25
@@ -131,7 +131,7 @@ class MotorControls(Adw.PreferencesGroup):
         GLib.timeout_add(100, self.update_motor_info)
 
     def on_enable_controls(self, switch, gparam):
-        self.motor_control_enabled = not self.motor_control_enabled
+        self.manual_motor_control = not self.manual_motor_control
         self.step_size_entry.set_sensitive(switch.get_active())
         self.acceleration_entry.set_sensitive(switch.get_active())
         self.max_velocity_entry.set_sensitive(switch.get_active())
