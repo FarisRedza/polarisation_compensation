@@ -127,37 +127,27 @@ class PolCompPage(Adw.PreferencesPage):
                     threshold_small: float,
                     threshold_large: float
             ) -> None:
-                mcg = self.motor_controllers[motor_index].motor_controls_group
+                mcg: motor_box.MotorControls = self.motor_controllers[motor_index].motor_controls_group
                 if mcg.manual_motor_control == False:
                     mcg.motor.position = mcg.motor._motor.get_position()
-                    if current_value > target_value + threshold_small:
-                        if getattr(self, direction_attr) == '-':
-                            mcg.motor._motor.stop()
-                            setattr(self, direction_attr, '+')
-                        if current_value > target_value + threshold_large:
+                    delta = current_value - target_value
+                    direction = '+' if delta > 0 else '-'
+                    if getattr(self, direction_attr) != direction:
+                        mcg.motor._motor.stop()
+                        setattr(self, direction_attr, direction)
+
+                    if abs(delta) > threshold_small:
+                        if abs(delta) > threshold_large:
                             mcg.motor._motor.jog(
-                                direction='+',
+                                direction=direction,
                                 kind='continuous'
                             )
                         else:
                             mcg.motor._motor.jog(
-                                direction='+',
+                                direction=direction,
                                 kind='builtin'
                             )
-                    elif current_value < target_value - threshold_small:
-                        if getattr(self, direction_attr) == '+':
-                            mcg.motor._motor.stop()
-                            setattr(self, direction_attr, '-')
-                        if current_value < target_value - threshold_large:
-                            mcg.motor._motor.jog(
-                                direction='-',
-                                kind='continuous'
-                            )
-                        else:
-                            mcg.motor._motor.jog(
-                                direction='-',
-                                kind='builtin'
-                            )
+                    
                     else:
                         mcg.motor._motor.stop()
 
