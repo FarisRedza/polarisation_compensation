@@ -19,7 +19,7 @@ sys.path.append(
 )
 import polarimeter.polarimeter as polarimeter
 
-class PolPage(Adw.PreferencesPage):
+class ColumnOne(Adw.PreferencesPage):
     def __init__(self):
         super().__init__()
 
@@ -230,15 +230,12 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.canvas.draw_idle()
 
 
-class DataViewPage(Adw.PreferencesPage):
+class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(self, data: polarimeter.Data):
-        super().__init__()
-
-        data_group = Adw.PreferencesGroup(title='Measurement Value Table')
-        self.add(data_group)
+        super().__init__(title='Measurement Value Table')
 
         data_row = Adw.ActionRow()
-        data_group.add(data_row)
+        self.add(data_row)
 
         data_box = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
@@ -492,6 +489,39 @@ class DataViewPage(Adw.PreferencesPage):
         self.phase_difference_label.set_text(f'Phase-difference: {data.phase_difference:.2f}')
         self.circularity_label.set_text(f'Circularity: {data.circularity:.2f} %')
 
+class DeviceInfoGroup(Adw.PreferencesGroup):
+    def __init__(self, polarimeter: polarimeter.Polarimeter):
+        super().__init__(title='Polarimeter Info')
+
+        # serial number
+        serial_no_row = Adw.ActionRow(title='Serial number')
+        self.add(serial_no_row)
+        serial_no_label = Gtk.Label(label=polarimeter.device_info.serial_number)
+        serial_no_row.add_suffix(widget=serial_no_label)
+
+        # model number
+        model_no_row = Adw.ActionRow(title='Model number')
+        self.add(model_no_row)
+        model_no_label = Gtk.Label(label=polarimeter.device_info.model)
+        model_no_row.add_suffix(widget=model_no_label)
+
+        # firmware
+        fw_ver_row = Adw.ActionRow(title='Firmware version')
+        self.add(fw_ver_row)
+        fw_ver_label = Gtk.Label(label=polarimeter.device_info.firmware_version)
+        fw_ver_row.add_suffix(widget=fw_ver_label)
+
+class ColumnTwo(Adw.PreferencesPage):
+    def __init__(self, polarimeter: polarimeter.Polarimeter, data: polarimeter.Data):
+        super().__init__()
+        self.data = data
+
+        self.measurement_group = MeasurementGroup(data=self.data)
+        self.add(self.measurement_group)
+
+        self.polarimeter_group = DeviceInfoGroup(polarimeter=polarimeter)
+        self.add(self.polarimeter_group)
+
 class PolarimeterBox(Gtk.Box):
     def __init__(self):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
@@ -503,11 +533,11 @@ class PolarimeterBox(Gtk.Box):
         self.pax.set_wavelength(wavelength=7e-7)
         self.data = polarimeter.Data()
 
-        self.plot_box = PolPage()
+        self.plot_box = ColumnOne()
         self.append(self.plot_box)
 
-        self.data_view_page = DataViewPage(data=self.data)
-        self.append(self.data_view_page)
+        self.columntwo = ColumnTwo(polarimeter=self.pax,data=self.data)
+        self.append(self.columntwo)
 
         GLib.timeout_add(100, self.update_from_polarimeter)
 
@@ -519,4 +549,4 @@ class PolarimeterBox(Gtk.Box):
     def set_polarimeter_data(self, data: polarimeter.Data):
         self.plot_box.plot_ellipse_group.update_plot(data=data)
         self.plot_box.plot_bloch_group.update_point(data=data)
-        self.data_view_page.update_polarimeter_info(data=self.data)
+        self.columntwo.measurement_group.update_polarimeter_info(data=self.data)

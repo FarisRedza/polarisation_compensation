@@ -391,9 +391,4 @@ class Polarimeter(SCPIDevice):
 if __name__ == '__main__':
     pax = Polarimeter(id='1313:8031', serial_number='M00910360')
     pprint.pprint(pax.device_info)
-
-    import time
-    for i in range(10):
-        pprint.pprint(pax.measure())
-        time.sleep(1)
-    pax.disconnect()
+    

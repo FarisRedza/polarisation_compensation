@@ -20,6 +20,10 @@ import polarimeter.polarimeter as polarimeter
 import motor.motor as motor
 
 class PolCompPage(Adw.PreferencesPage):
+    class MotorWP(enum.Enum):
+        QWP = 55353314  # azimuth
+        HWP = 55356974  # ellipticity
+
     def __init__(self, polarimeter_box: polarisation_box.PolarimeterBox, motor_controllers: list[motor_box.MotorControls]):
         super().__init__()
         self.polarimeter_box = polarimeter_box
@@ -30,6 +34,12 @@ class PolCompPage(Adw.PreferencesPage):
 
         self.target_azimuth = 0
         self.target_ellipticity = 0
+
+        self.azimuth_threshold_small = 0.1
+        self.azimuth_threshold_large = 10
+
+        self.ellipticity_threshold_small = 0.075
+        self.ellipticity_threshold_large = 5
 
         pol_comp_group = Adw.PreferencesGroup(title='Polarisation Compensation')
         self.add(pol_comp_group)
@@ -72,7 +82,7 @@ class PolCompPage(Adw.PreferencesPage):
         )
         pol_comp_group.add(motor_qwp_row)
 
-        motor_qwp_label = Gtk.Label(label='55353314')
+        motor_qwp_label = Gtk.Label(label=self.MotorWP.QWP.value)
         motor_qwp_row.add_suffix(widget=motor_qwp_label)
 
         # hwp
@@ -82,7 +92,7 @@ class PolCompPage(Adw.PreferencesPage):
         )
         pol_comp_group.add(motor_hwp_row)
 
-        motor_hwp_label = Gtk.Label(label='55356974')
+        motor_hwp_label = Gtk.Label(label=self.MotorWP.HWP.value)
         motor_hwp_row.add_suffix(widget=motor_hwp_label)
 
         GLib.timeout_add(
@@ -111,13 +121,9 @@ class PolCompPage(Adw.PreferencesPage):
 
     def pol_comp(self) -> bool:
         if self.enable_compensation == True:
-            class MotorWP(enum.Enum):
-                QWP = 55353314  # azimuth
-                HWP = 55356974  # ellipticity
-
             motor_list: list[motor.Motor] = [m.motor_controls_group.motor for m in self.motor_controllers]
-            motor_qwp_index = next((i for i, motor in enumerate(motor_list) if motor.serial_no == MotorWP.QWP.value),-1)
-            motor_hwp_index = next((i for i, motor in enumerate(motor_list) if motor.serial_no == MotorWP.HWP.value),-1)
+            motor_qwp_index = next((i for i, motor in enumerate(motor_list) if motor.serial_no == self.MotorWP.QWP.value),-1)
+            motor_hwp_index = next((i for i, motor in enumerate(motor_list) if motor.serial_no == self.MotorWP.HWP.value),-1)
 
             def adjust_motor(
                     motor_index: int,
@@ -156,8 +162,8 @@ class PolCompPage(Adw.PreferencesPage):
                 current_value=self.polarimeter_box.data.azimuth,
                 target_value=self.target_azimuth,
                 direction_attr='motor_1_direction',
-                threshold_small=0.1,
-                threshold_large=10
+                threshold_small=self.azimuth_threshold_small,
+                threshold_large=self.azimuth_threshold_large
             )
 
             adjust_motor(
@@ -165,8 +171,8 @@ class PolCompPage(Adw.PreferencesPage):
                 current_value=self.polarimeter_box.data.ellipticity,
                 target_value=self.target_ellipticity,
                 direction_attr='motor_2_direction',
-                threshold_small=0.075,
-                threshold_large=5
+                threshold_small=self.ellipticity_threshold_small,
+                threshold_large=self.ellipticity_threshold_large
             )
 
         return True
@@ -175,8 +181,8 @@ class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_title(title='Polarisation Compensation')
-        self.set_default_size(width=1200, height=800)
-        self.set_size_request(width=500, height=150)
+        self.set_default_size(width=1300, height=800)
+        self.set_size_request(width=1250, height=300)
         self.connect("close-request", self.on_close_request)
 
         # main box
@@ -195,7 +201,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.polarimeter_box = polarisation_box.PolarimeterBox()
         self.content_box.append(child=self.polarimeter_box)
 
-        ### motor control box
+        ### init motor control boxes
         self.motors = motor.list_thorlabs_motors()
         self.motor_controllers: list[motor_box.MotorControlPage] = []
         for i, m in enumerate(self.motors):
@@ -208,9 +214,13 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
         ### pol comp
-        self.pol_comp_page = PolCompPage(polarimeter_box=self.polarimeter_box, motor_controllers=self.motor_controllers)
+        self.pol_comp_page = PolCompPage(
+            polarimeter_box=self.polarimeter_box,
+            motor_controllers=self.motor_controllers
+        )
         self.content_box.append(child=self.pol_comp_page)
 
+        ### add motor boxes
         for i, m in enumerate(self.motor_controllers):
             self.content_box.append(
                 child=self.motor_controllers[i]
