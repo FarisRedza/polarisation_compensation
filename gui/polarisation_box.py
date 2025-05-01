@@ -36,6 +36,7 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.fig, self.ax = matplotlib.pyplot.subplots()
         self.ax.set_aspect('equal')
         self.ax.axis('off')
+        self.fig.tight_layout()
 
         # circle
         circle = matplotlib.pyplot.Circle((0, 0), 1.0, color='gray', fill=False, linewidth=1)
@@ -164,6 +165,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.ax = self.fig.add_subplot(111, projection='3d')
         self.ax.axis('off')
         self.ax.set_box_aspect([1, 1, 1])
+        self.fig.tight_layout()
 
         # sphere surface
         u = numpy.linspace(0, 2 * numpy.pi, 50)
@@ -237,257 +239,277 @@ class MeasurementGroup(Adw.PreferencesGroup):
         data_row = Adw.ActionRow()
         self.add(data_row)
 
-        data_box = Gtk.Box(
+        margin = 6
+        box_spacing = 6
+        width_chars = 9
+
+        data_header_box = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
-            spacing=6
+            margin_top=margin,
+            margin_bottom=margin,
+            valign=Gtk.Align.CENTER,
+            spacing=box_spacing
         )
-        data_row.set_child(child=data_box)
+        data_row.add_prefix(widget=data_header_box)
 
-        ## wavelength
-        wavelength_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        data_value_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            margin_top=margin,
+            margin_bottom=margin,
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.END,
+            spacing=box_spacing,
         )
-        data_box.append(child=wavelength_row)
-        self.wavelength_label = Gtk.Label(label=f'Wavelength: {data.wavelength} m', xalign=0)
-        wavelength_row.append(child=self.wavelength_label)
+        data_row.add_suffix(widget=data_value_box)
 
-        ## azimuth
-        azimuth_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # wavelength
+        wavelength_label = Gtk.Label(
+            label='Wavelength',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=azimuth_row)
-        self.azimuth_label = Gtk.Label(
-            label=f'Azimuth: {data.azimuth} °',
-            xalign=0
+        data_header_box.append(child=wavelength_label)
+        self.wavelength_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        azimuth_row.append(child=self.azimuth_label)
+        data_value_box.append(child=self.wavelength_value_label)
 
-        ## ellipticity
-        ellipticity_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # azimuth
+        azimuth_label = Gtk.Label(
+            label='Azimuth',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=ellipticity_row)
-        self.ellipticity_label = Gtk.Label(
-            label=f'Ellipticity: {data.ellipticity} °',
-            xalign=0
+        data_header_box.append(child=azimuth_label)
+        self.azimuth_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        ellipticity_row.append(child=self.ellipticity_label)
+        data_value_box.append(child=self.azimuth_value_label)
 
-        ## dop
-        dop_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # ellipticity
+        ellipticity_label = Gtk.Label(
+            label='Ellipticity',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=dop_row)
-        self.dop_label = Gtk.Label(
-            label=f'DOP: {data.degree_of_polarisation} %',
-            xalign=0
+        data_header_box.append(child=ellipticity_label)
+        self.ellipticity_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        dop_row.append(child=self.dop_label)
+        data_value_box.append(child=self.ellipticity_value_label)
 
-        ## dolp
-        dolp_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # dop
+        dop_label = Gtk.Label(
+            label='DOP',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=dolp_row)
-        self.dolp_label = Gtk.Label(
-            label=f'DOLP: {data.degree_of_linear_polarisation} %',
-            xalign=0
+        data_header_box.append(child=dop_label)
+        self.dop_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        dolp_row.append(child=self.dolp_label)
-        
-        ## docp
-        docp_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
-        )
-        data_box.append(child=docp_row)
-        self.docp_label = Gtk.Label(
-            label=f'DOCP: {data.degree_of_circular_polarisation} %',
-            xalign=0
-        )
-        docp_row.append(child=self.docp_label)
+        data_value_box.append(child=self.dop_value_label)
 
-        ## power
-        power_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # dolp
+        dolp_label = Gtk.Label(
+            label='DOLP',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=power_row)
-        self.power_label = Gtk.Label(
-            label=f'Power: {data.power} dBm',
-            xalign=0
+        data_header_box.append(child=dolp_label)
+        self.dolp_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        power_row.append(child=self.power_label)
+        data_value_box.append(child=self.dolp_value_label)
 
-        ## power_polarised
-        power_polarised_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # docp
+        docp_label = Gtk.Label(
+            label='DOCP',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=power_polarised_row)
-        self.power_polarised_label = Gtk.Label(
-            label=f'PPol: {data.power_polarised} dBm',
-            xalign=0
+        data_header_box.append(child=docp_label)
+        self.docp_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        power_polarised_row.append(child=self.power_polarised_label)
+        data_value_box.append(child=self.docp_value_label)
 
-        ## power_unpolarised
-        power_unpolarised_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # power
+        power_label = Gtk.Label(
+            label='Power',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=power_unpolarised_row)
-        self.power_unpolarised_label = Gtk.Label(
-            label=f'PUnpol: {data.power_unpolarised} dBm',
-            xalign=0
+        data_header_box.append(child=power_label)
+        self.power_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        power_unpolarised_row.append(child=self.power_unpolarised_label)
+        data_value_box.append(child=self.power_value_label)
 
-        ## normalised_s1
-        normalised_s1_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # power polarised
+        poewr_polarised_label = Gtk.Label(
+            label='PPol',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=normalised_s1_row)
-        self.normalised_s1_label = Gtk.Label(
-            label=f's1: {data.normalised_s1}',
-            xalign=0
+        data_header_box.append(child=poewr_polarised_label)
+        self.power_polarised_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        normalised_s1_row.append(child=self.normalised_s1_label)
+        data_value_box.append(child=self.power_polarised_value_label)
 
-        ## normalised_s2
-        normalised_s2_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # power unpolarised
+        power_unpolarised_label = Gtk.Label(
+            label='PUnpol',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=normalised_s2_row)
-        self.normalised_s2_label = Gtk.Label(
-            label=f's2: {data.normalised_s2}',
-            xalign=0
+        data_header_box.append(child=power_unpolarised_label)
+        self.power_unpolarised_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        normalised_s2_row.append(child=self.normalised_s2_label)
+        data_value_box.append(child=self.power_unpolarised_value_label)
 
-        ## normalised_s3
-        normalised_s3_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # normalised s1
+        normalised_s1_label = Gtk.Label(
+            label='s1',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=normalised_s3_row)
-        self.normalised_s3_label = Gtk.Label(
-            label=f's3: {data.normalised_s3}',
-            xalign=0
+        data_header_box.append(child=normalised_s1_label)
+        self.normalised_s1_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        normalised_s3_row.append(child=self.normalised_s3_label)
+        data_value_box.append(child=self.normalised_s1_value_label)
 
-        ## S0
-        S0_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # normalised s2
+        normalised_s2_label = Gtk.Label(
+            label='s2',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=S0_row)
-        self.S0_label = Gtk.Label(
-            label=f'S0 {data.S0} W',
-            xalign=0
+        data_header_box.append(child=normalised_s2_label)
+        self.normalised_s2_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        S0_row.append(child=self.S0_label)
+        data_value_box.append(child=self.normalised_s2_value_label)
 
-        ## S1
-        S1_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # normalised s3
+        normalised_s3_label = Gtk.Label(
+            label='s3',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=S1_row)
-        self.S1_label = Gtk.Label(
-            label=f'01: {data.S1} W',
-            xalign=0
+        data_header_box.append(child=normalised_s3_label)
+        self.normalised_s3_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        S1_row.append(child=self.S1_label)
+        data_value_box.append(child=self.normalised_s3_value_label)
 
-        ## S2
-        S2_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # S0
+        S0_label = Gtk.Label(
+            label='S0',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=S2_row)
-        self.S2_label = Gtk.Label(
-            label=f'S2 {data.S2} W',
-            xalign=0
+        data_header_box.append(child=S0_label)
+        self.S0_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        S2_row.append(child=self.S2_label)
+        data_value_box.append(child=self.S0_value_label)
 
-        ## S3
-        S3_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # S1
+        S1_label = Gtk.Label(
+            label='S1',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=S3_row)
-        self.S3_label = Gtk.Label(
-            label=f'S3 {data.S3} W',
-            xalign=0
+        data_header_box.append(child=S1_label)
+        self.S1_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        S3_row.append(child=self.S3_label)
+        data_value_box.append(child=self.S1_value_label)
 
-        ## power_split_ratio
-        power_split_ratio_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # S2
+        S2_label = Gtk.Label(
+            label='S2',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=power_split_ratio_row)
-        self.power_split_ratio_label = Gtk.Label(
-            label=f'Power-split-ratio: {data.power_split_ratio}',
-            xalign=0
+        data_header_box.append(child=S2_label)
+        self.S2_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        power_split_ratio_row.append(child=self.power_split_ratio_label)
+        data_value_box.append(child=self.S2_value_label)
 
-        ## phase_difference
-        phase_difference_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # S3
+        S3_label = Gtk.Label(
+            label='S3',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=phase_difference_row)
-        self.phase_difference_label = Gtk.Label(
-            label=f'Phase-difference: {data.phase_difference} °',
-            xalign=0
+        data_header_box.append(child=S3_label)
+        self.S3_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        phase_difference_row.append(child=self.phase_difference_label)
+        data_value_box.append(child=self.S3_value_label)
 
-        ## circularity
-        circularity_row = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=6
+        # power split ratio
+        power_split_ratio_label = Gtk.Label(
+            label='Power-split-ratio',
+            halign=Gtk.Align.START
         )
-        data_box.append(child=circularity_row)
-        self.circularity_label = Gtk.Label(
-            label=f'Circularity: {data.circularity} %',
-            xalign=0
+        data_header_box.append(child=power_split_ratio_label)
+        self.power_split_ratio_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
         )
-        circularity_row.append(child=self.circularity_label)
+        data_value_box.append(child=self.power_split_ratio_value_label)
+
+        # phase difference
+        phase_difference_label = Gtk.Label(
+            label='Phase-difference',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=phase_difference_label)
+        self.phase_difference_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.phase_difference_value_label)
+
+        # circularity
+        circularity_label = Gtk.Label(
+            label='Circularity',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=circularity_label)
+        self.circularity_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.circularity_value_label)
 
     def update_polarimeter_info(self, data: polarimeter.Data):
-        self.wavelength_label.set_text(f'Wavelength: {data.wavelength} m')
-        self.azimuth_label.set_text(f'Azimuth: {data.azimuth:.2f} °')
-        self.ellipticity_label.set_text(f'Ellipticity: {data.ellipticity:.2f} °')
-        self.dop_label.set_text(f'DOP: {data.degree_of_polarisation:.2f} %')
-        self.dolp_label.set_text(f'DOLP: {data.degree_of_linear_polarisation:.2f} %')
-        self.docp_label.set_text(f'DOCP: {data.degree_of_circular_polarisation:.2f} %')
-        self.power_label.set_text(f'Power: {data.power:.2f} dBm')
-        self.power_polarised_label.set_text(f'PPol: {data.power_polarised:.2f} dBm')
-        self.power_unpolarised_label.set_text(f'PUnpol: {data.power_unpolarised:.2f} dBm')
-        self.normalised_s1_label.set_text(f's1: {data.normalised_s1:.2f}')
-        self.normalised_s2_label.set_text(f's2: {data.normalised_s2:.2f}')
-        self.normalised_s3_label.set_text(f's3: {data.normalised_s3:.2f}')
-        self.S0_label.set_text(f'S0: {data.S0:.2} W')
-        self.S1_label.set_text(f'S1: {data.S1:.2} W')
-        self.S2_label.set_text(f'S2: {data.S2:.2} W')
-        self.S3_label.set_text(f'S3: {data.S3:.2} W')
-        self.power_split_ratio_label.set_text(f'Power-split-ratio: {data.power_split_ratio:.2f}')
-        self.phase_difference_label.set_text(f'Phase-difference: {data.phase_difference:.2f}')
-        self.circularity_label.set_text(f'Circularity: {data.circularity:.2f} %')
+        self.wavelength_value_label.set_text(f'{data.wavelength} m')
+        self.azimuth_value_label.set_text(f'{data.azimuth:.2f} °')
+        self.ellipticity_value_label.set_text(f'{data.ellipticity:.2f} °')
+        self.dop_value_label.set_text(f'{data.degree_of_polarisation:.2f} %')
+        self.dolp_value_label.set_text(f'{data.degree_of_linear_polarisation:.2f} %')
+        self.docp_value_label.set_text(f'{data.degree_of_circular_polarisation:.2f} %')
+        self.power_value_label.set_text(f'{data.power:.2f} dBm')
+        self.power_polarised_value_label.set_text(f'{data.power_polarised:.2f} dBm')
+        self.power_unpolarised_value_label.set_text(f'{data.power_unpolarised:.2f} dBm')
+        self.normalised_s1_value_label.set_text(f'{data.normalised_s1:.2f}')
+        self.normalised_s2_value_label.set_text(f'{data.normalised_s2:.2f}')
+        self.normalised_s3_value_label.set_text(f'{data.normalised_s3:.2f}')
+        self.S0_value_label.set_text(f'{data.S0:.2} W')
+        self.S1_value_label.set_text(f'{data.S1:.2} W')
+        self.S2_value_label.set_text(f'{data.S2:.2} W')
+        self.S3_value_label.set_text(f'{data.S3:.2} W')
+        self.power_split_ratio_value_label.set_text(f'{data.power_split_ratio:.2f}')
+        self.phase_difference_value_label.set_text(f'{data.phase_difference:3.2f}')
+        self.circularity_value_label.set_text(f'{data.circularity:.2f} %')
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
     def __init__(self, polarimeter: polarimeter.Polarimeter):

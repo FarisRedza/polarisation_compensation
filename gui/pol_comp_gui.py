@@ -40,7 +40,7 @@ class PolCompPage(Adw.PreferencesPage):
 
         # descending order
         self.azimuth_thresholds_velocities = [
-            (10, 25),
+            (5, 25),
             (2.5, 15),
             (1, 5),
             (0.05, 1)
