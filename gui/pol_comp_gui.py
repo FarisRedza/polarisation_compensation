@@ -32,14 +32,26 @@ class PolCompPage(Adw.PreferencesPage):
         self.motor_1_direction = '+'
         self.motor_2_direction = '+'
 
+        self.motor_1_jog_max_velocity = 0
+        self.motor_2_jog_max_velocity = 0
+
         self.target_azimuth = 0
         self.target_ellipticity = 0
 
-        self.azimuth_threshold_small = 0.1
-        self.azimuth_threshold_large = 10
+        # descending order
+        self.azimuth_thresholds_velocities = [
+            (10, 25),
+            (2.5, 15),
+            (1, 5),
+            (0.05, 1)
+        ]
 
-        self.ellipticity_threshold_small = 0.075
-        self.ellipticity_threshold_large = 5
+        self.ellipticity_thresholds_velocities = [
+            (5, 25),
+            (2.5, 15),
+            (1, 5),
+            (0.075, 1)
+        ]
 
         pol_comp_group = Adw.PreferencesGroup(title='Polarisation Compensation')
         self.add(pol_comp_group)
@@ -120,62 +132,70 @@ class PolCompPage(Adw.PreferencesPage):
             self.target_ellipticity = value
 
     def pol_comp(self) -> bool:
-        if self.enable_compensation == True:
-            motor_list: list[motor.Motor] = [m.motor_controls_group.motor for m in self.motor_controllers]
-            motor_qwp_index = next((i for i, motor in enumerate(motor_list) if motor.serial_no == self.MotorWP.QWP.value),-1)
-            motor_hwp_index = next((i for i, motor in enumerate(motor_list) if motor.serial_no == self.MotorWP.HWP.value),-1)
+        if not self.enable_compensation:
+            return True
 
-            def adjust_motor(
-                    motor_index: int,
-                    current_value: float,
-                    target_value: float,
-                    direction_attr: str,
-                    threshold_small: float,
-                    threshold_large: float
-            ) -> None:
-                mcg: motor_box.MotorControls = self.motor_controllers[motor_index].motor_controls_group
-                if mcg.manual_motor_control == False:
-                    mcg.motor.position = mcg.motor._motor.get_position()
-                    delta = current_value - target_value
-                    direction = '+' if delta > 0 else '-'
-                    if getattr(self, direction_attr) != direction:
-                        mcg.motor._motor.stop()
-                        setattr(self, direction_attr, direction)
+        motor_list: list[motor.Motor] = [m.motor_controls_group.motor for m in self.motor_controllers]
+        motor_qwp_index = next((i for i, m in enumerate(motor_list) if m.serial_no == self.MotorWP.QWP.value), -1)
+        motor_hwp_index = next((i for i, m in enumerate(motor_list) if m.serial_no == self.MotorWP.HWP.value), -1)
 
-                    if abs(delta) > threshold_small:
-                        if abs(delta) > threshold_large:
-                            mcg.motor._motor.jog(
-                                direction=direction,
-                                kind='continuous'
-                            )
-                        else:
-                            mcg.motor._motor.jog(
-                                direction=direction,
-                                kind='builtin'
-                            )
-                    
-                    else:
-                        mcg.motor._motor.stop()
+        def adjust_motor(
+                motor_index: int,
+                current_value: float,
+                target_value: float,
+                direction_attr: str,
+                max_velocity_attr: str,
+                thresholds_velocities: list[tuple[float, int]]
+        ) -> None:
+            mcg: motor_box.MotorControls = self.motor_controllers[motor_index].motor_controls_group
+            if mcg.manual_motor_control:
+                return
 
-            adjust_motor(
-                motor_index=motor_qwp_index,
-                current_value=self.polarimeter_box.data.azimuth,
-                target_value=self.target_azimuth,
-                direction_attr='motor_1_direction',
-                threshold_small=self.azimuth_threshold_small,
-                threshold_large=self.azimuth_threshold_large
-            )
+            mcg.motor.position = mcg.motor._motor.get_position()
+            delta = current_value - target_value
+            direction = '+' if delta > 0 else '-'
 
-            adjust_motor(
-                motor_index=motor_hwp_index,
-                current_value=self.polarimeter_box.data.ellipticity,
-                target_value=self.target_ellipticity,
-                direction_attr='motor_2_direction',
-                threshold_small=self.ellipticity_threshold_small,
-                threshold_large=self.ellipticity_threshold_large
-            )
+            if getattr(self, direction_attr) != direction:
+                mcg.motor._motor.stop()
+                setattr(self, direction_attr, direction)
+
+            abs_delta = abs(delta)
+            for threshold, velocity in sorted(thresholds_velocities, reverse=True):
+                if abs_delta > threshold:
+                    if getattr(self, max_velocity_attr) != velocity:
+                        mcg.motor._motor.setup_jog(
+                            mode='continuous',
+                            max_velocity=velocity
+                        )
+                        setattr(self, max_velocity_attr, velocity)
+                    mcg.motor._motor.jog(
+                        direction=direction,
+                        kind='builtin'
+                    )
+                    break
+            else:
+                mcg.motor._motor.stop()
+
+        adjust_motor(
+            motor_index=motor_qwp_index,
+            current_value=self.polarimeter_box.data.azimuth,
+            target_value=self.target_azimuth,
+            direction_attr='motor_1_direction',
+            max_velocity_attr='motor_1_jog_max_velocity',
+            thresholds_velocities=self.azimuth_thresholds_velocities
+        )
+
+        adjust_motor(
+            motor_index=motor_hwp_index,
+            current_value=self.polarimeter_box.data.ellipticity,
+            target_value=self.target_ellipticity,
+            direction_attr='motor_2_direction',
+            max_velocity_attr='motor_2_jog_max_velocity',
+            thresholds_velocities=self.ellipticity_thresholds_velocities
+        )
 
         return True
+
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
