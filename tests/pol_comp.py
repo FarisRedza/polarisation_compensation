@@ -1,7 +1,7 @@
 import threading
 import time
 
-import motor.motor as motor
+import motor.motor as thorlabs_motor
 import polarimeter.polarimeter as polarimeter
 
 def polarimeter_measure(pax: polarimeter.Polarimeter, data: list[polarimeter.Data]) -> None:
@@ -15,7 +15,7 @@ def polarimeter_measure(pax: polarimeter.Polarimeter, data: list[polarimeter.Dat
     print('Stop taking data')
 
 def main():
-    stage = motor.Motor(serial_number=55356974)
+    stage = thorlabs_motor.Motor(serial_number=55356974)
     pax = polarimeter.Polarimeter(
         id='1313:8031',
         serial_number='M00910360'

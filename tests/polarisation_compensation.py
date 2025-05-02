@@ -3,7 +3,7 @@ import threading
 import pprint
 
 import polarimeter.polarimeter as polarimeter
-import motor.motor as motor
+import motor.motor as thorlabs_motor
 
 def polarimeter_measure(pax: polarimeter.Polarimeter, data: list[polarimeter.Data]) -> None:
     while True:
@@ -15,7 +15,7 @@ def polarimeter_measure(pax: polarimeter.Polarimeter, data: list[polarimeter.Dat
     pax.disconnect()
     print('Stop taking data')
 
-def move_motor(motor: motor.Motor, data: list[polarimeter.Data]) -> None:
+def move_motor(motor: thorlabs_motor.Motor, data: list[polarimeter.Data]) -> None:
     while True:
         if data[0].azimuth > 0:
             print('moving motor cw')
@@ -40,7 +40,7 @@ def main():
     )
     pax_thread.start()
 
-    motor_1 = motor.Motor(
+    motor_1 = thorlabs_motor.Motor(
         serial_number=55356974
     )
     motor_thread = threading.Thread(

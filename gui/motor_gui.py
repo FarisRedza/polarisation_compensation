@@ -14,7 +14,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import motor.motor as motor
+import motor.motor as thorlabs_motor
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
@@ -46,7 +46,7 @@ class MainWindow(Adw.ApplicationWindow):
         add_motor_group = Adw.PreferencesGroup(title='Motors')
         add_motor_page.add(add_motor_group)
 
-        motors = motor.list_thorlabs_motors()
+        motors = thorlabs_motor.list_thorlabs_motors()
         for i in motors:
             add_motor_row = Adw.ActionRow(
                 title=i.get_device_info().notes,
@@ -78,7 +78,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_add_motor(self, button, serial_number):
         self.motor_control_box = motor_box.MotorControlPage(
-            motor=motor.Motor(serial_number=serial_number)
+            motor=thorlabs_motor.Motor(serial_number=serial_number)
         )
         self.main_stack.add_titled(
             child=self.motor_control_box,

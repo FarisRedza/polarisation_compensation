@@ -1,6 +1,5 @@
 import sys
 import os
-import threading
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -13,10 +12,10 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import motor.motor as motor
+import motor.motor as thorlabs_motor
 
 class MotorControls(Adw.PreferencesGroup):
-    def __init__(self, motor: motor.Motor):
+    def __init__(self, motor: thorlabs_motor.Motor) -> None:
         super().__init__()
         self.set_title(title='Motor Controls')
         self.motor = motor
@@ -29,10 +28,10 @@ class MotorControls(Adw.PreferencesGroup):
         enable_controls_row = Adw.ActionRow(title='Enable motor controls')
         self.add(child=enable_controls_row)
 
-        enable_controls_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
-        enable_controls_switch.connect('notify::active', self.on_enable_controls)
-        enable_controls_row.add_suffix(widget=enable_controls_switch)
-        enable_controls_row.set_activatable_widget(widget=enable_controls_switch)
+        self.enable_controls_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        self.enable_controls_switch.connect('notify::active', self.on_enable_controls)
+        enable_controls_row.add_suffix(widget=self.enable_controls_switch)
+        enable_controls_row.set_activatable_widget(widget=self.enable_controls_switch)
 
         # position
         position_row = Adw.ActionRow(title='Position')
@@ -130,7 +129,7 @@ class MotorControls(Adw.PreferencesGroup):
 
         GLib.timeout_add(100, self.update_motor_info)
 
-    def on_enable_controls(self, switch, gparam):
+    def on_enable_controls(self, switch: Gtk.Switch, gparam):
         self.manual_motor_control = not self.manual_motor_control
         self.step_size_entry.set_sensitive(switch.get_active())
         self.acceleration_entry.set_sensitive(switch.get_active())
@@ -143,7 +142,7 @@ class MotorControls(Adw.PreferencesGroup):
         self.position_label.set_text(f'{self.motor.position:.3f}')
         return True
     
-    def on_set_step_size(self, entry):
+    def on_set_step_size(self, entry: Gtk.Entry):
         try:
             value = abs(float(entry.get_text()))
         except:
@@ -151,7 +150,7 @@ class MotorControls(Adw.PreferencesGroup):
         else:
             self.motor_step_size = value
 
-    def on_set_acceleration(self, entry):
+    def on_set_acceleration(self, entry: Gtk.Entry):
         try:
             value = abs(float(entry.get_text()))
         except:
@@ -162,7 +161,7 @@ class MotorControls(Adw.PreferencesGroup):
             else:
                 self.motor_acceleration = value
 
-    def on_set_max_velocity(self, entry):
+    def on_set_max_velocity(self, entry: Gtk.Entry):
         try:
             value = abs(float(entry.get_text()))
         except:
@@ -173,21 +172,21 @@ class MotorControls(Adw.PreferencesGroup):
             else:
                 self.motor_max_velocity = value
 
-    def rotate_motor_ccw(self, button):
+    def rotate_motor_ccw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
             angle=-self.motor_step_size,
             acceleration=self.motor_acceleration,
             max_velocity=self.motor_max_velocity
         )
 
-    def rotate_motor_0(self, button):
+    def rotate_motor_0(self, button: Gtk.Button):
         self.motor.threaded_move_to(
             position=0,
             acceleration=self.motor_acceleration,
             max_velocity=self.motor_max_velocity
         )
 
-    def rotate_motor_cw(self, button):
+    def rotate_motor_cw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
             angle=self.motor_step_size,
             acceleration=self.motor_acceleration,
@@ -195,7 +194,7 @@ class MotorControls(Adw.PreferencesGroup):
         )
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
-    def __init__(self, motor: motor.Motor):
+    def __init__(self, motor: thorlabs_motor.Motor) -> None:
         super().__init__()
         self.set_title(title='Motor Info')
         self.motor = motor
@@ -229,7 +228,7 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
         device_name_row.add_suffix(widget=self.device_name_label)
 
 class MotorControlPage(Adw.PreferencesPage):
-    def __init__(self, motor: motor.Motor):
+    def __init__(self, motor: thorlabs_motor.Motor) -> None:
         super().__init__()
 
         self.motor_controls_group = MotorControls(motor=motor)

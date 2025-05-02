@@ -9,6 +9,7 @@ from gi.repository import Gtk, Adw, GLib
 
 import polarisation_box
 import gui.motor_box as motor_box
+import pol_compensation
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -17,23 +18,32 @@ sys.path.append(
     ))
 )
 import polarimeter.polarimeter as polarimeter
-import motor.motor as motor
+import motor.motor as thorlabs_motor
 
 class PolCompPage(Adw.PreferencesPage):
     class MotorWP(enum.Enum):
         QWP = 55353314  # azimuth
         HWP = 55356974  # ellipticity
 
-    def __init__(self, polarimeter_box: polarisation_box.PolarimeterBox, motor_controllers: list[motor_box.MotorControls]):
+    def __init__(
+            self,
+            polarimeter_box: polarisation_box.PolarimeterBox,
+            motor_controllers: list[motor_box.MotorControlPage]
+    ) -> None:
         super().__init__()
         self.polarimeter_box = polarimeter_box
-        self.motor_controllers = motor_controllers
-        self.enable_compensation = False
-        self.motor_1_direction = '+'
-        self.motor_2_direction = '+'
+        self.motor_controllers = [m.motor_controls_group for m in motor_controllers]
 
-        self.motor_1_jog_max_velocity = 0
-        self.motor_2_jog_max_velocity = 0
+        for mc in self.motor_controllers:
+            mc.enable_controls_switch.connect(
+                'notify::active',
+                self.on_update_available_motors
+            )
+
+        self.enable_compensation = False
+        self.available_motors = [
+            m.motor for m in self.motor_controllers if m.manual_motor_control == False
+        ]
 
         self.target_azimuth = 0
         self.target_ellipticity = 0
@@ -54,16 +64,21 @@ class PolCompPage(Adw.PreferencesPage):
         ]
 
         pol_comp_group = Adw.PreferencesGroup(title='Polarisation Compensation')
-        self.add(pol_comp_group)
+        self.add(group=pol_comp_group)
 
         # enable compensation
         enable_compensation_row = Adw.ActionRow(title='Enable compensation')
         pol_comp_group.add(child=enable_compensation_row)
 
         enable_compensation_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
-        enable_compensation_switch.connect('notify::active', self.on_enable_compensation)
+        enable_compensation_switch.connect(
+            'notify::active',
+            self.on_enable_compensation
+        )
         enable_compensation_row.add_suffix(widget=enable_compensation_switch)
-        enable_compensation_row.set_activatable_widget(widget=enable_compensation_switch)
+        enable_compensation_row.set_activatable_widget(
+            widget=enable_compensation_switch
+        )
 
         # azimuth
         target_azimuth_row = Adw.ActionRow(title='Target azimuth')
@@ -74,7 +89,10 @@ class PolCompPage(Adw.PreferencesPage):
             valign=Gtk.Align.CENTER,
         )
         target_azimuth_row.add_suffix(widget=self.target_azimuth_entry)
-        self.target_azimuth_entry.connect('activate', self.on_set_target_azimuth)
+        self.target_azimuth_entry.connect(
+            'activate',
+            self.on_set_target_azimuth
+        )
 
         # ellipticity
         target_ellipticity_row = Adw.ActionRow(title='Target ellipticity')
@@ -85,37 +103,20 @@ class PolCompPage(Adw.PreferencesPage):
             valign=Gtk.Align.CENTER,
         )
         target_ellipticity_row.add_suffix(widget=self.target_ellipticity_entry)
-        self.target_ellipticity_entry.connect('activate', self.on_set_target_ellipticity)
-
-        # qwp
-        motor_qwp_row = Adw.ActionRow(
-            title='QWP motor',
-            subtitle='Azimuth'
+        self.target_ellipticity_entry.connect(
+            'activate',
+            self.on_set_target_ellipticity
         )
-        pol_comp_group.add(motor_qwp_row)
-
-        motor_qwp_label = Gtk.Label(label=self.MotorWP.QWP.value)
-        motor_qwp_row.add_suffix(widget=motor_qwp_label)
-
-        # hwp
-        motor_hwp_row = Adw.ActionRow(
-            title='HWP motor',
-            subtitle='Ellipticity'
-        )
-        pol_comp_group.add(motor_hwp_row)
-
-        motor_hwp_label = Gtk.Label(label=self.MotorWP.HWP.value)
-        motor_hwp_row.add_suffix(widget=motor_hwp_label)
 
         GLib.timeout_add(
             interval=100,
             function=self.pol_comp
         )
 
-    def on_enable_compensation(self, switch, gparam):
+    def on_enable_compensation(self, switch: Gtk.Switch, gparam):
         self.enable_compensation = not self.enable_compensation
 
-    def on_set_target_azimuth(self, entry):
+    def on_set_target_azimuth(self, entry: Gtk.Entry):
         try:
             value = float(entry.get_text())
         except:
@@ -123,7 +124,7 @@ class PolCompPage(Adw.PreferencesPage):
         else:
             self.target_azimuth = value
 
-    def on_set_target_ellipticity(self, entry):
+    def on_set_target_ellipticity(self, entry: Gtk.Entry):
         try:
             value = float(entry.get_text())
         except:
@@ -131,71 +132,29 @@ class PolCompPage(Adw.PreferencesPage):
         else:
             self.target_ellipticity = value
 
-    def pol_comp(self) -> bool:
+    def on_update_available_motors(self, switch: Gtk.Entry, gparam):
+        self.available_motors = [
+            m.motor for m in self.motor_controllers if m.manual_motor_control == False
+        ]
+
+    def pol_comp(
+            self
+    ) -> bool:
         if not self.enable_compensation:
             return True
-
-        motor_list: list[motor.Motor] = [m.motor_controls_group.motor for m in self.motor_controllers]
-        motor_qwp_index = next((i for i, m in enumerate(motor_list) if m.serial_no == self.MotorWP.QWP.value), -1)
-        motor_hwp_index = next((i for i, m in enumerate(motor_list) if m.serial_no == self.MotorWP.HWP.value), -1)
-
-        def adjust_motor(
-                motor_index: int,
-                current_value: float,
-                target_value: float,
-                direction_attr: str,
-                max_velocity_attr: str,
-                thresholds_velocities: list[tuple[float, int]]
-        ) -> None:
-            mcg: motor_box.MotorControls = self.motor_controllers[motor_index].motor_controls_group
-            if mcg.manual_motor_control:
-                return
-
-            mcg.motor.position = mcg.motor._motor.get_position()
-            delta = current_value - target_value
-            direction = '+' if delta > 0 else '-'
-
-            if getattr(self, direction_attr) != direction:
-                mcg.motor._motor.stop()
-                setattr(self, direction_attr, direction)
-
-            abs_delta = abs(delta)
-            for threshold, velocity in sorted(thresholds_velocities, reverse=True):
-                if abs_delta > threshold:
-                    if getattr(self, max_velocity_attr) != velocity:
-                        mcg.motor._motor.setup_jog(
-                            mode='continuous',
-                            max_velocity=velocity
-                        )
-                        setattr(self, max_velocity_attr, velocity)
-                    mcg.motor._motor.jog(
-                        direction=direction,
-                        kind='builtin'
-                    )
-                    break
-            else:
-                mcg.motor._motor.stop()
-
-        adjust_motor(
-            motor_index=motor_qwp_index,
-            current_value=self.polarimeter_box.data.azimuth,
-            target_value=self.target_azimuth,
-            direction_attr='motor_1_direction',
-            max_velocity_attr='motor_1_jog_max_velocity',
-            thresholds_velocities=self.azimuth_thresholds_velocities
-        )
-
-        adjust_motor(
-            motor_index=motor_hwp_index,
-            current_value=self.polarimeter_box.data.ellipticity,
-            target_value=self.target_ellipticity,
-            direction_attr='motor_2_direction',
-            max_velocity_attr='motor_2_jog_max_velocity',
-            thresholds_velocities=self.ellipticity_thresholds_velocities
+        pol_compensation.pol_comp(
+            motor_list=self.available_motors,
+            motor_qwp_serial_no=self.MotorWP.QWP.value,
+            motor_hwp_serial_no=self.MotorWP.HWP.value,
+            target_azimuth=self.target_azimuth,
+            target_ellipticity=self.target_ellipticity,
+            azimuth_thresholds_velocities=self.azimuth_thresholds_velocities,
+            ellipticity_thresholds_velocities=self.ellipticity_thresholds_velocities,
+            current_azimuth=self.polarimeter_box.data.azimuth,
+            current_ellipticity=self.polarimeter_box.data.ellipticity
         )
 
         return True
-
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
@@ -203,7 +162,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_title(title='Polarisation Compensation')
         self.set_default_size(width=1300, height=800)
         self.set_size_request(width=1250, height=300)
-        self.connect("close-request", self.on_close_request)
+        self.connect(
+            'close-request',
+            self.on_close_request
+        )
 
         # main box
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -222,12 +184,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_box.append(child=self.polarimeter_box)
 
         ### init motor control boxes
-        self.motors = motor.list_thorlabs_motors()
+        self.motors = thorlabs_motor.list_thorlabs_motors()
         self.motor_controllers: list[motor_box.MotorControlPage] = []
         for i, m in enumerate(self.motors):
             self.motor_controllers.append(
                 motor_box.MotorControlPage(
-                    motor=motor.Motor(
+                    motor=thorlabs_motor.Motor(
                         serial_number=m.get_device_info().serial_no
                     )
                 )

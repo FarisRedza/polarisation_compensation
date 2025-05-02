@@ -20,27 +20,33 @@ sys.path.append(
 import polarimeter.polarimeter as polarimeter
 
 class ColumnOne(Adw.PreferencesPage):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         self.plot_ellipse_group = PolEllipseGroup()
-        self.add(self.plot_ellipse_group)
+        self.add(group=self.plot_ellipse_group)
 
         self.plot_bloch_group = BlochSphere3D()
-        self.add(self.plot_bloch_group)
+        self.add(group=self.plot_bloch_group)
 
 class PolEllipseGroup(Adw.PreferencesGroup):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(title='Polarisation Ellipse')
 
         self.fig, self.ax = matplotlib.pyplot.subplots()
-        self.ax.set_aspect('equal')
+        self.ax.set_aspect(aspect='equal')
         self.ax.axis('off')
         self.fig.tight_layout()
 
         # circle
-        circle = matplotlib.pyplot.Circle((0, 0), 1.0, color='gray', fill=False, linewidth=1)
-        self.ax.add_patch(circle)
+        circle = matplotlib.pyplot.Circle(
+            xy=(0, 0),
+            radius=1.0,
+            color='gray',
+            fill=False,
+            linewidth=1
+        )
+        self.ax.add_patch(p=circle)
 
         # circle cross
         self.ax.plot([-1, 1], [0, 0], color='gray', linewidth=1)
@@ -50,16 +56,22 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.major_axis, = self.ax.plot([], [], color='blue')
         self.minor_axis, = self.ax.plot([], [], color='blue')
 
-        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
-        self.canvas.set_size_request(200, 200)
-        self.add(self.canvas)
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
+            figure=self.fig
+        )
+        self.canvas.set_size_request(width=200, height=200)
+        self.add(child=self.canvas)
 
-    def update_plot(self, data: polarimeter.Data):
+    def update_plot(self, data: polarimeter.Data) -> None:
         theta = numpy.radians(data.azimuth)
         eta = numpy.radians(data.ellipticity)
 
         ## parametric angle
-        t = numpy.linspace(0, 2 * numpy.pi, 500)
+        t = numpy.linspace(
+            start=0,
+            stop=2 * numpy.pi,
+            num=500
+        )
         
         ## semi-axes
         a = 1
@@ -158,7 +170,7 @@ class BlochSphere2D(Gtk.Box):
 
 
 class BlochSphere3D(Adw.PreferencesGroup):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(title='Bloch Sphere')
         
         self.fig = matplotlib.figure.Figure(figsize=(4, 4))
@@ -168,11 +180,19 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.fig.tight_layout()
 
         # sphere surface
-        u = numpy.linspace(0, 2 * numpy.pi, 50)
-        v = numpy.linspace(0, numpy.pi, 50)
-        x = numpy.outer(numpy.cos(u), numpy.sin(v))
-        y = numpy.outer(numpy.sin(u), numpy.sin(v))
-        z = numpy.outer(numpy.ones_like(u), numpy.cos(v))
+        u = numpy.linspace(
+            start=0,
+            stop=2 * numpy.pi,
+            num=50
+        )
+        v = numpy.linspace(
+            start=0,
+            stop=numpy.pi,
+            num=50
+        )
+        x = numpy.outer(a=numpy.cos(u), b=numpy.sin(v))
+        y = numpy.outer(a=numpy.sin(u), b=numpy.sin(v))
+        z = numpy.outer(a=numpy.ones_like(u), b=numpy.cos(v))
         self.ax.plot_wireframe(x, y, z, color='lightgray', linewidth=0.5, alpha=0.3)
 
         self.ax.plot3D([-1, 1], [0, 0], [0, 0], color='gray', linestyle='--', linewidth=1)
@@ -197,8 +217,8 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.point = self.ax.plot([0], [0], [0], 'o', color='blue', markersize=6)[0]
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
-        self.canvas.set_size_request(200, 200)
-        self.add(self.canvas)
+        self.canvas.set_size_request(width=200, height=200)
+        self.add(child=self.canvas)
 
     def is_behind_camera(self, x, y, z):
         # Get current 3D projection matrix
@@ -212,7 +232,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
         return transformed[2] < 0
 
 
-    def update_point(self, data: polarimeter.Data):
+    def update_point(self, data: polarimeter.Data) -> None:
         x = data.normalised_s1
         y = data.normalised_s2
         z = data.normalised_s3
@@ -233,7 +253,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
 
 class MeasurementGroup(Adw.PreferencesGroup):
-    def __init__(self, data: polarimeter.Data):
+    def __init__(self, data: polarimeter.Data) -> None:
         super().__init__(title='Measurement Value Table')
 
         data_row = Adw.ActionRow()
@@ -512,29 +532,33 @@ class MeasurementGroup(Adw.PreferencesGroup):
         self.circularity_value_label.set_text(f'{data.circularity:.2f} %')
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
-    def __init__(self, polarimeter: polarimeter.Polarimeter):
+    def __init__(self, polarimeter: polarimeter.Polarimeter) -> None:
         super().__init__(title='Polarimeter Info')
 
         # serial number
         serial_no_row = Adw.ActionRow(title='Serial number')
-        self.add(serial_no_row)
+        self.add(child=serial_no_row)
         serial_no_label = Gtk.Label(label=polarimeter.device_info.serial_number)
         serial_no_row.add_suffix(widget=serial_no_label)
 
         # model number
         model_no_row = Adw.ActionRow(title='Model number')
-        self.add(model_no_row)
+        self.add(child=model_no_row)
         model_no_label = Gtk.Label(label=polarimeter.device_info.model)
         model_no_row.add_suffix(widget=model_no_label)
 
         # firmware
         fw_ver_row = Adw.ActionRow(title='Firmware version')
-        self.add(fw_ver_row)
+        self.add(child=fw_ver_row)
         fw_ver_label = Gtk.Label(label=polarimeter.device_info.firmware_version)
         fw_ver_row.add_suffix(widget=fw_ver_label)
 
 class ColumnTwo(Adw.PreferencesPage):
-    def __init__(self, polarimeter: polarimeter.Polarimeter, data: polarimeter.Data):
+    def __init__(
+            self,
+            polarimeter: polarimeter.Polarimeter,
+            data: polarimeter.Data
+    ) -> None:
         super().__init__()
         self.data = data
 
@@ -545,7 +569,7 @@ class ColumnTwo(Adw.PreferencesPage):
         self.add(self.polarimeter_group)
 
 class PolarimeterBox(Gtk.Box):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
         self.pax = polarimeter.Polarimeter(
@@ -556,12 +580,18 @@ class PolarimeterBox(Gtk.Box):
         self.data = polarimeter.Data()
 
         self.plot_box = ColumnOne()
-        self.append(self.plot_box)
+        self.append(child=self.plot_box)
 
-        self.columntwo = ColumnTwo(polarimeter=self.pax,data=self.data)
-        self.append(self.columntwo)
+        self.columntwo = ColumnTwo(
+            polarimeter=self.pax,
+            data=self.data
+        )
+        self.append(child=self.columntwo)
 
-        GLib.timeout_add(100, self.update_from_polarimeter)
+        GLib.timeout_add(
+            interval=100,
+            function=self.update_from_polarimeter
+        )
 
     def update_from_polarimeter(self) -> bool:
         self.data = self.pax.measure().to_data()
