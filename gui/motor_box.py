@@ -1,5 +1,6 @@
 import sys
 import os
+import typing
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -15,14 +16,28 @@ sys.path.append(
 import motor.motor as thorlabs_motor
 
 class MotorControls(Adw.PreferencesGroup):
-    def __init__(self, motor: thorlabs_motor.Motor) -> None:
-        super().__init__()
-        self.set_title(title='Motor Controls')
+    def __init__(
+            self,
+            motor: thorlabs_motor.Motor,
+            get_position_callback: typing.Callable,
+            set_step_size_callback: typing.Callable,
+            get_step_size_callback: typing.Callable,
+            set_acceleration_callback: typing.Callable,
+            get_acceleration_callback: typing.Callable,
+            set_max_velocity_callback: typing.Callable,
+            get_max_velocity_callback: typing.Callable
+    ) -> None:
+        super().__init__(title='Motor Controls')
+        self.get_position_callback = get_position_callback
+        self.set_step_size_callback = set_step_size_callback
+        self.get_step_size_callback = get_step_size_callback
+        self.set_acceleration_callback = set_acceleration_callback
+        self.get_acceleration_callback = get_acceleration_callback
+        self.set_max_velocity_callback = set_max_velocity_callback
+        self.get_max_velocity_callback = get_max_velocity_callback
+
         self.motor = motor
         self.manual_motor_control = False
-        self.motor_step_size = 5
-        self.motor_acceleration = 20
-        self.motor_max_velocity = 25
 
         # enable controls
         enable_controls_row = Adw.ActionRow(title='Enable motor controls')
@@ -37,7 +52,7 @@ class MotorControls(Adw.PreferencesGroup):
         position_row = Adw.ActionRow(title='Position')
         self.add(child=position_row)
 
-        self.position_label = Gtk.Label(label=f'{self.motor._motor.get_position():.3f}')
+        self.position_label = Gtk.Label(label=f'{self.get_position_callback():.3f}')
         position_row.add_suffix(widget=self.position_label)
 
         # step size
@@ -45,7 +60,7 @@ class MotorControls(Adw.PreferencesGroup):
         self.add(child=step_size_row)
 
         self.step_size_entry = Gtk.Entry(
-            text=self.motor_step_size,
+            text=self.get_step_size_callback(),
             valign=Gtk.Align.CENTER,
             sensitive=False
         )
@@ -57,7 +72,7 @@ class MotorControls(Adw.PreferencesGroup):
         self.add(child=acceleration_row)
 
         self.acceleration_entry = Gtk.Entry(
-            text=self.motor_acceleration,
+            text=get_acceleration_callback(),
             placeholder_text = 'Max value: 20',
             valign=Gtk.Align.CENTER,
             sensitive=False
@@ -70,7 +85,7 @@ class MotorControls(Adw.PreferencesGroup):
         self.add(child=max_velocity_row)
 
         self.max_velocity_entry = Gtk.Entry(
-            text=self.motor_max_velocity,
+            text=self.get_max_velocity_callback(),
             placeholder_text = 'Max value: 25',
             valign=Gtk.Align.CENTER,
             sensitive=False
@@ -127,7 +142,10 @@ class MotorControls(Adw.PreferencesGroup):
         control_grid.attach(self.cw_button, 3, 1, 1, 1)
         self.cw_button.connect('clicked', self.rotate_motor_cw)
 
-        GLib.timeout_add(100, self.update_motor_info)
+        GLib.timeout_add(
+            interval=100,
+            function=self.update_motor_info
+        )
 
     def on_enable_controls(self, switch: Gtk.Switch, gparam):
         self.manual_motor_control = not self.manual_motor_control
@@ -139,7 +157,7 @@ class MotorControls(Adw.PreferencesGroup):
         self.cw_button.set_sensitive(switch.get_active())
 
     def update_motor_info(self) -> bool:
-        self.position_label.set_text(f'{self.motor.position:.3f}')
+        self.position_label.set_text(f'{self.get_position_callback():.3f}')
         return True
     
     def on_set_step_size(self, entry: Gtk.Entry):
@@ -148,7 +166,7 @@ class MotorControls(Adw.PreferencesGroup):
         except:
             print(f'Invalid entry: {entry.get_text()}')
         else:
-            self.motor_step_size = value
+            self.set_step_size_callback(value=value)
 
     def on_set_acceleration(self, entry: Gtk.Entry):
         try:
@@ -157,9 +175,9 @@ class MotorControls(Adw.PreferencesGroup):
             print(f'Invalid entry: {entry.get_text()}')
         else:
             if value > 20:
-                self.motor_acceleration = 20
+                print(f'Invalid entry: {entry.get_text()}')
             else:
-                self.motor_acceleration = value
+                self.set_acceleration_callback(value=value)
 
     def on_set_max_velocity(self, entry: Gtk.Entry):
         try:
@@ -168,71 +186,110 @@ class MotorControls(Adw.PreferencesGroup):
             print(f'Invalid entry: {entry.get_text()}')
         else:
             if value > 25:
-                self.motor_max_velocity = 25
+                print(f'Invalid entry: {entry.get_text()}')
             else:
-                self.motor_max_velocity = value
+                self.set_max_velocity_callback(value=value)
 
     def rotate_motor_ccw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
-            angle=-self.motor_step_size,
-            acceleration=self.motor_acceleration,
-            max_velocity=self.motor_max_velocity
+            angle=-self.get_step_size_callback(),
+            acceleration=self.get_acceleration_callback(),
+            max_velocity=self.get_max_velocity_callback()
         )
 
     def rotate_motor_0(self, button: Gtk.Button):
         self.motor.threaded_move_to(
             position=0,
-            acceleration=self.motor_acceleration,
-            max_velocity=self.motor_max_velocity
+            acceleration=self.get_acceleration_callback(),
+            max_velocity=self.get_max_velocity_callback()
         )
 
     def rotate_motor_cw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
-            angle=self.motor_step_size,
-            acceleration=self.motor_acceleration,
-            max_velocity=self.motor_max_velocity
+            angle=self.get_step_size_callback(),
+            acceleration=self.get_acceleration_callback(),
+            max_velocity=self.get_max_velocity_callback()
         )
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
-    def __init__(self, motor: thorlabs_motor.Motor) -> None:
+    def __init__(
+            self,
+            get_device_info_callback: typing.Callable
+    ) -> None:
         super().__init__()
         self.set_title(title='Motor Info')
-        self.motor = motor
+        device_info: thorlabs_motor.DeviceInfo = get_device_info_callback()
 
         # serial number
         serial_no_row = Adw.ActionRow(title='Serial number')
         self.add(child=serial_no_row)
 
-        self.serial_no_label = Gtk.Label(label=self.motor._motor.get_device_info().serial_no)
+        self.serial_no_label = Gtk.Label(label=device_info.serial_number)
         serial_no_row.add_suffix(widget=self.serial_no_label)
 
         # model number
         model_no_row = Adw.ActionRow(title='Model number')
         self.add(child=model_no_row)
 
-        self.model_no_label = Gtk.Label(label=self.motor._motor.get_device_info().model_no)
+        self.model_no_label = Gtk.Label(label=device_info.model)
         model_no_row.add_suffix(widget=self.model_no_label)
 
         # firmware
         fw_ver_row = Adw.ActionRow(title='Firmware version')
         self.add(child=fw_ver_row)
 
-        self.fw_ver_label = Gtk.Label(label=self.motor._motor.get_device_info().fw_ver)
+        self.fw_ver_label = Gtk.Label(label=device_info.firmware_version)
         fw_ver_row.add_suffix(widget=self.fw_ver_label)
 
         # device_name
         device_name_row = Adw.ActionRow(title='Device name')
         self.add(child=device_name_row)
 
-        self.device_name_label = Gtk.Label(label=self.motor._motor.get_device_info().notes)
+        self.device_name_label = Gtk.Label(label=device_info.device_name)
         device_name_row.add_suffix(widget=self.device_name_label)
 
 class MotorControlPage(Adw.PreferencesPage):
     def __init__(self, motor: thorlabs_motor.Motor) -> None:
         super().__init__()
+        self.motor = motor
 
-        self.motor_controls_group = MotorControls(motor=motor)
+        self.motor_controls_group = MotorControls(
+            motor=motor,
+            get_position_callback=self.get_position,
+            set_step_size_callback=self.set_step_size,
+            get_step_size_callback=self.get_step_size,
+            set_acceleration_callback=self.set_acceleration,
+            get_acceleration_callback=self.get_acceleration,
+            set_max_velocity_callback=self.set_max_velocity,
+            get_max_velocity_callback=self.get_max_velocity
+        )
         self.add(self.motor_controls_group)
 
-        device_info_group = DeviceInfoGroup(motor=motor)
+        device_info_group = DeviceInfoGroup(
+            get_device_info_callback=self.get_device_info
+        )
         self.add(device_info_group)
+
+    def get_device_info(self) -> thorlabs_motor.DeviceInfo:
+        return self.motor.device_info
+    
+    def get_position(self) -> float:
+        return self.motor.position
+
+    def set_step_size(self, value: float) -> None:
+        self.motor.step_size = value
+
+    def get_step_size(self) -> float:
+        return self.motor.step_size
+
+    def set_acceleration(self, value: float) -> None:
+        self.motor.acceleration = value
+
+    def get_acceleration(self) -> float:
+        return self.motor.acceleration
+    
+    def set_max_velocity(self, value: float) -> None:
+        self.motor.max_velocity = value
+
+    def get_max_velocity(self) -> float:
+        return self.motor.max_velocity

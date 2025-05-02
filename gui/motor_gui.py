@@ -76,7 +76,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         add_motor_button.connect('clicked', self.on_add_motor)
 
-    def on_add_motor(self, button, serial_number):
+    def on_add_motor(self, button: Gtk.Button, serial_number):
         self.motor_control_box = motor_box.MotorControlPage(
             motor=thorlabs_motor.Motor(serial_number=serial_number)
         )
@@ -87,7 +87,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self.main_stack.set_visible_child(child=self.motor_control_box)
 
-    def on_close_request(self, window) -> bool:
+    def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         return False
 
 class App(Adw.Application):
