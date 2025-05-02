@@ -2,9 +2,9 @@ import threading
 import time
 
 import motor.motor as thorlabs_motor
-import polarimeter.polarimeter as polarimeter
+import polarimeter.polarimeter as scpi_polarimeter
 
-def polarimeter_measure(pax: polarimeter.Polarimeter, data: list[polarimeter.Data]) -> None:
+def polarimeter_measure(pax: scpi_polarimeter.Polarimeter, data: list[scpi_polarimeter.Data]) -> None:
     while True:
         for i in range(len(data)):
             data[i] = pax.measure().to_data()
@@ -16,11 +16,11 @@ def polarimeter_measure(pax: polarimeter.Polarimeter, data: list[polarimeter.Dat
 
 def main():
     stage = thorlabs_motor.Motor(serial_number=55356974)
-    pax = polarimeter.Polarimeter(
+    pax = scpi_polarimeter.Polarimeter(
         id='1313:8031',
         serial_number='M00910360'
     )
-    data = [polarimeter.Data()]
+    data = [scpi_polarimeter.Data()]
     pax_thread = threading.Thread(
         target=polarimeter_measure,
         args=(pax, data)

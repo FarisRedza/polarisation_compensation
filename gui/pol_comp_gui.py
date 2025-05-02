@@ -17,7 +17,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.polarimeter as polarimeter
+import polarimeter.polarimeter as scpi_polarimeter
 import motor.motor as thorlabs_motor
 
 class PolCompPage(Adw.PreferencesPage):
@@ -209,7 +209,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def on_close_request(self, window) -> bool:
-        self.polarimeter_box.pax.disconnect()
+        self.polarimeter_box.polarimeter.disconnect()
         for i in self.motor_controllers:
             i.motor_controls_group.motor._motor.stop()
         return False
@@ -228,5 +228,5 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        app.win.polarimeter_box.pax.disconnect()
+        app.win.polarimeter_box.polarimeter.disconnect()
         print('App crashed with an exception:', e)

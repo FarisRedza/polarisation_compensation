@@ -391,4 +391,8 @@ class Polarimeter(SCPIDevice):
 if __name__ == '__main__':
     pax = Polarimeter(id='1313:8031', serial_number='M00910360')
     pprint.pprint(pax.device_info)
+    pax.set_wavelength(wavelength=6.350000000000001e-07)
+    print(pax.measure().wavelength)
+    pax.set_wavelength(wavelength=7.000000000000001e-07)
+    print(pax.measure().wavelength)
     

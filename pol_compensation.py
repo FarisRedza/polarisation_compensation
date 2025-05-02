@@ -1,4 +1,4 @@
-import polarimeter.polarimeter as polarimeter
+import polarimeter.polarimeter as scpi_polarimeter
 import motor.motor as thorlabs_motor
 
 def pol_comp(

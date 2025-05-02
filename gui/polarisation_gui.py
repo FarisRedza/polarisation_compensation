@@ -14,7 +14,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.polarimeter as polarimeter
+import polarimeter.polarimeter as scpi_polarimeter
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
@@ -36,9 +36,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.polarimeter_box = polarisation_box.PolarimeterBox()
         main_box.append(child=self.polarimeter_box)
 
-    def on_close_request(self, window) -> bool:
+    def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         try:
-            self.polarimeter_box.pax.disconnect()
+            self.polarimeter_box.polarimeter.disconnect()
         except Exception as e:
             print('Error: Polarimeter already disconnected')
         return False
@@ -48,7 +48,7 @@ class App(Adw.Application):
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 
-    def on_activate(self, app):
+    def on_activate(self, app: Adw.Application):
         self.win = MainWindow(application=app)
         self.win.present()
 
@@ -57,5 +57,5 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        app.win.polarimeter_box.pax.disconnect()
+        app.win.polarimeter_box.polarimeter.disconnect()
         print('App crashed with an exception:', e)
