@@ -5,7 +5,7 @@ import typing
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Gtk, Adw, GLib, GObject
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -147,7 +147,11 @@ class MotorControls(Adw.PreferencesGroup):
             function=self.update_motor_info
         )
 
-    def on_enable_controls(self, switch: Gtk.Switch, gparam):
+    def on_enable_controls(
+            self,
+            switch: Gtk.Switch,
+            gparam: GObject.GParamSpec
+    ) -> None:
         self.manual_motor_control = not self.manual_motor_control
         self.step_size_entry.set_sensitive(switch.get_active())
         self.acceleration_entry.set_sensitive(switch.get_active())

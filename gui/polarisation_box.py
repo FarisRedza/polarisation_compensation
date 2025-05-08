@@ -47,15 +47,15 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.ax.plot([-1, 1], [0, 0], color='gray', linewidth=1)
         self.ax.plot([0, 0], [-1, 1], color='gray', linewidth=1)
 
-        self.ellipse, = self.ax.plot([], [], color='blue')
-        self.major_axis, = self.ax.plot([], [], color='blue')
-        self.minor_axis, = self.ax.plot([], [], color='blue')
+        self.ellipse = self.ax.plot([], [], color='blue')[0]
+        self.major_axis = self.ax.plot([], [], color='blue')[0]
+        self.minor_axis = self.ax.plot([], [], color='blue')[0]
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
             figure=self.fig
         )
         self.canvas.set_size_request(width=200, height=200)
-        self.add(child=self.canvas)
+        self.add(child=Gtk.Frame(child=self.canvas))
 
     def update_plot(self) -> None:
         data: scpi_polarimeter.Data = self.get_data_callback()
@@ -219,7 +219,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
         self.canvas.set_size_request(width=200, height=200)
-        self.add(child=self.canvas)
+        self.add(child=Gtk.Frame(child=self.canvas))
 
     def is_behind_camera(self, x, y, z) -> bool:
         # Get current 3D projection matrix
@@ -449,6 +449,18 @@ class MeasurementGroup(Adw.PreferencesGroup):
         )
         data_value_box.append(child=self.normalised_s3_value_label)
 
+        # qber
+        qber_label = Gtk.Label(
+            label='QBER',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=qber_label)
+        self.qber_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.qber_value_label)
+
         # S0
         S0_label = Gtk.Label(
             label='S0',
@@ -548,6 +560,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         self.normalised_s1_value_label.set_text(f'{data.normalised_s1:.2f}')
         self.normalised_s2_value_label.set_text(f'{data.normalised_s2:.2f}')
         self.normalised_s3_value_label.set_text(f'{data.normalised_s3:.2f}')
+        self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
         self.S0_value_label.set_text(f'{data.S0:.2} W')
         self.S1_value_label.set_text(f'{data.S1:.2} W')
         self.S2_value_label.set_text(f'{data.S2:.2} W')
@@ -562,21 +575,29 @@ class DeviceSettingsGroup(Adw.PreferencesGroup):
             set_enable_polarimeter_callback: typing.Callable,
             get_enable_polarimeter_callback: typing.Callable,
             set_wavelength_callback: typing.Callable,
+            get_wavelegnth_callback: typing.Callable,
+            set_poling_interval_callback: typing.Callable,
+            get_poling_interval_callback: typing.Callable,
             get_data_callback: typing.Callable
     ) -> None:
         super().__init__(title='Settings')
-        self.set_wavelength_callback = set_wavelength_callback
+        self.set_enable_polarimeter = set_enable_polarimeter_callback
+        self.get_enable_polarimeter = get_enable_polarimeter_callback
+        self.set_wavelength = set_wavelength_callback
+        self.get_wavelength = get_wavelegnth_callback
+        self.set_poling_interval = set_poling_interval_callback
+        self.get_poling_interval = get_poling_interval_callback
 
         enable_polarimeter_row = Adw.ActionRow(title='Enable polarimeter')
         self.add(child=enable_polarimeter_row)
 
         enable_polarimeter_switch = Gtk.Switch(
             valign=Gtk.Align.CENTER,
-            active=get_enable_polarimeter_callback()
+            active=self.get_enable_polarimeter()
         )
         enable_polarimeter_switch.connect(
-            "notify::active",
-            lambda sw, _: set_enable_polarimeter_callback(sw.get_active())
+            'notify::active',
+            lambda sw, _: self.set_enable_polarimeter(sw.get_active())
         )
         enable_polarimeter_row.add_suffix(
             widget=enable_polarimeter_switch
@@ -598,13 +619,36 @@ class DeviceSettingsGroup(Adw.PreferencesGroup):
         )
         wavelength_row.add_suffix(widget=wavelength_entry)
 
+        poling_interval_row = Adw.ActionRow(title='Poling interval')
+        self.add(child=poling_interval_row)
+        poling_interval_label = Gtk.Entry(
+            text=self.get_poling_interval(),
+            placeholder_text='ms',
+            valign=Gtk.Align.CENTER
+        )
+        poling_interval_label.connect(
+            'activate',
+            self.on_set_poling_interval
+        )
+        poling_interval_row.add_suffix(
+            widget=poling_interval_label
+        )
+
     def on_set_wavelength(self, entry: Gtk.Entry) -> None:
         try:
             value = abs(float(entry.get_text()) * 1e-9)
         except:
             print(f'Invalid entry: {entry.get_text()}')
         else:
-            self.set_wavelength_callback(value=value)
+            self.set_wavelength(value=value)
+
+    def on_set_poling_interval(self, entry: Gtk.Entry) -> None:
+        try:
+            value = abs(float(entry.get_text()))
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.set_poling_interval(value=value)
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
     def __init__(
@@ -638,6 +682,9 @@ class ColumnTwo(Adw.PreferencesPage):
             set_enable_polarimeter_callback: typing.Callable,
             get_enable_polarimeter_callback: typing.Callable,
             set_wavelength_callback: typing.Callable,
+            get_wavelength_callback: typing.Callable,
+            set_poling_interval_callback: typing.Callable,
+            get_poling_interval_callback: typing.Callable,
             get_data_callback: typing.Callable,
             get_device_info_callback: typing.Callable
     ) -> None:
@@ -652,6 +699,9 @@ class ColumnTwo(Adw.PreferencesPage):
             set_enable_polarimeter_callback=set_enable_polarimeter_callback,
             get_enable_polarimeter_callback=get_enable_polarimeter_callback,
             set_wavelength_callback=set_wavelength_callback,
+            get_wavelegnth_callback=get_wavelength_callback,
+            set_poling_interval_callback=set_poling_interval_callback,
+            get_poling_interval_callback=get_poling_interval_callback,
             get_data_callback=get_data_callback
         )
         self.add(group=self.device_settings_group)
@@ -680,17 +730,22 @@ class PolarimeterBox(Gtk.Box):
         )
         self.append(child=self.plot_box)
 
+        self.poling_interval = 100
+
         self.columntwo = ColumnTwo(
             set_enable_polarimeter_callback=self.set_enable_polarimeter,
             get_enable_polarimeter_callback=self.get_enable_polarimeter,
             set_wavelength_callback=self.set_wavelength,
+            get_wavelength_callback=self.get_wavelength,
+            set_poling_interval_callback=self.set_poling_interval,
+            get_poling_interval_callback=self.get_poling_interval,
             get_data_callback=self.get_data,
             get_device_info_callback=self.get_device_info
         )
         self.append(child=self.columntwo)
 
         GLib.timeout_add(
-            interval=100,
+            interval=self.poling_interval,
             function=self.update_from_polarimeter
         )
 
@@ -702,6 +757,16 @@ class PolarimeterBox(Gtk.Box):
     
     def set_wavelength(self, value: float) -> None:
         self.polarimeter.set_wavelength(wavelength=value)
+
+    def get_wavelength(self) -> float:
+        return self.polarimeter.measure().to_data().wavelength
+
+    def set_poling_interval(self, value: int) -> None:
+        self.poling_interval = value
+        print(self.poling_interval)
+
+    def get_poling_interval(self) -> int:
+        return self.poling_interval
 
     def get_data(self) -> scpi_polarimeter.Data:
         return self.data

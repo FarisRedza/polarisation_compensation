@@ -35,38 +35,45 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         main_box.append(child=self.main_stack)
 
-        ## add motor
-        add_motor_page = Adw.PreferencesPage()
-        self.main_stack.add_titled(
-            child=add_motor_page,
-            name='add motor',
-            title='add motor'
-        )
-
-        add_motor_group = Adw.PreferencesGroup(title='Motors')
-        add_motor_page.add(add_motor_group)
-
         motors = thorlabs_motor.list_thorlabs_motors()
-        for i in motors:
-            add_motor_row = Adw.ActionRow(
-                title=i.get_device_info().notes,
-                subtitle=i.get_device_info().serial_no
-            )
-            add_motor_group.add(add_motor_row)
-            add_motor_button = Gtk.Button(
-                label='Connect',
-                valign=Gtk.Align.CENTER
-            )
-            add_motor_button.connect(
-                'clicked',
-                lambda widget,
-                serial_number=i.get_device_info().serial_no: self.on_add_motor(
-                    widget,
-                    serial_number
+        if len(motors) == 0:
+            main_box.append(
+                child=Gtk.Label(
+                    label='No motors found',
+                    valign=Gtk.Align.CENTER,
+                    vexpand=True
                 )
             )
-            add_motor_row.add_suffix(widget=add_motor_button)
-            add_motor_row.set_activatable_widget(widget=add_motor_button)
+        else:
+            ## add motor
+            add_motor_page = Adw.PreferencesPage()
+            self.main_stack.add_titled(
+                child=add_motor_page,
+                name='add motor',
+                title='add motor'
+            )
+            add_motor_group = Adw.PreferencesGroup(title='Motors')
+            add_motor_page.add(add_motor_group)
+            for i in motors:
+                add_motor_row = Adw.ActionRow(
+                    title=i.get_device_info().notes,
+                    subtitle=i.get_device_info().serial_no
+                )
+                add_motor_group.add(add_motor_row)
+                add_motor_button = Gtk.Button(
+                    label='Connect',
+                    valign=Gtk.Align.CENTER
+                )
+                add_motor_button.connect(
+                    'clicked',
+                    lambda widget,
+                    serial_number=i.get_device_info().serial_no: self.on_add_motor(
+                        widget,
+                        serial_number
+                    )
+                )
+                add_motor_row.add_suffix(widget=add_motor_button)
+                add_motor_row.set_activatable_widget(widget=add_motor_button)
 
         ## add motor
         add_motor_button = Gtk.Button(

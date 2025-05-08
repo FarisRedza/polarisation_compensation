@@ -215,10 +215,11 @@ class RawData:
         dop = float(self.dop)
         ptotal = float(self.ptotal)
 
-        S0=ptotal
-        S1=ptotal * dop * math.cos(2*theta) * math.cos(2*eta)
-        S2=ptotal * dop * math.sin(2*theta) * math.cos(2*eta)
-        S3=ptotal * dop * math.sin(2*eta)
+        S0 = ptotal
+        S1 = ptotal * math.cos(2*theta) * math.cos(2*eta)
+        S2 = ptotal * math.sin(2*theta) * math.cos(2*eta)
+        S3 = ptotal * math.sin(2*eta)
+
 
         return Data(
             timestamp=timestamp,

@@ -33,8 +33,18 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=header_bar)
 
         ### polarimeter box
-        self.polarimeter_box = polarisation_box.PolarimeterBox()
-        main_box.append(child=self.polarimeter_box)
+        try:
+            self.polarimeter_box = polarisation_box.PolarimeterBox()
+        except:
+            main_box.append(
+                child=Gtk.Label(
+                    label='No polarimeter found',
+                    valign=Gtk.Align.CENTER,
+                    vexpand=True
+                )
+            )
+        else:
+            main_box.append(child=self.polarimeter_box)
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         try:
