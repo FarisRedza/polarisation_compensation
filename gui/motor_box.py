@@ -20,6 +20,8 @@ class MotorControls(Adw.PreferencesGroup):
             self,
             motor: thorlabs_motor.Motor,
             get_position_callback: typing.Callable,
+            set_direction_callback: typing.Callable,
+            get_direction_callback: typing.Callable,
             set_step_size_callback: typing.Callable,
             get_step_size_callback: typing.Callable,
             set_acceleration_callback: typing.Callable,
@@ -29,6 +31,8 @@ class MotorControls(Adw.PreferencesGroup):
     ) -> None:
         super().__init__(title='Motor Controls')
         self.get_position_callback = get_position_callback
+        self.set_direction_callback = set_direction_callback
+        self.get_direction_callback = get_direction_callback
         self.set_step_size_callback = set_step_size_callback
         self.get_step_size_callback = get_step_size_callback
         self.set_acceleration_callback = set_acceleration_callback
@@ -54,6 +58,13 @@ class MotorControls(Adw.PreferencesGroup):
 
         self.position_label = Gtk.Label(label=f'{self.get_position_callback():.3f}')
         position_row.add_suffix(widget=self.position_label)
+
+        # direction
+        direction_row = Adw.ActionRow(title='Direction')
+        self.add(child=direction_row)
+
+        self.direction_label = Gtk.Label(label=self.get_direction_callback().name)
+        direction_row.add_suffix(widget=self.direction_label)
 
         # step size
         step_size_row = Adw.ActionRow(title='Step size')
@@ -162,6 +173,7 @@ class MotorControls(Adw.PreferencesGroup):
 
     def update_motor_info(self) -> bool:
         self.position_label.set_text(f'{self.get_position_callback():.3f}')
+        self.direction_label.set_text(str=self.get_direction_callback().name)
         return True
     
     def on_set_step_size(self, entry: Gtk.Entry):
@@ -260,6 +272,8 @@ class MotorControlPage(Adw.PreferencesPage):
         self.motor_controls_group = MotorControls(
             motor=motor,
             get_position_callback=self.get_position,
+            set_direction_callback=self.set_direction,
+            get_direction_callback=self.get_direction,
             set_step_size_callback=self.set_step_size,
             get_step_size_callback=self.get_step_size,
             set_acceleration_callback=self.set_acceleration,
@@ -279,6 +293,12 @@ class MotorControlPage(Adw.PreferencesPage):
     
     def get_position(self) -> float:
         return self.motor.position
+    
+    def set_direction(self, value: thorlabs_motor.MotorDirection) -> None:
+        self.motor.direction = value
+
+    def get_direction(self) -> thorlabs_motor.MotorDirection:
+        return self.motor.direction
 
     def set_step_size(self, value: float) -> None:
         self.motor.step_size = value

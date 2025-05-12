@@ -205,6 +205,8 @@ class ControlGroup(Adw.PreferencesGroup):
         self.ellipticity_motor_max_velocity = 0
         self.ellipticity_motor_direction = self.MotorDirection.IDLE
 
+        motor_poling_interval = 100
+
         # enable compensation
         enable_compensation_row = Adw.ActionRow(
             title='Enable compensation'
@@ -255,7 +257,7 @@ class ControlGroup(Adw.PreferencesGroup):
         )
 
         GLib.timeout_add(
-            interval=100,
+            interval=motor_poling_interval,
             function=self.pol_comp
         )
 
@@ -303,12 +305,11 @@ class ControlGroup(Adw.PreferencesGroup):
             motor_hwp_serial_no=self.MotorWP.HWP.value,
             target_azimuth=self.target_azimuth,
             target_ellipticity=self.target_ellipticity,
-            azimuth_thresholds_velocities=self.get_azimuth_velocity(),
-            ellipticity_thresholds_velocities=self.get_ellipticity_velocity(),
+            azimuth_velocities=self.get_azimuth_velocity(),
+            ellipticity_velocities=self.get_ellipticity_velocity(),
             current_azimuth=self.polarimeter_box.data.azimuth,
             current_ellipticity=self.polarimeter_box.data.ellipticity
         )
-
         return True
 
 class DevicesGroup(Adw.PreferencesGroup):
@@ -343,17 +344,17 @@ class DevicesGroup(Adw.PreferencesGroup):
             subtitle='QWP Motor'
         )
         self.add(child=qwp_motor_row)
-        qwp_motor_curve_button = Gtk.Button(
-            icon_name='settings-symbolic',
-            valign=Gtk.Align.CENTER
-        )
-        qwp_motor_curve_button.connect(
-            'clicked',
-            self.on_qwp_motor_settings
-        )
-        qwp_motor_row.add_suffix(
-            widget=qwp_motor_curve_button
-        )
+        # qwp_motor_curve_button = Gtk.Button(
+        #     icon_name='settings-symbolic',
+        #     valign=Gtk.Align.CENTER
+        # )
+        # qwp_motor_curve_button.connect(
+        #     'clicked',
+        #     self.on_qwp_motor_settings
+        # )
+        # qwp_motor_row.add_suffix(
+        #     widget=qwp_motor_curve_button
+        # )
         qwp_motor_label = Gtk.Label(
             label=self.get_qwp_motor(),
             valign=Gtk.Align.CENTER
@@ -367,17 +368,17 @@ class DevicesGroup(Adw.PreferencesGroup):
             subtitle='HWP Motor'
         )
         self.add(child=hwp_motor_row)
-        hwp_motor_curve_button = Gtk.Button(
-            icon_name='settings-symbolic',
-            valign=Gtk.Align.CENTER
-        )
-        hwp_motor_curve_button.connect(
-            'clicked',
-            self.on_hwp_motor_settings
-        )
-        hwp_motor_row.add_suffix(
-            widget=hwp_motor_curve_button
-        )
+        # hwp_motor_curve_button = Gtk.Button(
+        #     icon_name='settings-symbolic',
+        #     valign=Gtk.Align.CENTER
+        # )
+        # hwp_motor_curve_button.connect(
+        #     'clicked',
+        #     self.on_hwp_motor_settings
+        # )
+        # hwp_motor_row.add_suffix(
+        #     widget=hwp_motor_curve_button
+        # )
         hwp_motor_label = Gtk.Label(
             label=self.get_hwp_motor(),
             valign=Gtk.Align.CENTER
