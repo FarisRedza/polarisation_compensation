@@ -172,8 +172,10 @@ class MotorControls(Adw.PreferencesGroup):
         self.cw_button.set_sensitive(switch.get_active())
 
     def update_motor_info(self) -> bool:
-        self.position_label.set_text(f'{self.get_position_callback():.3f}')
+        self.position_label.set_text(str=f'{self.get_position_callback():.3f}')
         self.direction_label.set_text(str=self.get_direction_callback().name)
+        self.acceleration_entry.set_text(text=f'{self.get_acceleration_callback():.3f}')
+        self.max_velocity_entry.set_text(text=f'{self.get_max_velocity_callback():.3f}')
         return True
     
     def on_set_step_size(self, entry: Gtk.Entry):
