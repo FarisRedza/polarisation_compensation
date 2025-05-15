@@ -1,0 +1,6 @@
+[submodule "ttag"]
+	path = ttag
+	url = https://github.com/edinburgh-mostly-quantum-lab/ttag.git
+[submodule "timetag"]
+	path = timetag
+	url = https://github.com/edinburgh-mostly-quantum-lab/timetag.git
