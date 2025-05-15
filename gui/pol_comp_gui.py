@@ -15,7 +15,7 @@ from gi.repository import Gtk, Adw, GLib, GObject
 
 import polarisation_box
 import gui.motor_box as motor_box
-import pol_compensation
+import polarisation_compensation.pol_compensation as pol_compensation
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -461,17 +461,21 @@ class PolCompPage(Adw.PreferencesPage):
         #     (0.075, 0.5)
         # ]
         self.azimuth_velocity = [
-            (2.5, 25),
-            (1, 15),
-            (0.5, 5),
-            (0.05, 1)
+            (2.5, 25.0),
+            (1.5, 20.0),
+            (1, 15.0),
+            (0.5, 5.0),
+            (0.1, 1.0),
+            (0.05, 0.5)
         ]
 
         self.ellipticity_velocity = [
-            (5, 25),
-            (2.5, 15),
-            (1, 5),
-            (0.075, 1)
+            (5.0, 25.0),
+            (3.5, 20.0),
+            (2.5, 15.0),
+            (1.0, 5.0),
+            (0.1, 1.0),
+            (0.075, 0.5)
         ]
 
         self.control_group = ControlGroup(
