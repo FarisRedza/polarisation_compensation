@@ -3,6 +3,11 @@ import os
 import pathlib
 import time
 
+C_H = 0
+C_V = 1
+C_D = 2
+C_A = 3
+
 os.environ['TTAG'] = str(pathlib.Path(
     os.environ['HOME'],
     'Projects',
@@ -11,7 +16,7 @@ os.environ['TTAG'] = str(pathlib.Path(
     'python'
 ))
 sys.path.append(os.environ['TTAG'])
-import ttag
+import ttag as tt
 
 os.environ['TIMETAG'] = str(pathlib.Path(
     os.environ['HOME'],
@@ -23,11 +28,15 @@ os.environ['TIMETAG'] = str(pathlib.Path(
 sys.path.append(os.environ['TIMETAG'])
 import timetag
 
-uqd = timetag.CTimeTag() # type: ignore
-if uqd.IsOpen() == True:
-    print('Starting measurement')
-    uqd.StartTimeTags()
-    time.sleep(1)
-    uqd.StopTimeTags()
-    time.sleep(1)
-    print(uqd.ReadTags())
+buffernumber = tt.getfreebuffer()-1
+
+ttag = tt.TTBuffer(buffernumber=buffernumber)
+for _ in range(0,50):
+    data = ttag.singles(1)[0:4]
+    print(data)
+    s_0 = 1
+    s_1 = (data[C_H] - data[C_V])/(data[C_H] + data[C_V])
+    s_2 = (data[C_D] - data[C_A])/(data[C_D] + data[C_A])
+    print(s_1, s_2)
+    
+    time.sleep(0.1)
