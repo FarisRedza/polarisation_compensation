@@ -5,12 +5,12 @@ import time
 
 def pol_comp(
         motor_list: list[thorlabs_motor.Motor],
-        motor_qwp_serial_no: str,
-        motor_hwp_serial_no: str,
+        motor_qwp_serial_no: str | int,
+        motor_hwp_serial_no: str | int,
         target_azimuth: float,
         target_ellipticity: float,
-        azimuth_velocities: list[tuple[float, int]],
-        ellipticity_velocities: list[tuple[float, int]],
+        azimuth_velocities: list[tuple[float, float]],
+        ellipticity_velocities: list[tuple[float, float]],
         current_azimuth: float,
         current_ellipticity: float
 ) -> bool:
@@ -39,15 +39,20 @@ def pol_comp(
         abs_delta = abs(delta)
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
             if abs_delta > threshold:
-                if motor.max_velocity != velocity:
-                    motor._motor.setup_jog(
-                        mode='continuous',
-                        max_velocity=velocity
-                    )
-                    motor.max_velocity = velocity
-                motor._motor.jog(
-                    direction=direction,
-                    kind='builtin'
+                # if motor.max_velocity != velocity:
+                #     motor._motor.setup_jog(
+                #         mode='continuous',
+                #         max_velocity=velocity
+                #     )
+                #     motor.max_velocity = velocity
+                # motor._motor.jog(
+                #     direction=direction,
+                #     kind='builtin'
+                # )
+                # break
+                motor.jog(
+                    direction=thorlabs_motor.MotorDirection(direction),
+                    max_velocity=velocity
                 )
                 break
         else:
