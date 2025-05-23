@@ -28,12 +28,12 @@ def pol_comp(
             return
 
         motor = motor_list[motor_index]
-        motor.position = motor._motor.get_position()
+        motor.position
         delta = current_value - target_value
         direction = '+' if delta > 0 else '-'
 
         if motor.direction.value != direction:
-            motor._motor.stop()
+            motor.stop()
             motor.direction = thorlabs_motor.MotorDirection(direction)
 
         abs_delta = abs(delta)
@@ -56,7 +56,7 @@ def pol_comp(
                 )
                 break
         else:
-            motor._motor.stop()
+            motor.stop()
 
     adjust_motor(
         motor_list=motor_list,
