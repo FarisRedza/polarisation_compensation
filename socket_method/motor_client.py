@@ -13,7 +13,7 @@ sys.path.append(
     ))
 )
 import motor.motor as thorlabs_motor
-server_ip = '137.195.89.222'
+server_ip = '127.0.0.1'
 server_port = 5002
 motor_refresh_time = 0.1
 
@@ -21,11 +21,12 @@ def send_request(
         host: str,
         port: int,
         command: str,
-        arguments: list = []
+        arguments: list = [],
+        timeout: int = 5
 ) -> typing.Any:
+    request = {'command': command}
     try:
-        with socket.create_connection(address=(host,port)) as s:
-            request = {'command': command}
+        with socket.create_connection(address=(host,port), timeout=timeout) as s:
             match command:
                 case 'list_motors':
                     pass
@@ -52,11 +53,21 @@ def send_request(
                     raise Exception
 
             s.sendall(json.dumps(request).encode())
-            response = s.recv(1024)
-            return json.loads(response.decode())
+            # response = s.recv(1024)
+            # return json.loads(response.decode())
+            buffer = ""
+            while True:
+                data = s.recv(1024).decode()
+                if not data:
+                    break
+                buffer += data
+                if "\n" in buffer:
+                    break
+            response = json.loads(buffer.strip())
+            return response
 
     except Exception as e:
-        return {'error': str(e)}
+        return {f'Error sending request {request}': str(e)}
     
 class RemoteMotor(thorlabs_motor.Motor):
     def __init__(
@@ -154,6 +165,15 @@ class RemoteMotor(thorlabs_motor.Motor):
             arguments=[self.serial_no, direction.value]
         )
         print("Command sent:", result.get("status") or result.get("error"))
+
+    def stop(self) -> None:
+        result = send_request(
+            host=self.ip_addr,
+            port=self.port,
+            command='stop',
+            arguments=[self.serial_no]
+        )
+        print("Command sent:", result.get("status") or result.get("error"))
         
 def main():
     motor = RemoteMotor(
@@ -169,153 +189,153 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    # result = send_request(
-    #     host=server_ip,
-    #     port=server_port,
-    #     command='list_motors'
-    # )
-    # motors: list[str] = result.get('motors')
-    # while True:
-    #     print(f'Available motors: {motors}' or result.get('error'))
-    #     print('1. Print motor position')
-    #     print('2. Move motor by offset')
-    #     print('3. Move motor to')
-    #     print('4. Jog motor')
-    #     print('5. Stop motor')
-    #     print('q. Quit')
+    # main()
+    result = send_request(
+        host=server_ip,
+        port=server_port,
+        command='list_motors'
+    )
+    motors: list[str] = result.get('motors')
+    while True:
+        print(f'Available motors: {motors}' or result.get('error'))
+        print('1. Print motor position')
+        print('2. Move motor by offset')
+        print('3. Move motor to')
+        print('4. Jog motor')
+        print('5. Stop motor')
+        print('q. Quit')
 
-    #     choice = input().strip().lower()
-    #     match choice:
-    #         case '1':
-    #             print('Select motor')
-    #             for i, motor in enumerate(motors):
-    #                 print(f'{i+1}. {motor}')
-    #             motor_choice = int(input().strip()) - 1
-    #             serial_number = motors[motor_choice]
+        choice = input().strip().lower()
+        match choice:
+            case '1':
+                print('Select motor')
+                for i, motor in enumerate(motors):
+                    print(f'{i+1}. {motor}')
+                motor_choice = int(input().strip()) - 1
+                serial_number = motors[motor_choice]
 
-    #             result = send_request(
-    #                 host=server_ip,
-    #                 port=server_port,
-    #                 command='get_position',
-    #                 arguments=[serial_number]
-    #             )
-    #             print(
-    #                 f"Motor {serial_number} position: {result['position']} | Moving: {result['moving']}"
-    #             )
+                result = send_request(
+                    host=server_ip,
+                    port=server_port,
+                    command='get_position',
+                    arguments=[serial_number]
+                )
+                print(
+                    f"Motor {serial_number} position: {result['position']} | Moving: {result['moving']}"
+                )
 
-    #         case '2':
-    #             print('Select motor')
-    #             for i, motor in enumerate(motors):
-    #                 print(f'{i+1}. {motor}')
-    #             motor_choice = int(input().strip()) - 1
-    #             serial_number = motors[motor_choice]
+            case '2':
+                print('Select motor')
+                for i, motor in enumerate(motors):
+                    print(f'{i+1}. {motor}')
+                motor_choice = int(input().strip()) - 1
+                serial_number = motors[motor_choice]
 
-    #             angle = input('Enter offset angle: ')
-    #             result = send_request(
-    #                 host=server_ip,
-    #                 port=server_port,
-    #                 command='move_by',
-    #                 arguments=[serial_number, angle]
-    #             )
-    #             print('Command sent:', result.get('status') or result.get('error'))
+                angle = input('Enter offset angle: ')
+                result = send_request(
+                    host=server_ip,
+                    port=server_port,
+                    command='move_by',
+                    arguments=[serial_number, angle]
+                )
+                print('Command sent:', result.get('status') or result.get('error'))
 
-    #             while True:
-    #                 update = send_request(
-    #                     host=server_ip,
-    #                     port=server_port,
-    #                     command='get_position',
-    #                     arguments=[serial_number]
-    #                 )
-    #                 if 'error' in update:
-    #                     print('Error:', update['error'])
-    #                     break
-    #                 print(
-    #                     f"Motor {serial_number} position: {update['position']} | Moving: {update['moving']}"
-    #                 )
-    #                 if not update['moving']:
-    #                     break
-    #                 time.sleep(motor_refresh_time)
+                while True:
+                    update = send_request(
+                        host=server_ip,
+                        port=server_port,
+                        command='get_position',
+                        arguments=[serial_number]
+                    )
+                    if 'error' in update:
+                        print('Error:', update['error'])
+                        break
+                    print(
+                        f"Motor {serial_number} position: {update['position']} | Moving: {update['moving']}"
+                    )
+                    if not update['moving']:
+                        break
+                    time.sleep(motor_refresh_time)
 
-    #         case '3':
-    #             print('Select motor')
-    #             for i, motor in enumerate(motors):
-    #                 print(f'{i+1}. {motor}')
-    #             motor_choice = int(input().strip()) - 1
-    #             serial_number = motors[motor_choice]
+            case '3':
+                print('Select motor')
+                for i, motor in enumerate(motors):
+                    print(f'{i+1}. {motor}')
+                motor_choice = int(input().strip()) - 1
+                serial_number = motors[motor_choice]
 
-    #             position = input('Enter position: ')
-    #             result = send_request(
-    #                 host=server_ip,
-    #                 port=server_port,
-    #                 command='move_to',
-    #                 arguments=[serial_number, position]
-    #             )
-    #             print('Command sent:', result.get('status') or result.get('error'))
+                position = input('Enter position: ')
+                result = send_request(
+                    host=server_ip,
+                    port=server_port,
+                    command='move_to',
+                    arguments=[serial_number, position]
+                )
+                print('Command sent:', result.get('status') or result.get('error'))
 
-    #             while True:
-    #                 update = send_request(
-    #                     host=server_ip,
-    #                     port=server_port,
-    #                     command='get_position',
-    #                     arguments=[serial_number]
-    #                 )
-    #                 if 'error' in update:
-    #                     print('Error:', update['error'])
-    #                     break
-    #                 print(
-    #                     f"Motor {serial_number} position: {update['position']} | Moving: {update['moving']}"
-    #                 )
-    #                 if not update['moving']:
-    #                     break
-    #                 time.sleep(motor_refresh_time)
+                while True:
+                    update = send_request(
+                        host=server_ip,
+                        port=server_port,
+                        command='get_position',
+                        arguments=[serial_number]
+                    )
+                    if 'error' in update:
+                        print('Error:', update['error'])
+                        break
+                    print(
+                        f"Motor {serial_number} position: {update['position']} | Moving: {update['moving']}"
+                    )
+                    if not update['moving']:
+                        break
+                    time.sleep(motor_refresh_time)
 
-    #         case '4':
-    #             print('Select motor')
-    #             for i, motor in enumerate(motors):
-    #                 print(f'{i+1}. {motor}')
-    #             motor_choice = int(input().strip()) - 1
-    #             serial_number = motors[motor_choice]
+            case '4':
+                print('Select motor')
+                for i, motor in enumerate(motors):
+                    print(f'{i+1}. {motor}')
+                motor_choice = int(input().strip()) - 1
+                serial_number = motors[motor_choice]
 
-    #             print('Choose direction')
-    #             print('1. Forward')
-    #             print('2. Backward')
-    #             direction_choice = input().strip()
-    #             match direction_choice:
-    #                 case '1':
-    #                     direction = thorlabs_motor.MotorDirection.FORWARD
-    #                 case '2':
-    #                     direction = thorlabs_motor.MotorDirection.BACKWARD
-    #                 case _:
-    #                     print('Invalid choice')
-    #                     break
+                print('Choose direction')
+                print('1. Forward')
+                print('2. Backward')
+                direction_choice = input().strip()
+                match direction_choice:
+                    case '1':
+                        direction = thorlabs_motor.MotorDirection.FORWARD
+                    case '2':
+                        direction = thorlabs_motor.MotorDirection.BACKWARD
+                    case _:
+                        print('Invalid choice')
+                        break
 
-    #             result = send_request(
-    #                 host=server_ip,
-    #                 port=server_port,
-    #                 command='jog',
-    #                 arguments=[serial_number, direction.value]
-    #             )
-    #             print('Command sent:', result.get('status') or result.get('error'))
+                result = send_request(
+                    host=server_ip,
+                    port=server_port,
+                    command='jog',
+                    arguments=[serial_number, direction.value]
+                )
+                print('Command sent:', result.get('status') or result.get('error'))
 
-    #         case '5':
-    #             print('Select motor')
-    #             for i, motor in enumerate(motors):
-    #                 print(f'{i+1}. {motor}')
-    #             motor_choice = int(input().strip()) - 1
-    #             serial_number = motors[motor_choice]
+            case '5':
+                print('Select motor')
+                for i, motor in enumerate(motors):
+                    print(f'{i+1}. {motor}')
+                motor_choice = int(input().strip()) - 1
+                serial_number = motors[motor_choice]
 
-    #             result = send_request(
-    #                 host=server_ip,
-    #                 port=server_port,
-    #                 command='stop',
-    #                 arguments=[serial_number]
-    #             )
-    #             print('Command sent:', result.get('status') or result.get('error'))
+                result = send_request(
+                    host=server_ip,
+                    port=server_port,
+                    command='stop',
+                    arguments=[serial_number]
+                )
+                print('Command sent:', result.get('status') or result.get('error'))
 
-    #         case 'q':
-    #             break
+            case 'q':
+                break
 
-    #         case _:
-    #             print("Invalid choice")
+            case _:
+                print("Invalid choice")
         
