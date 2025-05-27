@@ -19,10 +19,24 @@ class MotorControls(Adw.PreferencesGroup):
     def __init__(
         self,
         motor: thorlabs_motor.Motor,
-        get_position_callback: typing.Callable
+        get_position_callback: typing.Callable,
+        get_direction_callback: typing.Callable,
+        get_step_size_callback: typing.Callable,
+        set_step_size_callback: typing.Callable,
+        get_acceleration_callback: typing.Callable,
+        set_acceleration_callback: typing.Callable,
+        get_max_velocity_callback: typing.Callable,
+        set_max_velocity_callback: typing.Callable
     ) -> None:
         super().__init__(title='Motor Controls')
         self.get_position_callback = get_position_callback
+        self.get_direction_callback = get_direction_callback
+        self.get_step_size_callback = get_step_size_callback
+        self.set_step_size_callback = set_step_size_callback
+        self.get_acceleration_callback = get_acceleration_callback
+        self.set_acceleration_callback = set_acceleration_callback
+        self.get_max_velocity_callback = get_max_velocity_callback
+        self.set_max_velocity_callback = set_max_velocity_callback
 
         self.motor = motor
 
@@ -38,10 +52,12 @@ class MotorControls(Adw.PreferencesGroup):
         self.add(child=rotation_row)
 
         ## control box
-        control_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        control_box.set_valign(Gtk.Align.CENTER)
-        control_box.set_halign(Gtk.Align.CENTER)
-        control_box.set_hexpand(True)
+        control_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.CENTER,
+            hexpand=True
+        )
         rotation_row.set_child(child=control_box)
 
         ### control grid
@@ -155,7 +171,14 @@ class MotorControlPage(Adw.PreferencesPage):
 
         motor_controls_group = MotorControls(
             motor=self.motor,
-            get_position_callback=self.get_position
+            get_position_callback=self.get_motor_position,
+            get_direction_callback=self.get_motor_direction,
+            get_step_size_callback=self.get_motor_step_size,
+            set_step_size_callback=self.set_motor_step_size,
+            get_acceleration_callback=self.get_motor_acceleration,
+            set_acceleration_callback=self.set_motor_acceleration,
+            get_max_velocity_callback=self.get_motor_max_velocity,
+            set_max_velocity_callback=self.set_motor_max_velocity
         )
         self.add(group=motor_controls_group)
 
@@ -167,5 +190,26 @@ class MotorControlPage(Adw.PreferencesPage):
     def get_device_info(self) -> thorlabs_motor.DeviceInfo:
         return self.motor.device_info
     
-    def get_position(self) -> float:
+    def get_motor_position(self) -> float:
         return self.motor.position
+
+    def get_motor_direction(self) -> thorlabs_motor.MotorDirection:
+        return self.motor.direction
+    
+    def get_motor_step_size(self) -> float:
+        return self.motor.step_size
+    
+    def set_motor_step_size(self, value: float) -> None:
+        self.motor.step_size = value
+    
+    def get_motor_acceleration(self) -> float:
+        return self.motor.acceleration
+    
+    def set_motor_acceleration(self, value: float) -> None:
+        self.motor.acceleration = value
+
+    def get_motor_max_velocity(self) -> float:
+        return self.motor.max_velocity
+    
+    def set_motor_max_velocity(self, value: float) -> None:
+        self.motor.max_velocity = value

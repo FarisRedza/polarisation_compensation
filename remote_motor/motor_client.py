@@ -72,8 +72,6 @@ def send_request(
                     raise Exception
 
             s.sendall(json.dumps(request).encode())
-            # response = s.recv(1024)
-            # return json.loads(response.decode())
             buffer = ""
             while True:
                 data = s.recv(1024).decode()
@@ -111,10 +109,14 @@ class Motor:
         self.ip_addr = ip_addr
         self.port = port
 
+        self._position_lock = threading.Lock()
         self._position_polling = 0.1
         self._position: list[float] = [0.0]
         self.motor_thread: threading.Thread | None = None
-        
+
+        self.step_size: float = 5
+        self.acceleration: float = MAX_ACCELERATION
+        self.max_velocity: float = MAX_VELOCITY
 
         available_motors = send_request(
             host=ip_addr,
@@ -165,9 +167,9 @@ class Motor:
             if 'error' in update:
                 print('Error:', update['error'])
                 break
-            # print(
-            #     f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
-            # )
+            print(
+                f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
+            )
             if not update['moving']:
                 break
         return True
@@ -241,7 +243,7 @@ class Motor:
             self.motor_thread.start()
         else:
             print('Warning: Motor is busy')
-    
+
     def jog(
             self,
             direction: MotorDirection,
@@ -254,6 +256,7 @@ class Motor:
             command='jog',
             arguments=[self.device_info.serial_number, direction.value]
         )
+        self._start_tracking_positon()
         print("Command sent:", result.get("status") or result.get("error"))
 
     def stop(self) -> None:
@@ -263,9 +266,21 @@ class Motor:
             command='stop',
             arguments=[self.device_info.serial_number]
         )
+        self._stop_tracking_position()
         print("Command sent:", result.get("status") or result.get("error"))
 
+    def _get_motor_position(self) -> None:
+        with self._position_lock:
+            result = send_request(
+                host=self.ip_addr,
+                port=self.port,
+                command='get_position',
+                arguments=[self.device_info.serial_number]
+            )
+            self.position = float(result['position'])
+
     def _track_position(self):
+        self.is_moving = True
         while self.is_moving == True:
             time.sleep(motor_refresh_time)
             update = send_request(
@@ -277,9 +292,9 @@ class Motor:
             if 'error' in update:
                 print('Error:', update['error'])
                 break
-            print(
-                f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
-            )
+            # print(
+            #     f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
+            # )
             if not update['moving']:
                 self.is_moving = False
 
@@ -443,12 +458,16 @@ def motor_cli():
                 print("Invalid choice")
         
 if __name__ == '__main__':
-    motor_cli()
+    # motor_cli()
 
-    # print(list_thorlabs_motors(host=server_ip, port=server_port))
-    # motor = Motor(
-    #     serial_number='55356974',
-    #     ip_addr=server_ip,
-    #     port=server_port
-    # )
-    # motor.threaded_move_by(angle=25)
+    print(list_thorlabs_motors(host=server_ip, port=server_port))
+    motor = Motor(
+        serial_number='55356974',
+        ip_addr=server_ip,
+        port=server_port
+    )
+    motor.jog(direction=MotorDirection.BACKWARD)
+    for _ in range(5):
+        print(motor.position)
+        time.sleep(1)
+    motor.stop()
