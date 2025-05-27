@@ -334,10 +334,10 @@ class ColumnOne(Adw.PreferencesPage):
         )
         self.add(group=self.plot_ellipse_group)
 
-        # self.plot_bloch_group = BlochSphere3D(
-        #     get_data_callback=get_data_callback
-        # )
-        # self.add(group=self.plot_bloch_group)
+        self.plot_bloch_group = BlochSphere3D(
+            get_data_callback=get_data_callback
+        )
+        self.add(group=self.plot_bloch_group)
 
 class ColumnTwo(Adw.PreferencesPage):
     def __init__(
@@ -376,5 +376,5 @@ class QuTAGBox(Gtk.Box):
     
     def set_qutag_data(self) -> None:
         self.columnone.plot_ellipse_group.update_plot()
-        # self.columnone.plot_bloch_group.update_point()
+        self.columnone.plot_bloch_group.update_point()
         self.columntwo.measurement_group.update_qutag_info()
