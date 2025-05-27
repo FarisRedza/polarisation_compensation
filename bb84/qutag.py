@@ -60,6 +60,9 @@ class Qutag():
             self._qutag.setChannelDelay(channel=channel, delays=0)
             self._qutag.setExposureTime(expTime=exposure_time)
 
+    def __del__(self):
+        self._qutag.deInitialize()
+
     def measure(self) -> Data:
         data = Data()
         

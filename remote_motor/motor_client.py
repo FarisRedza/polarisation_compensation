@@ -16,8 +16,8 @@ sys.path.append(
     ))
 )
 # import motor.motor as thorlabs_motor
-# server_ip = '127.0.0.1'
-server_ip = '137.195.89.222'
+server_ip = '127.0.0.1'
+# server_ip = '137.195.89.222'
 server_port = 5002
 motor_refresh_time = 0.1
 
@@ -205,23 +205,42 @@ class Motor:
         )
         print('Command sent:', result.get('status') or result.get('error'))
         self._start_tracking_positon()
-        # while True:
-        #     time.sleep(motor_refresh_time)
-        #     update = send_request(
-        #         host=server_ip,
-        #         port=server_port,
-        #         command='get_position',
-        #         arguments=[self.device_info.serial_number]
-        #     )
-        #     if 'error' in update:
-        #         print('Error:', update['error'])
-        #         break
-        #     print(
-        #         f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
-        #     )
-        #     if not update['moving']:
-        #         break
+        while True:
+            time.sleep(motor_refresh_time)
+            update = send_request(
+                host=server_ip,
+                port=server_port,
+                command='get_position',
+                arguments=[self.device_info.serial_number]
+            )
+            if 'error' in update:
+                print('Error:', update['error'])
+                break
+            print(
+                f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
+            )
+            if not update['moving']:
+                break
         return True
+    
+    def threaded_move_to(
+            self, 
+            position: float,
+            acceleration: float = MAX_ACCELERATION,
+            max_velocity: float = MAX_VELOCITY
+    ) -> None:
+        if self.motor_thread is None or not self.motor_thread.is_alive():
+            self.motor_thread = threading.Thread(
+                target=self.move_to,
+                args=(
+                    position,
+                    acceleration,
+                    max_velocity
+                )
+            )
+            self.motor_thread.start()
+        else:
+            print('Warning: Motor is busy')
     
     def jog(
             self,
@@ -424,12 +443,12 @@ def motor_cli():
                 print("Invalid choice")
         
 if __name__ == '__main__':
-    # motor_cli()
+    motor_cli()
 
-    print(list_thorlabs_motors(host=server_ip, port=server_port))
-    motor = Motor(
-        serial_number='55356974',
-        ip_addr=server_ip,
-        port=server_port
-    )
-    motor.threaded_move_by(angle=25)
+    # print(list_thorlabs_motors(host=server_ip, port=server_port))
+    # motor = Motor(
+    #     serial_number='55356974',
+    #     ip_addr=server_ip,
+    #     port=server_port
+    # )
+    # motor.threaded_move_by(angle=25)

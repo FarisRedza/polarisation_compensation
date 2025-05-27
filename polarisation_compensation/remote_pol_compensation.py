@@ -1,7 +1,16 @@
-import bb84.qutag as qutag
-import remote_motor.motor_client as thorlabs_motor
+import sys
+import os
 import threading
 import time
+
+sys.path.append(
+    os.path.abspath(os.path.join(
+        os.path.dirname(__file__),
+        os.path.pardir
+    ))
+)
+import bb84.qutag as qutag
+import remote_motor.motor_client as thorlabs_motor
 
 def pol_comp(
         motor_list: list[thorlabs_motor.Motor],

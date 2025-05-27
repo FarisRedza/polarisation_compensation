@@ -7,7 +7,13 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
-import motor_client as thorlabs_motor
+sys.path.append(
+    os.path.abspath(os.path.join(
+        os.path.dirname(__file__),
+        os.path.pardir
+    ))
+)
+import remote_motor.motor_client as thorlabs_motor
 
 class MotorControls(Adw.PreferencesGroup):
     def __init__(
@@ -85,7 +91,7 @@ class MotorControls(Adw.PreferencesGroup):
         return True
 
     def rotate_motor_ccw(self, button: Gtk.Button):
-        self.motor.move_by(
+        self.motor.threaded_move_by(
             angle=-45,
             acceleration=20,
             max_velocity=25
@@ -99,7 +105,7 @@ class MotorControls(Adw.PreferencesGroup):
         )
 
     def rotate_motor_cw(self, button: Gtk.Button):
-        self.motor.move_by(
+        self.motor.threaded_move_by(
             angle=45,
             acceleration=20,
             max_velocity=25

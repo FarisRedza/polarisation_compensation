@@ -18,7 +18,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import qutag
+import bb84.qutag as qutag
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(

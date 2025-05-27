@@ -13,8 +13,6 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
-import bb84.qutag_box as qutag_box
-import remote_motor.remote_motor_box as motor_box
 import remote_pol_compensation
 
 sys.path.append(
@@ -23,6 +21,8 @@ sys.path.append(
         os.path.pardir
     ))
 )
+import bb84.qutag_box as qutag_box
+import remote_motor.remote_motor_box as motor_box
 import bb84.qutag as qutag
 import remote_motor.motor_client as thorlabs_motor
 
@@ -114,6 +114,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_title(title='Polarisation Compensation')
         self.set_default_size(width=1300, height=800)
         self.set_size_request(width=1250, height=300)
+        self.connect(
+            'close-request',
+            self.on_close_request
+        )
 
         # main box
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -132,7 +136,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_box.append(child=self.qutag_box)
 
         ### init motor control boxes
-        self.motors = thorlabs_motor.list_thorlabs_motors(host=thorlabs_motor.server_ip, port=thorlabs_motor.server_port)
+        self.motors = thorlabs_motor.list_thorlabs_motors(
+            host=thorlabs_motor.server_ip,
+            port=thorlabs_motor.server_port
+        )
         self.motor_controllers: list[motor_box.MotorControlPage] = []
         for i, m in enumerate(self.motors):
             self.motor_controllers.append(
@@ -157,6 +164,12 @@ class MainWindow(Adw.ApplicationWindow):
             self.content_box.append(
                 child=self.motor_controllers[i]
             )
+
+    def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
+        self.qutag_box.qutag._qutag.deInitialize()
+        # for i in self.motor_controllers:
+        #     i.motor_controls_group.motor._motor.stop()
+        return False
     
 class App(Adw.Application):
     def __init__(self, **kwargs):
