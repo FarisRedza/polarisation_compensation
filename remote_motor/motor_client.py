@@ -6,6 +6,8 @@ import json
 import time
 import typing
 import enum
+import pprint
+import dataclasses
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -14,12 +16,20 @@ sys.path.append(
     ))
 )
 # import motor.motor as thorlabs_motor
-server_ip = '127.0.0.1'
+# server_ip = '127.0.0.1'
+server_ip = '137.195.89.222'
 server_port = 5002
 motor_refresh_time = 0.1
 
 MAX_ACCELERATION = 20.0
 MAX_VELOCITY = 25.0
+
+@dataclasses.dataclass
+class DeviceInfo:
+    device_name: str
+    model: str
+    serial_number: str
+    firmware_version: str
 
 class MotorDirection(enum.Enum):
     FORWARD = '+'
@@ -78,26 +88,58 @@ def send_request(
     except Exception as e:
         return {f'Error sending request {request}': str(e)}
     
-class RemoteMotor:
+def list_thorlabs_motors(
+        host: str,
+        port: int,
+        timeout: int = 5
+) -> list[DeviceInfo]:
+    result = send_request(
+        host=host,
+        port=port,
+        command='list_motors',
+        timeout=timeout
+    )
+    return [DeviceInfo(**motor) for motor in result['motors']] 
+    
+class Motor:
     def __init__(
             self,
             serial_number: str,
             ip_addr: str,
             port: int
     ) -> None:
-        self.serial_no = serial_number
         self.ip_addr = ip_addr
         self.port = port
+
+        self._position_polling = 0.1
+        self._position: list[float] = [0.0]
+        self.motor_thread: threading.Thread | None = None
+        
 
         available_motors = send_request(
             host=ip_addr,
             port=server_port,
             command='list_motors'
         )['motors']
-        if self.serial_no not in available_motors:
+        motor_index = next(
+            (i for i, motor in enumerate(available_motors) if str(motor['serial_number']) == serial_number),
+            None
+        )
+        if motor_index is None:
             raise Exception
         else:
-            print(f'Connected to motor {self.serial_no}')
+            self.device_info = DeviceInfo(**available_motors[motor_index])
+            status = send_request(
+                host=self.ip_addr,
+                port=self.port,
+                command='get_position',
+                arguments=[self.device_info.serial_number]
+            )
+            self.position = float(status['position'])
+            self.is_moving = bool(status['moving'])
+            self.direction = MotorDirection(status['direction'])
+
+            print(f'Connected to motor {self.device_info.serial_number}')
 
     def move_by(
             self,
@@ -109,7 +151,7 @@ class RemoteMotor:
             host=self.ip_addr,
             port=self.port,
             command='move_by',
-            arguments=[self.serial_no, angle]
+            arguments=[self.device_info.serial_number, angle]
         )
         print('Command sent:', result.get('status') or result.get('error'))
         while True:
@@ -118,18 +160,37 @@ class RemoteMotor:
                 host=server_ip,
                 port=server_port,
                 command='get_position',
-                arguments=[self.serial_no]
+                arguments=[self.device_info.serial_number]
             )
             if 'error' in update:
                 print('Error:', update['error'])
                 break
-            print(
-                f"Motor {self.serial_no} position: {update['position']} | Moving: {update['moving']}"
-            )
+            # print(
+            #     f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
+            # )
             if not update['moving']:
                 break
         return True
     
+    def threaded_move_by(
+            self, 
+            angle: float,
+            acceleration: float = MAX_ACCELERATION,
+            max_velocity: float = MAX_VELOCITY
+    ) -> None:
+        if self.motor_thread is None or not self.motor_thread.is_alive():
+            self.motor_thread = threading.Thread(
+                target=self.move_by,
+                args=(
+                    angle,
+                    acceleration,
+                    max_velocity
+                )
+            )
+            self.motor_thread.start()
+        else:
+            print('Warning: Motor is busy')
+
     def move_to(
             self,
             position: float,
@@ -140,25 +201,26 @@ class RemoteMotor:
             host=self.ip_addr,
             port=self.port,
             command='move_to',
-            arguments=[self.serial_no, position]
+            arguments=[self.device_info.serial_number, position]
         )
         print('Command sent:', result.get('status') or result.get('error'))
-        while True:
-            time.sleep(motor_refresh_time)
-            update = send_request(
-                host=server_ip,
-                port=server_port,
-                command='get_position',
-                arguments=[self.serial_no]
-            )
-            if 'error' in update:
-                print('Error:', update['error'])
-                break
-            print(
-                f"Motor {self.serial_no} position: {update['position']} | Moving: {update['moving']}"
-            )
-            if not update['moving']:
-                break
+        self._start_tracking_positon()
+        # while True:
+        #     time.sleep(motor_refresh_time)
+        #     update = send_request(
+        #         host=server_ip,
+        #         port=server_port,
+        #         command='get_position',
+        #         arguments=[self.device_info.serial_number]
+        #     )
+        #     if 'error' in update:
+        #         print('Error:', update['error'])
+        #         break
+        #     print(
+        #         f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
+        #     )
+        #     if not update['moving']:
+        #         break
         return True
     
     def jog(
@@ -171,7 +233,7 @@ class RemoteMotor:
             host=self.ip_addr,
             port=self.port,
             command='jog',
-            arguments=[self.serial_no, direction.value]
+            arguments=[self.device_info.serial_number, direction.value]
         )
         print("Command sent:", result.get("status") or result.get("error"))
 
@@ -180,31 +242,44 @@ class RemoteMotor:
             host=self.ip_addr,
             port=self.port,
             command='stop',
-            arguments=[self.serial_no]
+            arguments=[self.device_info.serial_number]
         )
         print("Command sent:", result.get("status") or result.get("error"))
-        
-def main():
-    motor = RemoteMotor(
-        serial_number='55353314',
-        ip_addr=server_ip,
-        port=server_port
-    )
-    motor.move_by(angle=45)
-    time.sleep(0.1)
-    motor.move_to(
-        position=0
-    )
 
+    def _track_position(self):
+        while self.is_moving == True:
+            time.sleep(motor_refresh_time)
+            update = send_request(
+                host=server_ip,
+                port=server_port,
+                command='get_position',
+                arguments=[self.device_info.serial_number]
+            )
+            if 'error' in update:
+                print('Error:', update['error'])
+                break
+            print(
+                f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
+            )
+            if not update['moving']:
+                self.is_moving = False
 
-if __name__ == '__main__':
-    # main()
+    def _start_tracking_positon(self):
+        self._position_thread = threading.Thread(
+            target=self._track_position
+        )
+        self._position_thread.start()
+
+    def _stop_tracking_position(self):
+        self._position_thread.join()
+
+def motor_cli():
     result = send_request(
         host=server_ip,
         port=server_port,
         command='list_motors'
     )
-    motors: list[str] = result.get('motors')
+    motors: list[str] = [DeviceInfo(**motor).serial_number for motor in result.get('motors')]
     while True:
         print(f'Available motors: {motors}' or result.get('error'))
         print('1. Print motor position')
@@ -348,3 +423,13 @@ if __name__ == '__main__':
             case _:
                 print("Invalid choice")
         
+if __name__ == '__main__':
+    # motor_cli()
+
+    print(list_thorlabs_motors(host=server_ip, port=server_port))
+    motor = Motor(
+        serial_number='55356974',
+        ip_addr=server_ip,
+        port=server_port
+    )
+    motor.threaded_move_by(angle=25)

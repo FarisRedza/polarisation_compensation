@@ -3,6 +3,7 @@ import os
 import socket
 import threading
 import json
+import dataclasses
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -26,7 +27,7 @@ def handle_client(conn: socket.socket, addr) -> None:
                 print(f'Command received: {command}')
                 match command:
                     case 'list_motors':
-                        motor_list = [motor.serial_no for motor in motors]
+                        motor_list = [dataclasses.asdict(motor.device_info) for motor in motors]
                         response = {'motors': motor_list}
 
                     case 'get_position':
@@ -41,7 +42,8 @@ def handle_client(conn: socket.socket, addr) -> None:
                         else:
                             response = {
                                 'position': motor.position,
-                                'moving': motor.is_moving
+                                'moving': motor.is_moving,
+                                'direction': motor.direction.value
                             }
 
                     case 'move_by':
