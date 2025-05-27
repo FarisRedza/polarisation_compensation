@@ -92,7 +92,7 @@ class MotorControls(Adw.PreferencesGroup):
 
     def rotate_motor_ccw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
-            angle=-45,
+            angle=-15,
             acceleration=20,
             max_velocity=25
         )
@@ -106,7 +106,7 @@ class MotorControls(Adw.PreferencesGroup):
 
     def rotate_motor_cw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
-            angle=45,
+            angle=15,
             acceleration=20,
             max_velocity=25
         )
@@ -152,7 +152,6 @@ class MotorControlPage(Adw.PreferencesPage):
     def __init__(self, motor: thorlabs_motor.Motor) -> None:
         super().__init__()
         self.motor = motor
-        print(self.motor)
 
         motor_controls_group = MotorControls(
             motor=self.motor,

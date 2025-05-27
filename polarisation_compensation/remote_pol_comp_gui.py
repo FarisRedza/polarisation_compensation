@@ -26,6 +26,128 @@ import remote_motor.remote_motor_box as motor_box
 import bb84.qutag as qutag
 import remote_motor.motor_client as thorlabs_motor
 
+class ControlGroup(Adw.PreferencesGroup):
+    class MotorWP(enum.Enum):
+        QWP = '55353314'
+        HWP = '55356974'
+
+    class MotorDirection(enum.Enum):
+        FORWARD = '+'
+        BACKWARD = '-'
+        IDLE = None
+
+    def __init__(
+            self,
+            qutag_box: qutag_box.QuTAGBox,
+            motor_controllers: list[motor_box.MotorControlPage],
+            get_enable_compensation: typing.Callable,
+            set_enable_compensation: typing.Callable,
+            get_target_azimuth: typing.Callable,
+            set_target_azimuth: typing.Callable,
+            get_target_ellipticity: typing.Callable,
+            set_target_ellipticity: typing.Callable,
+            set_azimuth_velocity: typing.Callable,
+            get_azimuth_velocity: typing.Callable,
+            set_ellipticity_velocity: typing.Callable,
+            get_ellipticity_velocity: typing.Callable
+    ) -> None:
+        super().__init__(title='Polarisation Compensation')
+        self.qutag_box = qutag_box
+        self.motor_controllers = motor_controllers
+
+        self.get_enable_compensation = get_enable_compensation
+        self.set_enable_compensation = set_enable_compensation
+        self.get_target_azimuth = get_target_azimuth
+        self.set_target_azimuth = set_target_azimuth
+        self.get_target_ellipticity = get_target_ellipticity
+        self.set_target_ellipticity = set_target_ellipticity
+        self.set_azimuth_velocity = set_azimuth_velocity
+        self.get_azimuth_velocity = get_azimuth_velocity
+        self.set_ellipticity_velocity = set_ellipticity_velocity
+        self.get_ellipticity_velocity = get_ellipticity_velocity
+
+        # enable compensation
+        enable_compensation_row = Adw.ActionRow(title='Enable compensation')
+        self.add(child=enable_compensation_row)
+
+        enable_compensation_switch = Gtk.Switch(
+            active=self.get_enable_compensation(),
+            valign=Gtk.Align.CENTER
+        )
+        enable_compensation_switch.connect(
+            'notify::active',
+            lambda sw, _: self.set_enable_compensation(sw.get_active())
+        )
+        enable_compensation_row.add_suffix(
+            widget=enable_compensation_switch
+        )
+        enable_compensation_row.set_activatable_widget(
+            widget=enable_compensation_switch
+        )
+
+        # azimuth
+        target_azimuth_row = Adw.ActionRow(title='Target azimuth')
+        self.add(child=target_azimuth_row)
+        self.target_azimuth_entry = Gtk.Entry(
+            text=self.get_target_azimuth(),
+            valign=Gtk.Align.CENTER
+        )
+        target_azimuth_row.add_suffix(widget=self.target_azimuth_entry)
+        self.target_azimuth_entry.connect(
+            'activate',
+            self.set_target_azimuth
+        )
+
+        # ellipticity
+        target_ellipticity_row = Adw.ActionRow(title='Target ellipticity')
+        self.add(child=target_ellipticity_row)
+        self.target_ellipticity_entry = Gtk.Entry(
+            text=self.get_target_ellipticity(),
+            valign=Gtk.Align.CENTER
+        )
+        target_ellipticity_row.add_suffix(widget=self.target_ellipticity_entry)
+        self.target_ellipticity_entry.connect(
+            'activate',
+            self.set_target_ellipticity
+        )
+
+        GLib.timeout_add(
+            interval=100,
+            function=self.pol_comp
+        )
+
+    def pol_comp(self) -> bool:
+        if not self.get_enable_compensation():
+            return True
+        remote_pol_compensation.pol_comp(
+            motor_list=[m.motor for m in self.motor_controllers],
+            motor_qwp_serial_no=self.MotorWP.QWP.value,
+            motor_hwp_serial_no=self.MotorWP.HWP.value,
+            target_azimuth=self.get_target_azimuth(),
+            target_ellipticity=self.get_target_ellipticity(),
+            azimuth_velocities=self.get_azimuth_velocity(),
+            ellipticity_velocities=self.get_ellipticity_velocity(),
+            current_azimuth=self.qutag_box.data.azimuth,
+            current_ellipticity=self.qutag_box.data.ellipticity
+        )
+        return True
+
+    def on_set_target_azimuth(self, entry: Gtk.Entry):
+        try:
+            value = float(entry.get_text())
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.set_target_azimuth(value=value)
+
+    def on_set_target_ellipticity(self, entry: Gtk.Entry):
+        try:
+            value = float(entry.get_text())
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.set_target_ellipticity(value=value)
+
 class PolCompPage(Adw.PreferencesPage):
     def __init__(
             self,
@@ -35,7 +157,7 @@ class PolCompPage(Adw.PreferencesPage):
         super().__init__()
         self.enable_compensation = False
 
-        self.target_azimuth = 0
+        self.target_azimuth = 45
         self.target_ellipticity = 0
 
         self.qwp_motor = ''
@@ -43,22 +165,40 @@ class PolCompPage(Adw.PreferencesPage):
         self.qutag = ''
 
         self.azimuth_velocity = [
-            (2.5, 25.0),
-            (1.5, 20.0),
-            (1, 15.0),
-            (0.5, 5.0),
-            (0.1, 1.0),
-            (0.05, 0.5)
+            # (2.5, 25.0),
+            # (1.5, 20.0),
+            # (1, 15.0),
+            # (0.5, 5.0),
+            # (0.1, 1.0),
+            # (0.05, 0.5)
+            (2.5, 5)
         ]
 
         self.ellipticity_velocity = [
-            (5.0, 25.0),
-            (3.5, 20.0),
-            (2.5, 15.0),
-            (1.0, 5.0),
-            (0.1, 1.0),
-            (0.075, 0.5)
+            # (5.0, 25.0),
+            # (3.5, 20.0),
+            # (2.5, 15.0),
+            # (1.0, 5.0),
+            # (0.1, 1.0),
+            # (0.075, 0.5)
+            (2.5, 5)
         ]
+
+        self.control_group = ControlGroup(
+            qutag_box=qutag_box,
+            motor_controllers=motor_controllers,
+            get_enable_compensation=self.get_enable_compensation,
+            set_enable_compensation=self.set_enable_compensation,
+            get_target_azimuth=self.get_target_azimuth,
+            set_target_azimuth=self.set_target_azimuth,
+            get_target_ellipticity=self.get_target_ellipticity,
+            set_target_ellipticity=self.set_target_ellipticity,
+            set_azimuth_velocity=self.set_azimuth_velocity,
+            get_azimuth_velocity=self.get_azimuth_velocity,
+            set_ellipticity_velocity=self.set_ellipticity_velocity,
+            get_ellipticity_velocity=self.get_ellipticity_velocity
+        )
+        self.add(group=self.control_group)
 
     def set_enable_compensation(self, value: bool) -> None:
         self.enable_compensation = value

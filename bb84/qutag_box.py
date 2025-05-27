@@ -362,7 +362,7 @@ class QuTAGBox(Gtk.Box):
         self.append(child=self.columntwo)
 
         GLib.timeout_add(
-            interval=200,
+            interval=125,
             function=self.update_from_qutag
         )
 
