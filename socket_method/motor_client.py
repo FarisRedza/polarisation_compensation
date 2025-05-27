@@ -5,6 +5,7 @@ import threading
 import json
 import time
 import typing
+import enum
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -12,10 +13,18 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import motor.motor as thorlabs_motor
+# import motor.motor as thorlabs_motor
 server_ip = '127.0.0.1'
 server_port = 5002
 motor_refresh_time = 0.1
+
+MAX_ACCELERATION = 20.0
+MAX_VELOCITY = 25.0
+
+class MotorDirection(enum.Enum):
+    FORWARD = '+'
+    BACKWARD = '-'
+    IDLE = None
 
 def send_request(
         host: str,
@@ -69,7 +78,7 @@ def send_request(
     except Exception as e:
         return {f'Error sending request {request}': str(e)}
     
-class RemoteMotor(thorlabs_motor.Motor):
+class RemoteMotor:
     def __init__(
             self,
             serial_number: str,
@@ -93,8 +102,8 @@ class RemoteMotor(thorlabs_motor.Motor):
     def move_by(
             self,
             angle: float,
-            acceleration: float = thorlabs_motor.MAX_ACCELERATION,
-            max_velocity: float = thorlabs_motor.MAX_VELOCITY
+            acceleration: float = MAX_ACCELERATION,
+            max_velocity: float = MAX_VELOCITY
     ) -> bool:
         result = send_request(
             host=self.ip_addr,
@@ -124,8 +133,8 @@ class RemoteMotor(thorlabs_motor.Motor):
     def move_to(
             self,
             position: float,
-            acceleration: float = thorlabs_motor.MAX_ACCELERATION,
-            max_velocity: float = thorlabs_motor.MAX_VELOCITY
+            acceleration: float = MAX_ACCELERATION,
+            max_velocity: float = MAX_VELOCITY
     ) -> bool:
         result = send_request(
             host=self.ip_addr,
@@ -154,9 +163,9 @@ class RemoteMotor(thorlabs_motor.Motor):
     
     def jog(
             self,
-            direction: thorlabs_motor.MotorDirection,
-            acceleration: float = thorlabs_motor.MAX_ACCELERATION,
-            max_velocity: float = thorlabs_motor.MAX_VELOCITY
+            direction: MotorDirection,
+            acceleration: float = MAX_ACCELERATION,
+            max_velocity: float = MAX_VELOCITY
     ) -> None:
         result = send_request(
             host=self.ip_addr,
@@ -303,9 +312,9 @@ if __name__ == '__main__':
                 direction_choice = input().strip()
                 match direction_choice:
                     case '1':
-                        direction = thorlabs_motor.MotorDirection.FORWARD
+                        direction = MotorDirection.FORWARD
                     case '2':
-                        direction = thorlabs_motor.MotorDirection.BACKWARD
+                        direction = MotorDirection.BACKWARD
                     case _:
                         print('Invalid choice')
                         break

@@ -23,6 +23,7 @@ def handle_client(conn: socket.socket, addr) -> None:
                 
                 request = json.loads(data)
                 command = str(request.get('command'))
+                print(f'Command received: {command}')
                 match command:
                     case 'list_motors':
                         motor_list = [motor.serial_no for motor in motors]
@@ -119,10 +120,12 @@ def handle_client(conn: socket.socket, addr) -> None:
                     case _:
                         response = {'error': 'Unkown command'}
 
-                conn.sendall(json.dumps(response).encode())
+                # conn.sendall(json.dumps(response).encode())
+                conn.sendall((json.dumps(response) + "\n").encode())
 
             except Exception as e:
                 conn.sendall(json.dumps({'error': str(e)}).encode())
+                # conn.sendall(json.dumps({'error': str(e)} + "\n").encode())
                 break
 
 def start_server(host: str = '0.0.0.0', port: int = 5002) -> None:
