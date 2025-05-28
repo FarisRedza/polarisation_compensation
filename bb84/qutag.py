@@ -47,6 +47,46 @@ class Data:
     # phase_difference = Degrees(0.0)
     # circularity = Percent(0.0)
 
+@dataclasses.dataclass
+class RawData:
+    singles_h: int = 0
+    singles_v: int = 0
+    singles_d: int = 0
+    singles_a: int = 0
+    singles_l: int = 0
+    singles_r: int = 0
+
+    def to_data(self) -> Data:
+        try:
+            s1 = (self.singles_h - self.singles_v)/(self.singles_h + self.singles_v)
+        except:
+            s1 = 0
+        try:
+            s2 = (self.singles_d - self.singles_a)/(self.singles_d + self.singles_a)
+        except:
+            s2 = 0
+        try:
+            s3 = (self.singles_r - self.singles_l)/(self.singles_r + self.singles_l)
+        except:
+            s3 = 0
+
+        try:
+            eta = math.asin(data.normalised_s1)/2
+        except:
+            eta = 0
+        try:
+            theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
+        except:
+            theta = 0
+
+        return Data(
+            azimuth=math.degrees(theta),
+            ellipticity=math.degrees(eta),
+            normalised_s1=s1,
+            normalised_s2=s2,
+            normalised_s3=s3
+        )
+
 class Qutag():
     def __init__(self):
         self._qutag = QuTAG_HR.QuTAG()
@@ -63,8 +103,8 @@ class Qutag():
     def __del__(self):
         self._qutag.deInitialize()
 
-    def measure(self) -> Data:
-        data = Data()
+    def measure(self) -> RawData:
+        data = RawData()
         
         self._qutag.getLastTimestamps(reset=True)
         time.sleep(0.1)
@@ -72,17 +112,22 @@ class Qutag():
 
         singles = numpy.bincount(channels, minlength=8)[4:]
 
-        data.normalised_s1 = float((singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V]))
-        data.normalised_s3 = float((singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L]))
+        data.singles_h=singles[0]
+        data.singles_v=singles[1]
+        data.singles_l=singles[2]
+        data.singles_r=singles[3]
 
-        try:
-            eta = math.asin(data.normalised_s1)/2
-            theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
-        except (ValueError, ZeroDivisionError):
-            pass
-        else:
-            data.azimuth = math.degrees(theta)
-            data.ellipticity = math.degrees(eta)
+        # data.normalised_s1 = float((singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V]))
+        # data.normalised_s3 = float((singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L]))
+
+        # try:
+        #     eta = math.asin(data.normalised_s1)/2
+        #     theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
+        # except (ValueError, ZeroDivisionError):
+        #     pass
+        # else:
+        #     data.azimuth = math.degrees(theta)
+        #     data.ellipticity = math.degrees(eta)
 
         return data
 

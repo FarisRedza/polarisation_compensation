@@ -254,7 +254,12 @@ class Motor:
             host=self.ip_addr,
             port=self.port,
             command='jog',
-            arguments=[self.device_info.serial_number, direction.value]
+            arguments=[
+                self.device_info.serial_number,
+                direction.value,
+                acceleration,
+                max_velocity
+            ]
         )
         self._start_tracking_positon()
         print("Command sent:", result.get("status") or result.get("error"))

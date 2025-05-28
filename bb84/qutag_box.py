@@ -370,7 +370,7 @@ class QuTAGBox(Gtk.Box):
         return self.data
         
     def update_from_qutag(self) -> bool:
-        self.data = self.qutag.measure()
+        self.data = self.qutag.measure().to_data()
         self.set_qutag_data()
         return True
     

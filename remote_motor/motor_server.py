@@ -43,7 +43,9 @@ def handle_client(conn: socket.socket, addr) -> None:
                             response = {
                                 'position': motor.position,
                                 'moving': motor.is_moving,
-                                'direction': motor.direction.value
+                                'direction': motor.direction.value,
+                                'acceleration': motor.acceleration,
+                                'max_velocity': motor.max_velocity
                             }
 
                     case 'move_by':
