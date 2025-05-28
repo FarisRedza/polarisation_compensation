@@ -24,6 +24,13 @@ Watts = typing.NewType('Watts', float)
 Metres = typing.NewType('Metres', float)
 DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
+C_H = 0
+C_V = 1
+# C_D = 2
+# C_A = 3
+C_R = 2
+C_L = 3
+
 @dataclasses.dataclass
 class Data:
     # timestamp = float(0.0)
@@ -53,8 +60,8 @@ class RawData:
     singles_v: int = 0
     singles_d: int = 0
     singles_a: int = 0
-    singles_l: int = 0
     singles_r: int = 0
+    singles_l: int = 0
 
     def to_data(self) -> Data:
         try:
@@ -71,11 +78,11 @@ class RawData:
             s3 = 0
 
         try:
-            eta = math.asin(data.normalised_s1)/2
+            eta = math.asin(s1)/2
         except:
             eta = 0
         try:
-            theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
+            theta = math.acos(s3/math.cos(2*eta))/2
         except:
             theta = 0
 
@@ -112,10 +119,10 @@ class Qutag():
 
         singles = numpy.bincount(channels, minlength=8)[4:]
 
-        data.singles_h=singles[0]
-        data.singles_v=singles[1]
-        data.singles_l=singles[2]
-        data.singles_r=singles[3]
+        data.singles_h=int(singles[C_H])
+        data.singles_v=int(singles[C_V])
+        data.singles_r=int(singles[C_R])
+        data.singles_l=int(singles[C_L])
 
         # data.normalised_s1 = float((singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V]))
         # data.normalised_s3 = float((singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L]))
@@ -132,12 +139,6 @@ class Qutag():
         return data
 
 exposure_time = 100
-C_H = 0
-C_V = 1
-# C_D = 2
-# C_A = 3
-C_L = 2
-C_R = 3
 
 target_azimuth = 0
 azimuth_threshold = 1
@@ -209,7 +210,7 @@ def init_qutag() -> QuTAG_HR.QuTAG:
     return qutag
 
 if __name__ == '__main__':
-    qutag = init_qutag()
+    qutag = Qutag()
 
     # try:
     #     main()
@@ -222,24 +223,25 @@ if __name__ == '__main__':
     #     hwp_motor.stop()
     #     print('HWP Motor stopped')
     
-    data = Data()
+    # data = Data()
     for _ in range(10):
         time.sleep(10/exposure_time)
-        tags, channels, valid = qutag.getLastTimestamps(reset=True)
-        singles = numpy.bincount(channels, minlength=8)[4:]
+        print(qutag.measure().to_data())
+        # tags, channels, valid = qutag.getLastTimestamps(reset=True)
+        # singles = numpy.bincount(channels, minlength=8)[4:]
 
-        data.normalised_s1 = float((singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V]))
-        data.normalised_s3 = float((singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L]))
+        # data.normalised_s1 = float((singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V]))
+        # data.normalised_s3 = float((singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L]))
 
-        try:
-            eta = math.asin(data.normalised_s1)/2
-            theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
-        except (ValueError, ZeroDivisionError):
-            pass
-        else:
-            data.azimuth = math.degrees(theta)
-            data.ellipticity = math.degrees(eta)
+        # try:
+        #     eta = math.asin(data.normalised_s1)/2
+        #     theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
+        # except (ValueError, ZeroDivisionError):
+        #     pass
+        # else:
+        #     data.azimuth = math.degrees(theta)
+        #     data.ellipticity = math.degrees(eta)
 
-        pprint.pprint(data)
+        # pprint.pprint(data)
 
     qutag.deInitialize()

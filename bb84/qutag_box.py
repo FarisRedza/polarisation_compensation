@@ -192,6 +192,122 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
         self.canvas.draw_idle()
 
+class CountsGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            get_raw_data_callback: typing.Callable
+    ) -> None:
+        super().__init__(title='Counts')
+        self.get_raw_data_callback = get_raw_data_callback
+
+        data_row = Adw.ActionRow()
+        self.add(child=data_row)
+
+        margin = 6
+        box_spacing = 6
+        width_chars = 9
+
+        data_header_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            margin_top=margin,
+            margin_bottom=margin,
+            valign=Gtk.Align.CENTER,
+            spacing=box_spacing
+        )
+        data_row.add_prefix(widget=data_header_box)
+
+        data_value_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            margin_top=margin,
+            margin_bottom=margin,
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.END,
+            spacing=box_spacing,
+        )
+        data_row.add_suffix(widget=data_value_box)
+
+        # h
+        h_label = Gtk.Label(
+            label='H',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=h_label)
+        self.h_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.h_value_label)
+
+        # v
+        v_label = Gtk.Label(
+            label='V',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=v_label)
+        self.v_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.v_value_label)
+
+        # d
+        d_label = Gtk.Label(
+            label='D',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=d_label)
+        self.d_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.d_value_label)
+
+        # a
+        a_label = Gtk.Label(
+            label='A',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=a_label)
+        self.a_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.a_value_label)
+
+        # r
+        r_label = Gtk.Label(
+            label='R',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=r_label)
+        self.r_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.r_value_label)
+
+        # l
+        h_label = Gtk.Label(
+            label='L',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=h_label)
+        self.l_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.l_value_label)
+
+    def update_qutag_info(self):
+        raw_data: qutag.RawData = self.get_raw_data_callback()
+
+        self.h_value_label.set_text(f'{raw_data.singles_h}')
+        self.v_value_label.set_text(f'{raw_data.singles_v}')
+        self.d_value_label.set_text(f'{raw_data.singles_d}')
+        self.a_value_label.set_text(f'{raw_data.singles_a}')
+        self.r_value_label.set_text(f'{raw_data.singles_r}')
+        self.l_value_label.set_text(f'{raw_data.singles_l}')
+
 class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(
             self,
@@ -262,17 +378,17 @@ class MeasurementGroup(Adw.PreferencesGroup):
         )
         data_value_box.append(child=self.normalised_s1_value_label)
 
-        # # normalised s2
-        # normalised_s2_label = Gtk.Label(
-        #     label='s2',
-        #     halign=Gtk.Align.START
-        # )
-        # data_header_box.append(child=normalised_s2_label)
-        # self.normalised_s2_value_label = Gtk.Label(
-        #     halign=Gtk.Align.START,
-        #     width_chars=width_chars
-        # )
-        # data_value_box.append(child=self.normalised_s2_value_label)
+        # normalised s2
+        normalised_s2_label = Gtk.Label(
+            label='s2',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=normalised_s2_label)
+        self.normalised_s2_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.normalised_s2_value_label)
 
         # normalised s3
         normalised_s3_label = Gtk.Label(
@@ -286,17 +402,17 @@ class MeasurementGroup(Adw.PreferencesGroup):
         )
         data_value_box.append(child=self.normalised_s3_value_label)
 
-        # qber
-        qber_label = Gtk.Label(
-            label='QBER',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=qber_label)
-        self.qber_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.qber_value_label)
+        # # qber
+        # qber_label = Gtk.Label(
+        #     label='QBER',
+        #     halign=Gtk.Align.START
+        # )
+        # data_header_box.append(child=qber_label)
+        # self.qber_value_label = Gtk.Label(
+        #     halign=Gtk.Align.START,
+        #     width_chars=width_chars
+        # )
+        # data_value_box.append(child=self.qber_value_label)
 
     def update_qutag_info(self):
         data: qutag.Data = self.get_data_callback()
@@ -311,9 +427,9 @@ class MeasurementGroup(Adw.PreferencesGroup):
         # self.power_polarised_value_label.set_text(f'{data.power_polarised:.2f} dBm')
         # self.power_unpolarised_value_label.set_text(f'{data.power_unpolarised:.2f} dBm')
         self.normalised_s1_value_label.set_text(f'{data.normalised_s1:.2f}')
-        # self.normalised_s2_value_label.set_text(f'{data.normalised_s2:.2f}')
+        self.normalised_s2_value_label.set_text(f'{data.normalised_s2:.2f}')
         self.normalised_s3_value_label.set_text(f'{data.normalised_s3:.2f}')
-        self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
+        # self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
         # self.S0_value_label.set_text(f'{data.S0:.2} W')
         # self.S1_value_label.set_text(f'{data.S1:.2} W')
         # self.S2_value_label.set_text(f'{data.S2:.2} W')
@@ -342,10 +458,18 @@ class ColumnOne(Adw.PreferencesPage):
 class ColumnTwo(Adw.PreferencesPage):
     def __init__(
             self,
+            get_raw_data_callback: typing.Callable,
             get_data_callback: typing.Callable
     ) -> None:
         super().__init__()
-        self.measurement_group = MeasurementGroup(get_data_callback=get_data_callback)
+        self.counts_group = CountsGroup(
+            get_raw_data_callback=get_raw_data_callback
+        )
+        self.add(group=self.counts_group)
+
+        self.measurement_group = MeasurementGroup(
+            get_data_callback=get_data_callback
+        )
         self.add(group=self.measurement_group)
 
 class QuTAGBox(Gtk.Box):
@@ -353,12 +477,16 @@ class QuTAGBox(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
         self.qutag = qutag.Qutag()
+        self.raw_data = qutag.RawData()
         self.data = qutag.Data()
 
         self.columnone = ColumnOne(get_data_callback=self.get_data)
         self.append(child=self.columnone)
 
-        self.columntwo = ColumnTwo(get_data_callback=self.get_data)
+        self.columntwo = ColumnTwo(
+            get_raw_data_callback=self.get_raw_data,
+            get_data_callback=self.get_data
+        )
         self.append(child=self.columntwo)
 
         GLib.timeout_add(
@@ -366,15 +494,20 @@ class QuTAGBox(Gtk.Box):
             function=self.update_from_qutag
         )
 
+    def get_raw_data(self) -> qutag.RawData:
+        return self.raw_data
+
     def get_data(self) -> qutag.Data:
         return self.data
         
     def update_from_qutag(self) -> bool:
-        self.data = self.qutag.measure().to_data()
+        self.raw_data = self.qutag.measure()
+        self.data = self.raw_data.to_data()
         self.set_qutag_data()
         return True
     
     def set_qutag_data(self) -> None:
         self.columnone.plot_ellipse_group.update_plot()
         self.columnone.plot_bloch_group.update_point()
+        self.columntwo.counts_group.update_qutag_info()
         self.columntwo.measurement_group.update_qutag_info()
