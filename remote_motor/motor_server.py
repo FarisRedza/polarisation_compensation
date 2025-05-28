@@ -50,9 +50,15 @@ def handle_client(conn: socket.socket, addr) -> None:
 
                     case 'move_by':
                         serial_number = str(request.get('serial_number'))
-                        angle = float(request.get('angle', 0))
-                        acceleration = float(request.get('acceleration', thorlabs_motor.MAX_ACCELERATION))
-                        max_velocity = float(request.get('max_velocity', thorlabs_motor.MAX_VELOCITY))
+                        angle = float(request.get('angle', 0.0))
+                        acceleration = float(request.get(
+                            'acceleration',
+                            thorlabs_motor.MAX_ACCELERATION
+                        ))
+                        max_velocity = float(request.get(
+                            'max_velocity',
+                            thorlabs_motor.MAX_VELOCITY
+                        ))
 
                         motor = next(
                             (m for m in motors if m.serial_no == serial_number),
@@ -70,9 +76,15 @@ def handle_client(conn: socket.socket, addr) -> None:
 
                     case 'move_to':
                         serial_number = str(request.get('serial_number'))
-                        position = float(request.get('position', 0))
-                        acceleration = float(request.get('acceleration', thorlabs_motor.MAX_ACCELERATION))
-                        max_velocity = float(request.get('max_velocity', thorlabs_motor.MAX_VELOCITY))
+                        position = float(request.get('position', 0.0))
+                        acceleration = float(request.get(
+                            'acceleration',
+                            thorlabs_motor.MAX_ACCELERATION
+                        ))
+                        max_velocity = float(request.get(
+                            'max_velocity',
+                            thorlabs_motor.MAX_VELOCITY
+                        ))
 
                         motor = next(
                             (m for m in motors if m.serial_no == serial_number),
@@ -96,6 +108,14 @@ def handle_client(conn: socket.socket, addr) -> None:
                                 None
                             ),
                         )
+                        acceleration = float(request.get(
+                            'acceleration',
+                            thorlabs_motor.MAX_ACCELERATION
+                        ))
+                        max_velocity = float(request.get(
+                            'max_velocity',
+                            thorlabs_motor.MAX_VELOCITY
+                        ))
 
                         motor = next(
                             (m for m in motors if m.serial_no == serial_number),
@@ -105,7 +125,9 @@ def handle_client(conn: socket.socket, addr) -> None:
                             response = {'error': f'Motor {serial_number} not found'}
                         else:
                             motor.jog(
-                                direction=direction
+                                direction=direction,
+                                acceleration=acceleration,
+                                max_velocity=max_velocity
                             )
                             response = {'status': f'Moving {serial_number} {direction.name}'}
 

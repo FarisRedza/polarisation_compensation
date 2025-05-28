@@ -56,14 +56,20 @@ def send_request(
                 case 'move_by':
                     request['serial_number'] = arguments[0]
                     request['angle'] = arguments[1]
+                    request['acceleration'] = arguments[2]
+                    request['max_velocity'] = arguments[3]
 
                 case 'move_to':
                     request['serial_number'] = arguments[0]
                     request['position'] = arguments[1]
+                    request['acceleration'] = arguments[2]
+                    request['max_velocity'] = arguments[3]
 
                 case 'jog':
                     request['serial_number'] = arguments[0]
                     request['direction'] = arguments[1]
+                    request['acceleration'] = arguments[2]
+                    request['max_velocity'] = arguments[3]
 
                 case 'stop':
                     request['serial_number'] = arguments[0]
@@ -153,7 +159,12 @@ class Motor:
             host=self.ip_addr,
             port=self.port,
             command='move_by',
-            arguments=[self.device_info.serial_number, angle]
+            arguments=[
+                self.device_info.serial_number,
+                angle,
+                acceleration,
+                max_velocity
+            ]
         )
         print('Command sent:', result.get('status') or result.get('error'))
         while True:
@@ -203,7 +214,12 @@ class Motor:
             host=self.ip_addr,
             port=self.port,
             command='move_to',
-            arguments=[self.device_info.serial_number, position]
+            arguments=[
+                self.device_info.serial_number,
+                position,
+                acceleration,
+                max_velocity
+            ]
         )
         print('Command sent:', result.get('status') or result.get('error'))
         self._start_tracking_positon()
