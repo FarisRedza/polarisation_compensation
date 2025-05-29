@@ -4,7 +4,6 @@ import time
 import dataclasses
 import typing
 import math
-import pprint
 
 import numpy
 
@@ -15,7 +14,6 @@ sys.path.append(
     ))
 )
 import quTAG.QuTAG_HR as QuTAG_HR
-# import socket_method.motor_client as thorlabs_motor
 
 Percent = typing.NewType('Percent', float)
 Degrees = typing.NewType('Degrees', float)
@@ -94,7 +92,7 @@ class RawData:
             normalised_s3=s3
         )
 
-class Qutag():
+class Qutag:
     def __init__(self):
         self._qutag = QuTAG_HR.QuTAG()
         for channel in range(4, 9):
@@ -105,7 +103,7 @@ class Qutag():
                 threshold=1
             )
             self._qutag.setChannelDelay(channel=channel, delays=0)
-            self._qutag.setExposureTime(expTime=exposure_time)
+            self._qutag.setExposureTime(expTime=100)
 
     def __del__(self):
         self._qutag.deInitialize()
@@ -115,133 +113,26 @@ class Qutag():
         
         self._qutag.getLastTimestamps(reset=True)
         time.sleep(0.1)
-        tags, channels, valid = self._qutag.getLastTimestamps(reset=True)
+        tags, channels, valid = self._qutag.getLastTimestamps(
+            reset=True
+        )
 
         singles = numpy.bincount(channels, minlength=8)[4:]
 
         data.singles_h=int(singles[C_H])
         data.singles_v=int(singles[C_V])
+        # data.singles_d=int(singles[C_D])
+        # data.singles_a=int(singles[C_A])
         data.singles_r=int(singles[C_R])
         data.singles_l=int(singles[C_L])
 
-        # data.normalised_s1 = float((singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V]))
-        # data.normalised_s3 = float((singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L]))
-
-        # try:
-        #     eta = math.asin(data.normalised_s1)/2
-        #     theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
-        # except (ValueError, ZeroDivisionError):
-        #     pass
-        # else:
-        #     data.azimuth = math.degrees(theta)
-        #     data.ellipticity = math.degrees(eta)
-
         return data
-
-exposure_time = 100
-
-target_azimuth = 0
-azimuth_threshold = 1
-target_ellipticity = 0
-ellipticity_threshold = 1
-
-# qwp_motor = thorlabs_motor.RemoteMotor(
-#     serial_number='55353314',
-#     ip_addr=thorlabs_motor.server_ip,
-#     port=thorlabs_motor.server_port
-# )
-# hwp_motor = thorlabs_motor.RemoteMotor(
-#     serial_number='55356974',
-#     ip_addr=thorlabs_motor.server_ip,
-#     port=thorlabs_motor.server_port
-# )
-
-# def main():
-#     while True:
-#         qutag.getLastTimestamps(reset=True)
-#         time.sleep(10/exposure_time)
-#         tags, channels, valid = qutag.getLastTimestamps(reset=True)
-#         singles = numpy.bincount(channels, minlength=8)[4:]
-        
-#         s_1 = (singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V])
-#         s_3 = (singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L])
-
-#         print(f'QBER: {1-s_1**2}')
-
-#         try:
-#             eta = math.asin(s_3)/2
-#             theta = math.acos(s_1/math.cos(2*eta))/2
-#         except (ValueError, ZeroDivisionError):
-#             pass
-#         else:
-#             azimuth = math.degrees(theta)
-#             ellipticity = math.degrees(eta)
-
-#             print(f'azimuth: {azimuth} | ellipticity: {ellipticity}')
-
-#             if azimuth > target_azimuth + azimuth_threshold/2:
-#                 qwp_motor.jog(direction=thorlabs_motor.thorlabs_motor.MotorDirection.BACKWARD)
-#             elif azimuth < target_azimuth - azimuth_threshold/2:
-#                 qwp_motor.jog(direction=thorlabs_motor.thorlabs_motor.MotorDirection.FORWARD)
-#             else:
-#                 qwp_motor.stop()
-
-#             if ellipticity > target_ellipticity + ellipticity_threshold/2:
-#                 hwp_motor.jog(direction=thorlabs_motor.thorlabs_motor.MotorDirection.BACKWARD)
-#             elif ellipticity < target_ellipticity - ellipticity_threshold/2:
-#                 hwp_motor.jog(direction=thorlabs_motor.thorlabs_motor.MotorDirection.FORWARD)
-#             else:
-#                 hwp_motor.stop()
-
-#             time.sleep(1)
-
-def init_qutag() -> QuTAG_HR.QuTAG:
-    qutag = QuTAG_HR.QuTAG()
-    for channel in range(4, 9):
-        qutag.setSignalConditioning(
-            channel=channel,
-            conditioning=3,
-            edge=True,
-            threshold=1
-        )
-        print(f'Channel {channel}: {qutag.getSignalConditioning(channel=channel)}')
-        qutag.setChannelDelay(channel=channel, delays=0)
-        qutag.setExposureTime(expTime=exposure_time)
-    return qutag
 
 if __name__ == '__main__':
     qutag = Qutag()
 
-    # try:
-    #     main()
-    # except KeyboardInterrupt:
-    #     qutag.deInitialize()
-    #     print('QuTAG deinitialised')
-
-    #     qwp_motor.stop()
-    #     print('QWP Motor stopped')
-    #     hwp_motor.stop()
-    #     print('HWP Motor stopped')
-    
-    # data = Data()
     for _ in range(10):
-        time.sleep(10/exposure_time)
+        time.sleep(0.1)
         print(qutag.measure().to_data())
-        # tags, channels, valid = qutag.getLastTimestamps(reset=True)
-        # singles = numpy.bincount(channels, minlength=8)[4:]
 
-        # data.normalised_s1 = float((singles[C_H] - singles[C_V])/(singles[C_H] + singles[C_V]))
-        # data.normalised_s3 = float((singles[C_R] - singles[C_L])/(singles[C_R] + singles[C_L]))
-
-        # try:
-        #     eta = math.asin(data.normalised_s1)/2
-        #     theta = math.acos(data.normalised_s3/math.cos(2*eta))/2
-        # except (ValueError, ZeroDivisionError):
-        #     pass
-        # else:
-        #     data.azimuth = math.degrees(theta)
-        #     data.ellipticity = math.degrees(eta)
-
-        # pprint.pprint(data)
-
-    qutag.deInitialize()
+    qutag._qutag.deInitialize()
