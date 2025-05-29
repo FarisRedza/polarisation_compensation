@@ -23,7 +23,7 @@ sys.path.append(
 )
 import polarimeter.polarimeter_box as polarimeter_box
 import motor.motor_box as motor_box
-import motor.motor as thorlabs_motor
+import motor.thorlabs_motor as thorlabs_motor
 
 class CurveBox(Gtk.Box):
     def __init__(

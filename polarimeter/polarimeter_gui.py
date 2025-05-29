@@ -6,7 +6,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-import gui.polarimeter_box as polarimeter_box
+import polarimeter_box as polarimeter_box
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -14,7 +14,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.polarimeter as scpi_polarimeter
+import polarimeter.thorlabs_polarimeter as polarimeter
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):

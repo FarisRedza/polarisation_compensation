@@ -1,4 +1,4 @@
-import motor.motor as thorlabs_motor
+import motor.thorlabs_motor as thorlabs_motor
 
 def pol_comp(
         motor_list: list[thorlabs_motor.Motor],

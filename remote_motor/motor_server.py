@@ -11,7 +11,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import motor.motor as thorlabs_motor
+import motor.thorlabs_motor as thorlabs_motor
 
 def handle_client(conn: socket.socket, addr) -> None:
     print(f'Connected by {addr}')
