@@ -1,7 +1,4 @@
-import polarimeter.polarimeter as scpi_polarimeter
 import motor.motor as thorlabs_motor
-import threading
-import time
 
 def pol_comp(
         motor_list: list[thorlabs_motor.Motor],

@@ -3,11 +3,6 @@ import os
 import enum
 import typing
 
-import numpy
-import matplotlib.pyplot
-import matplotlib.backends.backend_gtk4agg
-import matplotlib.backend_bases
-
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -21,12 +16,11 @@ sys.path.append(
         os.path.pardir
     ))
 )
+import polarimeter.polarimeter_box as polarimeter_box
 import bb84.qutag_box as qutag_box
-import remote_motor.remote_motor_box as motor_box
-import bb84.qutag as qutag
-import remote_motor.motor_client as thorlabs_motor
 
-import gui.polarisation_box as polarisation_box
+import remote_motor.remote_motor_box as motor_box
+import remote_motor.motor_client as thorlabs_motor
 
 class ControlGroup(Adw.PreferencesGroup):
     class MotorWP(enum.Enum):
@@ -153,7 +147,7 @@ class ControlGroup(Adw.PreferencesGroup):
 class PolCompPage(Adw.PreferencesPage):
     def __init__(
             self,
-            qutag_box: qutag_box.QuTAGBox,
+            polarisation_box: qutag_box.QuTAGBox,
             motor_controllers: list[motor_box.MotorControlPage]
     ) -> None:
         super().__init__()
@@ -185,7 +179,7 @@ class PolCompPage(Adw.PreferencesPage):
         ]
 
         self.control_group = ControlGroup(
-            qutag_box=qutag_box,
+            qutag_box=polarisation_box,
             motor_controllers=motor_controllers,
             get_enable_compensation=self.get_enable_compensation,
             set_enable_compensation=self.set_enable_compensation,
@@ -275,9 +269,9 @@ class MainWindow(Adw.ApplicationWindow):
         # self.qutag_box = qutag_box.QuTAGBox()
         # self.content_box.append(child=self.qutag_box)
 
-        ### polarimeter box
-        self.qutag_box = polarisation_box.PolarimeterBox()
-        self.content_box.append(child=self.qutag_box)
+        ### polarisation box
+        self.polarisation_box = polarimeter_box.PolarimeterBox()
+        self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes
         self.motors = thorlabs_motor.list_thorlabs_motors(
@@ -298,7 +292,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### pol comp
         self.pol_comp_page = PolCompPage(
-            qutag_box=self.qutag_box,
+            polarisation_box=self.polarisation_box,
             motor_controllers=self.motor_controllers
         )
         self.content_box.append(child=self.pol_comp_page)

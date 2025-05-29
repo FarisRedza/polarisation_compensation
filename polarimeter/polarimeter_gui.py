@@ -6,7 +6,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-import polarisation_box
+import gui.polarimeter_box as polarimeter_box
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -34,7 +34,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### polarimeter box
         try:
-            self.polarimeter_box = polarisation_box.PolarimeterBox()
+            self.polarimeter_box = polarimeter_box.PolarimeterBox()
         except:
             main_box.append(
                 child=Gtk.Label(

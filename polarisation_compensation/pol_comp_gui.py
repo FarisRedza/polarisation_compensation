@@ -13,9 +13,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
-import polarisation_box
-import gui.motor_box as motor_box
-import polarisation_compensation.pol_compensation as pol_compensation
+import pol_compensation as pol_compensation
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -23,7 +21,8 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.polarimeter as scpi_polarimeter
+import polarimeter.polarimeter_box as polarimeter_box
+import motor.motor_box as motor_box
 import motor.motor as thorlabs_motor
 
 class CurveBox(Gtk.Box):
@@ -133,7 +132,7 @@ class ControlGroup(Adw.PreferencesGroup):
         IDLE = None
     def __init__(
             self,
-            polarimeter_box: polarisation_box.PolarimeterBox,
+            polarimeter_box: polarimeter_box.PolarimeterBox,
             motor_controllers: list[motor_box.MotorControlPage],
             set_enable_compensation_callback: typing.Callable,
             get_enable_compensation_callback: typing.Callable,
@@ -434,7 +433,7 @@ class DevicesGroup(Adw.PreferencesGroup):
 class PolCompPage(Adw.PreferencesPage):
     def __init__(
             self,
-            polarimeter_box: polarisation_box.PolarimeterBox,
+            polarimeter_box: polarimeter_box.PolarimeterBox,
             motor_controllers: list[motor_box.MotorControlPage]
     ) -> None:
         super().__init__()
@@ -586,7 +585,7 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=self.content_box)
 
         ### polarimeter box
-        self.polarimeter_box = polarisation_box.PolarimeterBox()
+        self.polarimeter_box = polarimeter_box.PolarimeterBox()
         self.content_box.append(child=self.polarimeter_box)
 
         ### init motor control boxes
