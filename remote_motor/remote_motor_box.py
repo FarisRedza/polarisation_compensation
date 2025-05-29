@@ -39,10 +39,70 @@ class MotorControls(Adw.PreferencesGroup):
         self.set_max_velocity_callback = set_max_velocity_callback
 
         self.motor = motor
+        self.manual_motor_control = False
+
+        # enable controls
+        enable_controls_row = Adw.ActionRow(title='Enable motor controls')
+        self.add(child=enable_controls_row)
+
+        self.enable_controls_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        self.enable_controls_switch.connect(
+            'notify::active',
+            self.on_enable_controls
+        )
+        enable_controls_row.add_suffix(widget=self.enable_controls_switch)
+        enable_controls_row.set_activatable_widget(widget=self.enable_controls_switch)
 
         # position
         position_row = Adw.ActionRow(title='Position')
         self.add(child=position_row)
+
+        # step size
+        step_size_row = Adw.ActionRow(title='Step size')
+        self.add(child=step_size_row)
+
+        self.step_size_entry = Gtk.Entry(
+            text=self.get_step_size_callback(),
+            valign=Gtk.Align.CENTER,
+            sensitive=False
+        )
+        step_size_row.add_suffix(widget=self.step_size_entry)
+        self.step_size_entry.connect(
+            'activate',
+            self.on_set_step_size
+        )
+
+        # acceleration
+        acceleration_row = Adw.ActionRow(title='Acceleration')
+        self.add(child=acceleration_row)
+
+        self.acceleration_entry = Gtk.Entry(
+            text=get_acceleration_callback(),
+            placeholder_text = 'Max value: 20',
+            valign=Gtk.Align.CENTER,
+            sensitive=False
+        )
+        acceleration_row.add_suffix(widget=self.acceleration_entry)
+        self.acceleration_entry.connect(
+            'activate',
+            self.on_set_acceleration
+        )
+
+        # max velocity
+        max_velocity_row = Adw.ActionRow(title='Max velocity')
+        self.add(child=max_velocity_row)
+
+        self.max_velocity_entry = Gtk.Entry(
+            text=self.get_max_velocity_callback(),
+            placeholder_text = 'Max value: 25',
+            valign=Gtk.Align.CENTER,
+            sensitive=False
+        )
+        max_velocity_row.add_suffix(widget=self.max_velocity_entry)
+        self.max_velocity_entry.connect(
+            'activate',
+            self.on_set_max_velocity
+        )
 
         self.position_label = Gtk.Label(label=f'{self.get_position_callback():.3f}')
         position_row.add_suffix(widget=self.position_label)
@@ -71,7 +131,7 @@ class MotorControls(Adw.PreferencesGroup):
         self.ccw_button = Gtk.Button(
             label='CCW',
             valign=Gtk.Align.CENTER,
-            sensitive=True
+            sensitive=False
         )
         control_grid.attach(self.ccw_button, 1, 1, 1, 1)
         self.ccw_button.connect('clicked', self.rotate_motor_ccw)
@@ -80,24 +140,37 @@ class MotorControls(Adw.PreferencesGroup):
         self.rot_0_button = Gtk.Button(
             label='0',
             valign=Gtk.Align.CENTER,
-            sensitive=True
+            sensitive=False
         )
         control_grid.attach(self.rot_0_button, 2, 1, 1, 1)
         self.rot_0_button.connect('clicked', self.rotate_motor_0)
 
         #### cw
-        self.ccw_button = Gtk.Button(
+        self.cw_button = Gtk.Button(
             label='CW',
             valign=Gtk.Align.CENTER,
-            sensitive=True
+            sensitive=False
         )
-        control_grid.attach(self.ccw_button, 3, 1, 1, 1)
-        self.ccw_button.connect('clicked', self.rotate_motor_cw)
+        control_grid.attach(self.cw_button, 3, 1, 1, 1)
+        self.cw_button.connect('clicked', self.rotate_motor_cw)
 
         GLib.timeout_add(
             interval=100,
             function=self.update_motor_info
         )
+
+    def on_enable_controls(
+            self,
+            switch: Gtk.Switch,
+            gparam: GObject.GParamSpec
+    ) -> None:
+        self.manual_motor_control = not self.manual_motor_control
+        self.step_size_entry.set_sensitive(switch.get_active())
+        self.acceleration_entry.set_sensitive(switch.get_active())
+        self.max_velocity_entry.set_sensitive(switch.get_active())
+        self.ccw_button.set_sensitive(switch.get_active())
+        self.rot_0_button.set_sensitive(switch.get_active())
+        self.cw_button.set_sensitive(switch.get_active())
 
     def update_motor_info(self) -> bool:
         self.position_label.set_text(str=f'{self.get_position_callback():.3f}')
@@ -106,15 +179,45 @@ class MotorControls(Adw.PreferencesGroup):
         # self.max_velocity_entry.set_text(text=f'{self.get_max_velocity_callback():.3f}')
         return True
 
+    def on_set_step_size(self, entry: Gtk.Entry):
+        try:
+            value = abs(float(entry.get_text()))
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.set_step_size_callback(value=value)
+
+    def on_set_acceleration(self, entry: Gtk.Entry):
+        try:
+            value = abs(float(entry.get_text()))
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            if value > 20:
+                print(f'Invalid entry: {entry.get_text()}')
+            else:
+                self.set_acceleration_callback(value=value)
+
+    def on_set_max_velocity(self, entry: Gtk.Entry):
+        try:
+            value = abs(float(entry.get_text()))
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            if value > 25:
+                print(f'Invalid entry: {entry.get_text()}')
+            else:
+                self.set_max_velocity_callback(value=value)
+
     def rotate_motor_ccw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
-            angle=-15,
-            acceleration=20,
-            max_velocity=25
+            angle=-self.get_step_size_callback(),
+            acceleration=self.get_acceleration_callback(),
+            max_velocity=self.get_max_velocity_callback()
         )
 
     def rotate_motor_0(self, button: Gtk.Button):
-        self.motor.move_to(
+        self.motor.threaded_move_to(
             position=0,
             acceleration=20,
             max_velocity=25
@@ -122,9 +225,9 @@ class MotorControls(Adw.PreferencesGroup):
 
     def rotate_motor_cw(self, button: Gtk.Button):
         self.motor.threaded_move_by(
-            angle=15,
-            acceleration=20,
-            max_velocity=25
+            angle=self.get_step_size_callback(),
+            acceleration=self.get_acceleration_callback(),
+            max_velocity=self.get_max_velocity_callback()
         )
 
 class DeviceInfoGroup(Adw.PreferencesGroup):

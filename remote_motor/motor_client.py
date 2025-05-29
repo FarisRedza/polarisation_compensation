@@ -17,7 +17,7 @@ sys.path.append(
 )
 # import motor.motor as thorlabs_motor
 server_ip = '127.0.0.1'
-# server_ip = '137.195.89.222'
+server_ip = '137.195.89.222'
 server_port = 5002
 motor_refresh_time = 0.1
 
@@ -155,6 +155,8 @@ class Motor:
             acceleration: float = MAX_ACCELERATION,
             max_velocity: float = MAX_VELOCITY
     ) -> bool:
+        self._start_tracking_positon()
+
         result = send_request(
             host=self.ip_addr,
             port=self.port,
@@ -182,6 +184,7 @@ class Motor:
                 f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
             )
             if not update['moving']:
+                self._stop_tracking_position()
                 break
         return True
     
@@ -210,6 +213,7 @@ class Motor:
             acceleration: float = MAX_ACCELERATION,
             max_velocity: float = MAX_VELOCITY
     ) -> bool:
+        self._start_tracking_positon()
         result = send_request(
             host=self.ip_addr,
             port=self.port,
@@ -222,7 +226,6 @@ class Motor:
             ]
         )
         print('Command sent:', result.get('status') or result.get('error'))
-        self._start_tracking_positon()
         while True:
             time.sleep(motor_refresh_time)
             update = send_request(
@@ -238,6 +241,7 @@ class Motor:
                 f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
             )
             if not update['moving']:
+                self._stop_tracking_position()
                 break
         return True
     
@@ -299,25 +303,13 @@ class Motor:
                 arguments=[self.device_info.serial_number]
             )
             self.position = float(result['position'])
+            self.is_moving = bool(result['moving'])
 
     def _track_position(self):
         self.is_moving = True
         while self.is_moving == True:
             time.sleep(motor_refresh_time)
-            update = send_request(
-                host=server_ip,
-                port=server_port,
-                command='get_position',
-                arguments=[self.device_info.serial_number]
-            )
-            if 'error' in update:
-                print('Error:', update['error'])
-                break
-            # print(
-            #     f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
-            # )
-            if not update['moving']:
-                self.is_moving = False
+            self._get_motor_position()
 
     def _start_tracking_positon(self):
         self._position_thread = threading.Thread(
