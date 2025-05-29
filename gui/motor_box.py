@@ -20,25 +20,25 @@ class MotorControls(Adw.PreferencesGroup):
             self,
             motor: thorlabs_motor.Motor,
             get_position_callback: typing.Callable,
-            set_direction_callback: typing.Callable,
             get_direction_callback: typing.Callable,
-            set_step_size_callback: typing.Callable,
+            set_direction_callback: typing.Callable,
             get_step_size_callback: typing.Callable,
-            set_acceleration_callback: typing.Callable,
+            set_step_size_callback: typing.Callable,
             get_acceleration_callback: typing.Callable,
-            set_max_velocity_callback: typing.Callable,
-            get_max_velocity_callback: typing.Callable
+            set_acceleration_callback: typing.Callable,
+            get_max_velocity_callback: typing.Callable,
+            set_max_velocity_callback: typing.Callable
     ) -> None:
         super().__init__(title='Motor Controls')
         self.get_position_callback = get_position_callback
-        self.set_direction_callback = set_direction_callback
         self.get_direction_callback = get_direction_callback
-        self.set_step_size_callback = set_step_size_callback
+        self.set_direction_callback = set_direction_callback
         self.get_step_size_callback = get_step_size_callback
-        self.set_acceleration_callback = set_acceleration_callback
+        self.set_step_size_callback = set_step_size_callback
         self.get_acceleration_callback = get_acceleration_callback
-        self.set_max_velocity_callback = set_max_velocity_callback
+        self.set_acceleration_callback = set_acceleration_callback
         self.get_max_velocity_callback = get_max_velocity_callback
+        self.set_max_velocity_callback = set_max_velocity_callback
 
         self.motor = motor
         self.manual_motor_control = False
@@ -58,13 +58,6 @@ class MotorControls(Adw.PreferencesGroup):
 
         self.position_label = Gtk.Label(label=f'{self.get_position_callback():.3f}')
         position_row.add_suffix(widget=self.position_label)
-
-        # # direction
-        # direction_row = Adw.ActionRow(title='Direction')
-        # self.add(child=direction_row)
-
-        # self.direction_label = Gtk.Label(label=self.get_direction_callback().name)
-        # direction_row.add_suffix(widget=self.direction_label)
 
         # step size
         step_size_row = Adw.ActionRow(title='Step size')
@@ -173,7 +166,6 @@ class MotorControls(Adw.PreferencesGroup):
 
     def update_motor_info(self) -> bool:
         self.position_label.set_text(str=f'{self.get_position_callback():.3f}')
-        # self.direction_label.set_text(str=self.get_direction_callback().name)
         # self.acceleration_entry.set_text(text=f'{self.get_acceleration_callback():.3f}')
         # self.max_velocity_entry.set_text(text=f'{self.get_max_velocity_callback():.3f}')
         return True
@@ -273,15 +265,15 @@ class MotorControlPage(Adw.PreferencesPage):
 
         self.motor_controls_group = MotorControls(
             motor=motor,
-            get_position_callback=self.get_position,
-            set_direction_callback=self.set_direction,
-            get_direction_callback=self.get_direction,
-            set_step_size_callback=self.set_step_size,
-            get_step_size_callback=self.get_step_size,
-            set_acceleration_callback=self.set_acceleration,
-            get_acceleration_callback=self.get_acceleration,
-            set_max_velocity_callback=self.set_max_velocity,
-            get_max_velocity_callback=self.get_max_velocity
+            get_position_callback=self.get_motor_position,
+            get_direction_callback=self.get_motor_direction,
+            set_direction_callback=self.set_motor_direction,
+            get_step_size_callback=self.get_motor_step_size,
+            set_step_size_callback=self.set_motor_step_size,
+            get_acceleration_callback=self.get_motor_acceleration,
+            set_acceleration_callback=self.set_motor_acceleration,
+            get_max_velocity_callback=self.get_motor_max_velocity,
+            set_max_velocity_callback=self.set_motor_max_velocity
         )
         self.add(self.motor_controls_group)
 
@@ -293,29 +285,29 @@ class MotorControlPage(Adw.PreferencesPage):
     def get_device_info(self) -> thorlabs_motor.DeviceInfo:
         return self.motor.device_info
     
-    def get_position(self) -> float:
+    def get_motor_position(self) -> float:
         return self.motor.position
     
-    def set_direction(self, value: thorlabs_motor.MotorDirection) -> None:
-        self.motor.direction = value
-
-    def get_direction(self) -> thorlabs_motor.MotorDirection:
+    def get_motor_direction(self) -> thorlabs_motor.MotorDirection:
         return self.motor.direction
 
-    def set_step_size(self, value: float) -> None:
-        self.motor.step_size = value
+    def set_motor_direction(self, value: thorlabs_motor.MotorDirection) -> None:
+        self.motor.direction = value
 
-    def get_step_size(self) -> float:
+    def get_motor_step_size(self) -> float:
         return self.motor.step_size
 
-    def set_acceleration(self, value: float) -> None:
-        self.motor.acceleration = value
+    def set_motor_step_size(self, value: float) -> None:
+        self.motor.step_size = value
 
-    def get_acceleration(self) -> float:
+    def get_motor_acceleration(self) -> float:
         return self.motor.acceleration
-    
-    def set_max_velocity(self, value: float) -> None:
-        self.motor.max_velocity = value
 
-    def get_max_velocity(self) -> float:
+    def set_motor_acceleration(self, value: float) -> None:
+        self.motor.acceleration = value
+    
+    def get_motor_max_velocity(self) -> float:
         return self.motor.max_velocity
+
+    def set_motor_max_velocity(self, value: float) -> None:
+        self.motor.max_velocity = value

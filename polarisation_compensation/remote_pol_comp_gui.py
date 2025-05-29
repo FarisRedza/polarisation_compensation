@@ -26,6 +26,8 @@ import remote_motor.remote_motor_box as motor_box
 import bb84.qutag as qutag
 import remote_motor.motor_client as thorlabs_motor
 
+import gui.polarisation_box as polarisation_box
+
 class ControlGroup(Adw.PreferencesGroup):
     class MotorWP(enum.Enum):
         QWP = '55353314'
@@ -165,23 +167,21 @@ class PolCompPage(Adw.PreferencesPage):
         self.qutag = ''
 
         self.azimuth_velocity = [
-            # (2.5, 25.0),
-            # (1.5, 20.0),
-            # (1, 15.0),
-            # (0.5, 5.0),
-            # (0.1, 1.0),
-            # (0.05, 0.5)
-            (2.5, 5)
+            (2.5, 25.0),
+            (1.5, 20.0),
+            (1, 15.0),
+            (0.5, 5.0),
+            (0.1, 1.0),
+            (0.05, 0.5)
         ]
 
         self.ellipticity_velocity = [
-            # (5.0, 25.0),
-            # (3.5, 20.0),
-            # (2.5, 15.0),
-            # (1.0, 5.0),
-            # (0.1, 1.0),
-            # (0.075, 0.5)
-            (2.5, 5)
+            (5.0, 25.0),
+            (3.5, 20.0),
+            (2.5, 15.0),
+            (1.0, 5.0),
+            (0.1, 1.0),
+            (0.075, 0.5)
         ]
 
         self.control_group = ControlGroup(
@@ -272,7 +272,11 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=self.content_box)
 
         ### qutag box
-        self.qutag_box = qutag_box.QuTAGBox()
+        # self.qutag_box = qutag_box.QuTAGBox()
+        # self.content_box.append(child=self.qutag_box)
+
+        ### polarimeter box
+        self.qutag_box = polarisation_box.PolarimeterBox()
         self.content_box.append(child=self.qutag_box)
 
         ### init motor control boxes
@@ -286,7 +290,7 @@ class MainWindow(Adw.ApplicationWindow):
                 motor_box.MotorControlPage(
                     motor=thorlabs_motor.Motor(
                         serial_number=m.serial_number,
-                        ip_addr=thorlabs_motor.server_ip,
+                        host=thorlabs_motor.server_ip,
                         port=thorlabs_motor.server_port
                     )
                 )
@@ -306,7 +310,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        self.qutag_box.qutag._qutag.deInitialize()
+        # self.qutag_box.qutag._qutag.deInitialize()
         # for i in self.motor_controllers:
         #     i.motor_controls_group.motor._motor.stop()
         return False

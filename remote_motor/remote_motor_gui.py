@@ -82,7 +82,7 @@ class MainWindow(Adw.ApplicationWindow):
     def on_add_motor(self, button: Gtk.Button, serial_number):
         self.motor_control_box = motor_box.MotorControlPage(
             motor=thorlabs_motor.Motor(
-                ip_addr=thorlabs_motor.server_ip,
+                host=thorlabs_motor.server_ip,
                 port=thorlabs_motor.server_port,
                 serial_number=serial_number
             )

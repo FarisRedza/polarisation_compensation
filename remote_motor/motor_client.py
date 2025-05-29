@@ -6,16 +6,8 @@ import json
 import time
 import typing
 import enum
-import pprint
 import dataclasses
 
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
-# import motor.motor as thorlabs_motor
 server_ip = '127.0.0.1'
 server_ip = '137.195.89.222'
 server_port = 5002
@@ -109,10 +101,10 @@ class Motor:
     def __init__(
             self,
             serial_number: str,
-            ip_addr: str,
+            host: str,
             port: int
     ) -> None:
-        self.ip_addr = ip_addr
+        self.host = host
         self.port = port
 
         self._position_lock = threading.Lock()
@@ -124,30 +116,7 @@ class Motor:
         self.acceleration: float = MAX_ACCELERATION
         self.max_velocity: float = MAX_VELOCITY
 
-        available_motors = send_request(
-            host=ip_addr,
-            port=server_port,
-            command='list_motors'
-        )['motors']
-        motor_index = next(
-            (i for i, motor in enumerate(available_motors) if str(motor['serial_number']) == serial_number),
-            None
-        )
-        if motor_index is None:
-            raise Exception
-        else:
-            self.device_info = DeviceInfo(**available_motors[motor_index])
-            status = send_request(
-                host=self.ip_addr,
-                port=self.port,
-                command='get_position',
-                arguments=[self.device_info.serial_number]
-            )
-            self.position = float(status['position'])
-            self.is_moving = bool(status['moving'])
-            self.direction = MotorDirection(status['direction'])
-
-            print(f'Connected to motor {self.device_info.serial_number}')
+        self._get_motor(serial_number=serial_number)
 
     def move_by(
             self,
@@ -158,7 +127,7 @@ class Motor:
         self._start_tracking_positon()
 
         result = send_request(
-            host=self.ip_addr,
+            host=self.host,
             port=self.port,
             command='move_by',
             arguments=[
@@ -215,7 +184,7 @@ class Motor:
     ) -> bool:
         self._start_tracking_positon()
         result = send_request(
-            host=self.ip_addr,
+            host=self.host,
             port=self.port,
             command='move_to',
             arguments=[
@@ -271,7 +240,7 @@ class Motor:
             max_velocity: float = MAX_VELOCITY
     ) -> None:
         result = send_request(
-            host=self.ip_addr,
+            host=self.host,
             port=self.port,
             command='jog',
             arguments=[
@@ -286,7 +255,7 @@ class Motor:
 
     def stop(self) -> None:
         result = send_request(
-            host=self.ip_addr,
+            host=self.host,
             port=self.port,
             command='stop',
             arguments=[self.device_info.serial_number]
@@ -297,7 +266,7 @@ class Motor:
     def _get_motor_position(self) -> None:
         with self._position_lock:
             result = send_request(
-                host=self.ip_addr,
+                host=self.host,
                 port=self.port,
                 command='get_position',
                 arguments=[self.device_info.serial_number]
@@ -319,6 +288,35 @@ class Motor:
 
     def _stop_tracking_position(self):
         self._position_thread.join()
+
+    def _get_motor(
+            self,
+            serial_number: str
+        ) -> None:
+        available_motors = send_request(
+            host=self.host,
+            port=self.port,
+            command='list_motors'
+        )['motors']
+        motor_index = next(
+            (i for i, motor in enumerate(available_motors) if str(motor['serial_number']) == serial_number),
+            None
+        )
+        if motor_index is None:
+            raise Exception
+        else:
+            self.device_info = DeviceInfo(**available_motors[motor_index])
+            status = send_request(
+                host=self.host,
+                port=self.port,
+                command='get_position',
+                arguments=[self.device_info.serial_number]
+            )
+            self.position = float(status['position'])
+            self.is_moving = bool(status['moving'])
+            self.direction = MotorDirection(status['direction'])
+
+            print(f'Connected to motor {self.device_info.serial_number}')
 
 def motor_cli():
     result = send_request(
@@ -476,7 +474,7 @@ if __name__ == '__main__':
     print(list_thorlabs_motors(host=server_ip, port=server_port))
     motor = Motor(
         serial_number='55356974',
-        ip_addr=server_ip,
+        host=server_ip,
         port=server_port
     )
     motor.jog(direction=MotorDirection.BACKWARD)

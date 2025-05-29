@@ -21,6 +21,7 @@ class MotorControls(Adw.PreferencesGroup):
         motor: thorlabs_motor.Motor,
         get_position_callback: typing.Callable,
         get_direction_callback: typing.Callable,
+        set_direction_callback: typing.Callable,
         get_step_size_callback: typing.Callable,
         set_step_size_callback: typing.Callable,
         get_acceleration_callback: typing.Callable,
@@ -31,6 +32,7 @@ class MotorControls(Adw.PreferencesGroup):
         super().__init__(title='Motor Controls')
         self.get_position_callback = get_position_callback
         self.get_direction_callback = get_direction_callback
+        self.set_direction_callback = set_direction_callback
         self.get_step_size_callback = get_step_size_callback
         self.set_step_size_callback = set_step_size_callback
         self.get_acceleration_callback = get_acceleration_callback
@@ -276,6 +278,7 @@ class MotorControlPage(Adw.PreferencesPage):
             motor=self.motor,
             get_position_callback=self.get_motor_position,
             get_direction_callback=self.get_motor_direction,
+            set_direction_callback=self.set_motor_direction,
             get_step_size_callback=self.get_motor_step_size,
             set_step_size_callback=self.set_motor_step_size,
             get_acceleration_callback=self.get_motor_acceleration,
@@ -295,24 +298,27 @@ class MotorControlPage(Adw.PreferencesPage):
     
     def get_motor_position(self) -> float:
         return self.motor.position
-
+    
     def get_motor_direction(self) -> thorlabs_motor.MotorDirection:
         return self.motor.direction
-    
+
+    def set_motor_direction(self, value: thorlabs_motor.MotorDirection) -> None:
+        self.motor.direction = value
+
     def get_motor_step_size(self) -> float:
         return self.motor.step_size
-    
+
     def set_motor_step_size(self, value: float) -> None:
         self.motor.step_size = value
-    
+
     def get_motor_acceleration(self) -> float:
         return self.motor.acceleration
-    
+
     def set_motor_acceleration(self, value: float) -> None:
         self.motor.acceleration = value
-
+    
     def get_motor_max_velocity(self) -> float:
         return self.motor.max_velocity
-    
+
     def set_motor_max_velocity(self, value: float) -> None:
         self.motor.max_velocity = value
