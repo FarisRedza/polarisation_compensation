@@ -25,7 +25,9 @@ class MainWindow(Adw.ApplicationWindow):
         header_bar = Adw.HeaderBar()
         main_box.append(child=header_bar)
 
-        self.main_stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        self.main_stack = Gtk.Stack(
+            transition_type=Gtk.StackTransitionType.CROSSFADE
+        )
         main_box.append(child=self.main_stack)
 
         motors = thorlabs_motor.list_thorlabs_motors(

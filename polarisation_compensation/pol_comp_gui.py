@@ -589,7 +589,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_box.append(child=self.polarimeter_box)
 
         ### init motor control boxes
-        self.motors = thorlabs_motor.list_thorlabs_motors()
+        self.motors = thorlabs_motor.list_motors()
         self.motor_controllers: list[motor_box.MotorControlPage] = []
         for i, m in enumerate(self.motors):
             self.motor_controllers.append(
