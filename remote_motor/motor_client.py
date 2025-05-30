@@ -109,6 +109,7 @@ class Motor:
 
         self._position_lock = threading.Lock()
         self._position_polling = 0.1
+        self._position_thread: threading.Thread | None = None
         self._position: list[float] = [0.0]
         self.motor_thread: threading.Thread | None = None
 
@@ -287,7 +288,9 @@ class Motor:
         self._position_thread.start()
 
     def _stop_tracking_position(self):
-        self._position_thread.join()
+        if self.is_moving == True:
+            self.is_moving = False
+            self._position_thread.join()
 
     def _get_motor(
             self,

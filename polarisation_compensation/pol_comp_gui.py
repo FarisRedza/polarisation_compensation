@@ -13,7 +13,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
-import pol_compensation as pol_compensation
+import pol_compensation
 
 sys.path.append(
     os.path.abspath(os.path.join(

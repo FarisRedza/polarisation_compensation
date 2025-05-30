@@ -1,7 +1,5 @@
 import sys
 import os
-import threading
-import time
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -9,7 +7,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import bb84.qutag as qutag
+
 import remote_motor.motor_client as thorlabs_motor
 
 def pol_comp(

@@ -16,7 +16,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.polarimeter_box as polarimeter_box
+# import polarimeter.polarimeter_box as polarimeter_box
 import bb84.qutag_box as qutag_box
 
 import remote_motor.remote_motor_box as motor_box
@@ -34,7 +34,7 @@ class ControlGroup(Adw.PreferencesGroup):
 
     def __init__(
             self,
-            qutag_box: qutag_box.QuTAGBox,
+            polarisation_box: qutag_box.QuTAGBox,
             motor_controllers: list[motor_box.MotorControlPage],
             get_enable_compensation: typing.Callable,
             set_enable_compensation: typing.Callable,
@@ -48,7 +48,7 @@ class ControlGroup(Adw.PreferencesGroup):
             get_ellipticity_velocity: typing.Callable
     ) -> None:
         super().__init__(title='Polarisation Compensation')
-        self.qutag_box = qutag_box
+        self.polarisation_box = polarisation_box
         self.motor_controllers = motor_controllers
 
         self.get_enable_compensation = get_enable_compensation
@@ -123,8 +123,8 @@ class ControlGroup(Adw.PreferencesGroup):
             target_ellipticity=self.get_target_ellipticity(),
             azimuth_velocities=self.get_azimuth_velocity(),
             ellipticity_velocities=self.get_ellipticity_velocity(),
-            current_azimuth=self.qutag_box.data.azimuth,
-            current_ellipticity=self.qutag_box.data.ellipticity
+            current_azimuth=self.polarisation_box.data.azimuth,
+            current_ellipticity=self.polarisation_box.data.ellipticity
         )
         return True
 
@@ -161,25 +161,25 @@ class PolCompPage(Adw.PreferencesPage):
         self.qutag = ''
 
         self.azimuth_velocity = [
-            (2.5, 25.0),
-            (1.5, 20.0),
-            (1, 15.0),
+            # (2.5, 25.0),
+            # (1.5, 20.0),
+            # (1, 15.0),
             (0.5, 5.0),
             (0.1, 1.0),
-            (0.05, 0.5)
+            # (0.05, 0.5)
         ]
 
         self.ellipticity_velocity = [
-            (5.0, 25.0),
-            (3.5, 20.0),
-            (2.5, 15.0),
+            # (5.0, 25.0),
+            # (3.5, 20.0),
+            # (2.5, 15.0),
             (1.0, 5.0),
             (0.1, 1.0),
-            (0.075, 0.5)
+            # (0.075, 0.5)
         ]
 
         self.control_group = ControlGroup(
-            qutag_box=polarisation_box,
+            polarisation_box=polarisation_box,
             motor_controllers=motor_controllers,
             get_enable_compensation=self.get_enable_compensation,
             set_enable_compensation=self.set_enable_compensation,
@@ -265,12 +265,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.content_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         main_box.append(child=self.content_box)
 
-        ### qutag box
-        # self.qutag_box = qutag_box.QuTAGBox()
-        # self.content_box.append(child=self.qutag_box)
-
         ### polarisation box
-        self.polarisation_box = polarimeter_box.PolarimeterBox()
+        # self.polarisation_box = polarimeter_box.PolarimeterBox()
+        self.polarisation_box = qutag_box.QuTAGBox()
         self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes
@@ -304,9 +301,9 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        # self.qutag_box.qutag._qutag.deInitialize()
-        # for i in self.motor_controllers:
-        #     i.motor_controls_group.motor._motor.stop()
+        self.polarisation_box.qutag._qutag.deInitialize()
+        for i in self.motor_controllers:
+            i.motor.stop()
         return False
     
 class App(Adw.Application):
