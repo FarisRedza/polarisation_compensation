@@ -37,7 +37,7 @@ def pol_comp(
         motor = motor_list[motor_index]
         motor.position
         delta = current_value - target_value
-        direction = '+' if delta > 0 else '-'
+        direction = '-' if delta > 0 else '+'
 
         if motor.direction.value != direction:
             motor.stop()

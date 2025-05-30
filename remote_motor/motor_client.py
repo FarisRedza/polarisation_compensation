@@ -24,8 +24,8 @@ class DeviceInfo:
     firmware_version: str
 
 class MotorDirection(enum.Enum):
-    FORWARD = '+'
-    BACKWARD = '-'
+    FORWARD = '-'
+    BACKWARD = '+'
     IDLE = None
 
 def send_request(
@@ -240,6 +240,7 @@ class Motor:
             acceleration: float = MAX_ACCELERATION,
             max_velocity: float = MAX_VELOCITY
     ) -> None:
+        self._start_tracking_positon()
         result = send_request(
             host=self.host,
             port=self.port,
@@ -251,7 +252,6 @@ class Motor:
                 max_velocity
             ]
         )
-        self._start_tracking_positon()
         print("Command sent:", result.get("status") or result.get("error"))
 
     def stop(self) -> None:
@@ -276,12 +276,12 @@ class Motor:
             self.is_moving = bool(result['moving'])
 
     def _track_position(self):
-        self.is_moving = True
         while self.is_moving == True:
             time.sleep(motor_refresh_time)
             self._get_motor_position()
 
     def _start_tracking_positon(self):
+        self.is_moving = True
         self._position_thread = threading.Thread(
             target=self._track_position
         )

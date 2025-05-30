@@ -129,13 +129,22 @@ class MotorControls(Adw.PreferencesGroup):
         )
         control_box.append(child=control_grid)
 
+        #### jog ccw
+        self.jog_ccw_button = Gtk.Button(
+            label='Jog CCW',
+            valign=Gtk.Align.CENTER,
+            sensitive=False
+        )
+        control_grid.attach(self.jog_ccw_button, 1, 1, 1, 1)
+        self.jog_ccw_button.connect('clicked', self.jog_motor_ccw)
+
         #### ccw
         self.ccw_button = Gtk.Button(
             label='CCW',
             valign=Gtk.Align.CENTER,
             sensitive=False
         )
-        control_grid.attach(self.ccw_button, 1, 1, 1, 1)
+        control_grid.attach(self.ccw_button, 2, 1, 1, 1)
         self.ccw_button.connect('clicked', self.rotate_motor_ccw)
 
         #### rotate to 0
@@ -144,7 +153,7 @@ class MotorControls(Adw.PreferencesGroup):
             valign=Gtk.Align.CENTER,
             sensitive=False
         )
-        control_grid.attach(self.rot_0_button, 2, 1, 1, 1)
+        control_grid.attach(self.rot_0_button, 3, 1, 1, 1)
         self.rot_0_button.connect('clicked', self.rotate_motor_0)
 
         #### cw
@@ -153,8 +162,31 @@ class MotorControls(Adw.PreferencesGroup):
             valign=Gtk.Align.CENTER,
             sensitive=False
         )
-        control_grid.attach(self.cw_button, 3, 1, 1, 1)
+        control_grid.attach(self.cw_button, 4, 1, 1, 1)
         self.cw_button.connect('clicked', self.rotate_motor_cw)
+
+        #### jog cw
+        self.jog_cw_button = Gtk.Button(
+            label='Jog CW',
+            valign=Gtk.Align.CENTER,
+            sensitive=False
+        )
+        control_grid.attach(self.jog_cw_button, 5, 1, 1, 1)
+        self.jog_cw_button.connect('clicked', self.jog_motor_cw)
+
+        GLib.timeout_add(
+            interval=100,
+            function=self.update_motor_info
+        )
+
+        #### stop
+        self.stop_button = Gtk.Button(
+            label='Stop',
+            valign=Gtk.Align.CENTER,
+            sensitive=False
+        )
+        control_grid.attach(self.stop_button, 1, 2, 5, 1)
+        self.stop_button.connect('clicked', self.stop_motor)
 
         GLib.timeout_add(
             interval=100,
@@ -173,6 +205,9 @@ class MotorControls(Adw.PreferencesGroup):
         self.ccw_button.set_sensitive(switch.get_active())
         self.rot_0_button.set_sensitive(switch.get_active())
         self.cw_button.set_sensitive(switch.get_active())
+        self.jog_ccw_button.set_sensitive(switch.get_active())
+        self.jog_cw_button.set_sensitive(switch.get_active())
+        self.stop_button.set_sensitive(switch.get_active())
 
     def update_motor_info(self) -> bool:
         self.position_label.set_text(str=f'{self.get_position_callback():.3f}')
@@ -231,6 +266,23 @@ class MotorControls(Adw.PreferencesGroup):
             acceleration=self.get_acceleration_callback(),
             max_velocity=self.get_max_velocity_callback()
         )
+
+    def jog_motor_ccw(self, button: Gtk.Button):
+        self.motor.jog(
+            direction=thorlabs_motor.MotorDirection.BACKWARD,
+            acceleration=self.get_acceleration_callback(),
+            max_velocity=self.get_max_velocity_callback()
+        )
+
+    def jog_motor_cw(self, button: Gtk.Button):
+        self.motor.jog(
+            direction=thorlabs_motor.MotorDirection.FORWARD,
+            acceleration=self.get_acceleration_callback(),
+            max_velocity=self.get_max_velocity_callback()
+        )
+
+    def stop_motor(self, button: Gtk.Button):
+        self.motor.stop()
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
     def __init__(
