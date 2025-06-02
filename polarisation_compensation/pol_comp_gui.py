@@ -293,9 +293,7 @@ class ControlGroup(Adw.PreferencesGroup):
             m.motor for m in self.motor_controllers if m.manual_motor_control == False
         ]
 
-    def pol_comp(
-            self
-    ) -> bool:
+    def pol_comp(self) -> bool:
         if not self.get_enable_compensation():
             return True
         pol_compensation.pol_comp(
@@ -595,7 +593,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.motor_controllers.append(
                 motor_box.MotorControlPage(
                     motor=thorlabs_motor.Motor(
-                        serial_number=m.get_device_info().serial_no
+                        serial_number=m.serial_number
                     )
                 )
             )

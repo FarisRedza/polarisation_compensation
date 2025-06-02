@@ -326,7 +326,7 @@ class MotorControlPage(Adw.PreferencesPage):
         super().__init__()
         self.motor = motor
 
-        motor_controls_group = MotorControls(
+        self.motor_controls_group = MotorControls(
             motor=self.motor,
             get_position_callback=self.get_motor_position,
             get_direction_callback=self.get_motor_direction,
@@ -338,7 +338,7 @@ class MotorControlPage(Adw.PreferencesPage):
             get_max_velocity_callback=self.get_motor_max_velocity,
             set_max_velocity_callback=self.set_motor_max_velocity
         )
-        self.add(group=motor_controls_group)
+        self.add(group=self.motor_controls_group)
 
         device_info_group = DeviceInfoGroup(
             get_device_info_callback=self.get_device_info

@@ -150,9 +150,9 @@ class Motor:
             if 'error' in update:
                 print('Error:', update['error'])
                 break
-            print(
-                f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
-            )
+            # print(
+            #     f"Motor {self.device_info.serial_number} position: {update['position']} | Moving: {update['moving']}"
+            # )
             if not update['moving']:
                 self._stop_tracking_position()
                 break

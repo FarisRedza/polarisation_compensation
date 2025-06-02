@@ -49,7 +49,7 @@ class ControlGroup(Adw.PreferencesGroup):
     ) -> None:
         super().__init__(title='Polarisation Compensation')
         self.polarisation_box = polarisation_box
-        self.motor_controllers = motor_controllers
+        self.motor_controllers = [m.motor_controls_group for m in motor_controllers]
 
         self.get_enable_compensation = get_enable_compensation
         self.set_enable_compensation = set_enable_compensation
@@ -61,6 +61,16 @@ class ControlGroup(Adw.PreferencesGroup):
         self.get_azimuth_velocity = get_azimuth_velocity
         self.set_ellipticity_velocity = set_ellipticity_velocity
         self.get_ellipticity_velocity = get_ellipticity_velocity
+
+        for mc in self.motor_controllers:
+            mc.enable_controls_switch.connect(
+                'notify::active',
+                self.on_update_available_motors
+            )
+
+        self.available_motors = [
+            m.motor for m in self.motor_controllers if m.manual_motor_control == False
+        ]
 
         # enable compensation
         enable_compensation_row = Adw.ActionRow(title='Enable compensation')
@@ -111,6 +121,15 @@ class ControlGroup(Adw.PreferencesGroup):
             interval=100,
             function=self.pol_comp
         )
+
+    def on_update_available_motors(
+            self,
+            switch: Gtk.Entry,
+            gparam: GObject.GParamSpec
+    ) -> None:
+        self.available_motors = [
+            m.motor for m in self.motor_controllers if m.manual_motor_control == False
+        ]
 
     def pol_comp(self) -> bool:
         if not self.get_enable_compensation():
