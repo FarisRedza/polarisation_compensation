@@ -24,47 +24,84 @@ def pol_comp(
     motor_qwp_index = next((i for i, m in enumerate(motor_list) if m.device_info.serial_number == motor_qwp_serial_no), -1)
     motor_hwp_index = next((i for i, m in enumerate(motor_list) if m.device_info.serial_number == motor_hwp_serial_no), -1)
 
+    # def adjust_motor(
+    #         motor_list: list[thorlabs_motor.Motor],
+    #         motor_index: int,
+    #         current_value: float,
+    #         target_value: float,
+    #         thresholds_velocities: list[tuple[float, float]]
+    # ) -> None:
+    #     if motor_index == -1:
+    #         return
+
+    #     motor = motor_list[motor_index]
+    #     delta = current_value - target_value
+    #     direction = '+' if delta > 0 else '-'
+
+    #     if motor.direction.value != direction:
+    #         motor.stop()
+    #         motor.direction = base_motor.MotorDirection(direction)
+
+    #     abs_delta = abs(delta)
+    #     for threshold, velocity in sorted(thresholds_velocities, reverse=True):
+    #         if abs_delta > threshold:
+    #             # if motor.max_velocity != velocity:
+    #             #     motor._motor.setup_jog(
+    #             #         mode='continuous',
+    #             #         max_velocity=velocity
+    #             #     )
+    #             #     motor.max_velocity = velocity
+    #             # motor._motor.jog(
+    #             #     direction=direction,
+    #             #     kind='builtin'
+    #             # )
+    #             # break
+    #             motor.jog(
+    #                 direction=motor.direction,
+    #                 acceleration=20.0,
+    #                 max_velocity=velocity
+    #             )
+    #             break
+    #     else:
+    #         motor.stop()
+
     def adjust_motor(
-            motor_list: list[thorlabs_motor.Motor],
-            motor_index: int,
-            current_value: float,
-            target_value: float,
-            thresholds_velocities: list[tuple[float, float]]
+        motor_list: list[thorlabs_motor.Motor],
+        motor_index: int,
+        current_value: float,
+        target_value: float,
+        thresholds_velocities: list[tuple[float, float]]
     ) -> None:
         if motor_index == -1:
             return
 
         motor = motor_list[motor_index]
-        motor.position
-        delta = current_value - target_value
-        direction = '-' if delta > 0 else '+'
+        delta = target_value - current_value
 
-        if motor.direction.value != direction:
+        if abs(delta) < 1e-3:  # Optional: small error threshold to prevent jitter
             motor.stop()
-            motor.direction = base_motor.MotorDirection(direction)
+            return
 
+        desired_direction = '-' if delta > 0 else '+'
         abs_delta = abs(delta)
+
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
             if abs_delta > threshold:
-                # if motor.max_velocity != velocity:
-                #     motor._motor.setup_jog(
-                #         mode='continuous',
-                #         max_velocity=velocity
-                #     )
-                #     motor.max_velocity = velocity
-                # motor._motor.jog(
-                #     direction=direction,
-                #     kind='builtin'
-                # )
-                # break
-                motor.jog(
-                    direction=motor.direction,
-                    acceleration=20.0,
-                    max_velocity=velocity
-                )
+                # Only jog if direction or velocity changed
+                if (motor.direction.value != desired_direction or
+                        motor.max_velocity != velocity):
+                    motor.stop()
+                    motor.direction = base_motor.MotorDirection(desired_direction)
+                    motor.jog(
+                        direction=motor.direction,
+                        acceleration=20.0,
+                        max_velocity=velocity
+                    )
+                # Else: already jogging in correct direction & speed, do nothing
                 break
         else:
             motor.stop()
+
 
     adjust_motor(
         motor_list=motor_list,

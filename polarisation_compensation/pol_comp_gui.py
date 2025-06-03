@@ -2,6 +2,8 @@ import sys
 import os
 import enum
 import typing
+import threading
+import time
 
 import numpy
 import matplotlib.pyplot
@@ -16,8 +18,10 @@ from gi.repository import Gtk, Adw, GLib, GObject
 import pol_compensation
 
 import polarimeter.polarimeter_box as polarimeter_box
+import bb84.qutag_box as qutag_box
 import motor.motor_box as motor_box
 import motor.thorlabs_motor as thorlabs_motor
+import motor.remote_motor as remote_motor
 
 class CurveBox(Gtk.Box):
     def __init__(
@@ -198,7 +202,7 @@ class ControlGroup(Adw.PreferencesGroup):
         self.ellipticity_motor_max_velocity = 0
         self.ellipticity_motor_direction = self.MotorDirection.IDLE
 
-        motor_poling_interval = 100
+        motor_poling_interval = 1000
 
         # enable compensation
         enable_compensation_row = Adw.ActionRow(
@@ -249,10 +253,29 @@ class ControlGroup(Adw.PreferencesGroup):
             self.on_set_target_ellipticity
         )
 
-        GLib.timeout_add(
-            interval=motor_poling_interval,
-            function=self.pol_comp
-        )
+        # GLib.timeout_add(
+        #     interval=motor_poling_interval,
+        #     function=self.pol_comp
+        # )
+        self._pol_comp_thread = threading.Thread(target=self._pol_comp_loop, daemon=True)
+        self._pol_comp_thread.start()
+
+    def _pol_comp_loop(self):
+        while True:
+            if self.get_enable_compensation():
+                pol_compensation.pol_comp(
+                    motor_list=self.available_motors,
+                    motor_qwp_serial_no=self.MotorWP.QWP.value,
+                    motor_hwp_serial_no=self.MotorWP.HWP.value,
+                    target_azimuth=self.target_azimuth,
+                    target_ellipticity=self.target_ellipticity,
+                    azimuth_velocities=self.get_azimuth_velocity(),
+                    ellipticity_velocities=self.get_ellipticity_velocity(),
+                    current_azimuth=self.polarimeter_box.data.azimuth,
+                    current_ellipticity=self.polarimeter_box.data.ellipticity
+                )
+            time.sleep(0.1)  # Or slightly faster/slower depending on responsiveness
+
 
     def on_set_target_azimuth(self, entry: Gtk.Entry):
         try:
@@ -444,13 +467,13 @@ class PolCompPage(Adw.PreferencesPage):
             (5.0, 25.0),
             (2.5, 15.0),
             (1.0, 5.0),
-            (0.075, 0.5)
+            (0.075, 0.1)
         ]
         self.ellipticity_velocity = [
             (5.0, 25.0),
             (2.5, 15.0),
-            (1.0, 5.0),
-            (0.075, 0.5)
+            (1.0, 1),
+            (0.075, 0.1)
         ]
         # self.azimuth_velocity = [
         #     (2.5, 25.0),
@@ -578,11 +601,16 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=self.content_box)
 
         ### polarimeter box
-        self.polarimeter_box = polarimeter_box.PolarimeterBox()
-        self.content_box.append(child=self.polarimeter_box)
+        self.polarisation_box = polarimeter_box.PolarimeterBox()
+        # self.polarisation_box = qutag_box.QuTAGBox()
+        self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes
-        self.motors = thorlabs_motor.list_motors()
+        # self.motors = thorlabs_motor.list_motors()
+        self.motors = remote_motor.list_motors(
+            ip_address=remote_motor.server_ip,
+            port=remote_motor.server_port
+        )
         self.motor_controllers: list[motor_box.MotorControlPage] = []
         for i, m in enumerate(self.motors):
             self.motor_controllers.append(
@@ -595,7 +623,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### pol comp
         self.pol_comp_page = PolCompPage(
-            polarimeter_box=self.polarimeter_box,
+            polarimeter_box=self.polarisation_box,
             motor_controllers=self.motor_controllers
         )
         self.content_box.append(child=self.pol_comp_page)
@@ -607,9 +635,9 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        self.polarimeter_box.polarimeter.disconnect()
+        self.polarisation_box.polarimeter.disconnect()
         for i in self.motor_controllers:
-            i.motor_controls_group.motor._motor.stop()
+            i.motor_controls_group.motor.stop()
         return False
     
 class App(Adw.Application):
@@ -626,5 +654,5 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        app.win.polarimeter_box.polarimeter.disconnect()
+        app.win.polarisation_box.polarimeter.disconnect()
         print('App crashed with an exception:', e)
