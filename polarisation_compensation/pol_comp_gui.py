@@ -15,12 +15,6 @@ from gi.repository import Gtk, Adw, GLib, GObject
 
 import pol_compensation
 
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
 import polarimeter.polarimeter_box as polarimeter_box
 import motor.motor_box as motor_box
 import motor.thorlabs_motor as thorlabs_motor

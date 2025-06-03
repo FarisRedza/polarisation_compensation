@@ -1,13 +1,12 @@
 import sys
-import os
 
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-import remote_motor_box as motor_box
-import motor_client as thorlabs_motor
+import motor_box
+import remote_motor
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
@@ -30,9 +29,9 @@ class MainWindow(Adw.ApplicationWindow):
         )
         main_box.append(child=self.main_stack)
 
-        motors = thorlabs_motor.list_thorlabs_motors(
-            host=thorlabs_motor.server_ip,
-            port=thorlabs_motor.server_port
+        motors = remote_motor.list_motors(
+            ip_address=remote_motor.server_ip,
+            port=remote_motor.server_port
         )
         if len(motors) == 0:
             main_box.append(
@@ -54,8 +53,8 @@ class MainWindow(Adw.ApplicationWindow):
             add_motor_page.add(add_motor_group)
             for i in motors:
                 add_motor_row = Adw.ActionRow(
-                    title=i.device_name,
-                    subtitle=i.serial_number
+                    title=i.device_info.device_name,
+                    subtitle=i.device_info.serial_number
                 )
                 add_motor_group.add(add_motor_row)
                 add_motor_button = Gtk.Button(
@@ -65,13 +64,12 @@ class MainWindow(Adw.ApplicationWindow):
                 add_motor_button.connect(
                     'clicked',
                     lambda widget,
-                    serial_number=i.serial_number: self.on_add_motor(
+                    serial_number=i.device_info.serial_number: self.on_add_motor(
                         widget,
                         serial_number
                     )
                 )
                 add_motor_row.add_suffix(widget=add_motor_button)
-                add_motor_row.set_activatable_widget(widget=add_motor_button)
 
         ## add motor
         add_motor_button = Gtk.Button(
@@ -83,9 +81,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_add_motor(self, button: Gtk.Button, serial_number):
         self.motor_control_box = motor_box.MotorControlPage(
-            motor=thorlabs_motor.Motor(
-                host=thorlabs_motor.server_ip,
-                port=thorlabs_motor.server_port,
+            motor=remote_motor.Motor(
+                ip_address=remote_motor.server_ip,
+                port=remote_motor.server_port,
                 serial_number=serial_number
             )
         )

@@ -1,5 +1,4 @@
 import sys
-import os
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -51,8 +50,8 @@ class MainWindow(Adw.ApplicationWindow):
             add_motor_page.add(add_motor_group)
             for i in motors:
                 add_motor_row = Adw.ActionRow(
-                    title=i.device_name,
-                    subtitle=i.serial_number
+                    title=i.device_info.device_name,
+                    subtitle=i.device_info.serial_number
                 )
                 add_motor_group.add(add_motor_row)
                 add_motor_button = Gtk.Button(
@@ -62,13 +61,12 @@ class MainWindow(Adw.ApplicationWindow):
                 add_motor_button.connect(
                     'clicked',
                     lambda widget,
-                    serial_number=i.serial_number: self.on_add_motor(
+                    serial_number=i.device_info.serial_number: self.on_add_motor(
                         widget,
                         serial_number
                     )
                 )
                 add_motor_row.add_suffix(widget=add_motor_button)
-                add_motor_row.set_activatable_widget(widget=add_motor_button)
 
         ## add motor
         add_motor_button = Gtk.Button(

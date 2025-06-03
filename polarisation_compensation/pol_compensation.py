@@ -40,7 +40,7 @@ def pol_comp(
 
         if motor.direction.value != direction:
             motor.stop()
-            motor.direction = thorlabs_motor.MotorDirection(direction)
+            motor.direction = motor.MotorDirection(direction)
 
         abs_delta = abs(delta)
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
@@ -57,7 +57,7 @@ def pol_comp(
                 # )
                 # break
                 motor.jog(
-                    direction=thorlabs_motor.MotorDirection(direction),
+                    direction=motor.MotorDirection(direction),
                     max_velocity=velocity
                 )
                 break
