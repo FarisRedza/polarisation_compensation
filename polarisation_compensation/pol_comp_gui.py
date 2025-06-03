@@ -175,9 +175,14 @@ class ControlGroup(Adw.PreferencesGroup):
 
         self.set_qwp_motor(value=self.MotorWP.QWP.value)
         self.set_hwp_motor(value=self.MotorWP.HWP.value)
-        self.set_polarimeter(
-            value=self.polarimeter_box.polarimeter.device_info.serial_number
-        )
+        try:
+            self.set_polarimeter(
+                value=self.polarimeter_box.polarimeter.device_info.serial_number
+            )
+        except Exception:
+            self.set_polarimeter(
+                value='N/A'
+            )
 
         for mc in self.motor_controllers:
             mc.enable_controls_switch.connect(
@@ -601,8 +606,8 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=self.content_box)
 
         ### polarimeter box
-        self.polarisation_box = polarimeter_box.PolarimeterBox()
-        # self.polarisation_box = qutag_box.QuTAGBox()
+        # self.polarisation_box = polarimeter_box.PolarimeterBox()
+        self.polarisation_box = qutag_box.QuTAGBox()
         self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes
@@ -614,9 +619,16 @@ class MainWindow(Adw.ApplicationWindow):
         self.motor_controllers: list[motor_box.MotorControlPage] = []
         for i, m in enumerate(self.motors):
             self.motor_controllers.append(
+                # motor_box.MotorControlPage(
+                #     motor=thorlabs_motor.Motor(
+                #         serial_number=m.device_info.serial_number
+                #     )
+                # )
                 motor_box.MotorControlPage(
-                    motor=thorlabs_motor.Motor(
-                        serial_number=m.device_info.serial_number
+                    motor=remote_motor.Motor(
+                        serial_number=m.device_info.serial_number,
+                        ip_address=remote_motor.server_ip,
+                        port=remote_motor.server_port
                     )
                 )
             )

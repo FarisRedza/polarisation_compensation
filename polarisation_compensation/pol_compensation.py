@@ -9,9 +9,10 @@ sys.path.append(
 )
 import motor.base_motor as base_motor
 import motor.thorlabs_motor as thorlabs_motor
+import motor.remote_motor as remote_motor
 
 def pol_comp(
-        motor_list: list[thorlabs_motor.Motor],
+        motor_list: list[thorlabs_motor.Motor | remote_motor.Motor],
         motor_qwp_serial_no: str,
         motor_hwp_serial_no: str,
         target_azimuth: float,
@@ -66,7 +67,7 @@ def pol_comp(
     #         motor.stop()
 
     def adjust_motor(
-        motor_list: list[thorlabs_motor.Motor],
+        motor_list: list[thorlabs_motor.Motor | remote_motor.Motor],
         motor_index: int,
         current_value: float,
         target_value: float,
@@ -82,16 +83,16 @@ def pol_comp(
             motor.stop()
             return
 
-        desired_direction = '-' if delta > 0 else '+'
+        taget_direction = '-' if delta > 0 else '+'
         abs_delta = abs(delta)
 
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
             if abs_delta > threshold:
                 # Only jog if direction or velocity changed
-                if (motor.direction.value != desired_direction or
+                if (motor.direction.value != taget_direction or
                         motor.max_velocity != velocity):
                     motor.stop()
-                    motor.direction = base_motor.MotorDirection(desired_direction)
+                    motor.direction = base_motor.MotorDirection(taget_direction)
                     motor.jog(
                         direction=motor.direction,
                         acceleration=20.0,
