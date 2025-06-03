@@ -130,7 +130,7 @@ class ControlGroup(Adw.PreferencesGroup):
         IDLE = None
     def __init__(
             self,
-            polarimeter_box: polarimeter_box.PolarimeterBox,
+            polarisation_box: polarimeter_box.PolarimeterBox | qutag_box.QuTAGBox,
             motor_controllers: list[motor_box.MotorControlPage],
             set_enable_compensation_callback: typing.Callable,
             get_enable_compensation_callback: typing.Callable,
@@ -150,7 +150,7 @@ class ControlGroup(Adw.PreferencesGroup):
             get_ellipticity_velocity_callback: typing.Callable,
     ) -> None:
         super().__init__(title='Polarisation Compensation')
-        self.polarimeter_box = polarimeter_box
+        self.polarimeter_box = polarisation_box
         self.motor_controllers = [m.motor_controls_group for m in motor_controllers]
 
         self.set_enable_compensation = set_enable_compensation_callback
@@ -175,11 +175,11 @@ class ControlGroup(Adw.PreferencesGroup):
 
         self.set_qwp_motor(value=self.MotorWP.QWP.value)
         self.set_hwp_motor(value=self.MotorWP.HWP.value)
-        try:
+        if type(self.polarimeter_box) == polarimeter_box.PolarimeterBox:
             self.set_polarimeter(
                 value=self.polarimeter_box.polarimeter.device_info.serial_number
             )
-        except Exception:
+        else:
             self.set_polarimeter(
                 value='N/A'
             )
@@ -272,8 +272,8 @@ class ControlGroup(Adw.PreferencesGroup):
                     motor_list=self.available_motors,
                     motor_qwp_serial_no=self.MotorWP.QWP.value,
                     motor_hwp_serial_no=self.MotorWP.HWP.value,
-                    target_azimuth=self.target_azimuth,
-                    target_ellipticity=self.target_ellipticity,
+                    target_azimuth=self.get_target_azimuth(),
+                    target_ellipticity=self.get_target_ellipticity(),
                     azimuth_velocities=self.get_azimuth_velocity(),
                     ellipticity_velocities=self.get_ellipticity_velocity(),
                     current_azimuth=self.polarimeter_box.data.azimuth,
@@ -468,38 +468,31 @@ class PolCompPage(Adw.PreferencesPage):
         self.polarimeter = None
 
         ## thresholds (descending order)
+        # self.azimuth_velocity = [
+        #     (5.0, 25.0),
+        #     (2.5, 15.0),
+        #     (1.0, 5.0),
+        #     (0.075, 0.1)
+        # ]
+        # self.ellipticity_velocity = [
+        #     (5.0, 25.0),
+        #     (2.5, 15.0),
+        #     (1.0, 1),
+        #     (0.075, 0.1)
+        # ]
         self.azimuth_velocity = [
             (5.0, 25.0),
-            (2.5, 15.0),
-            (1.0, 5.0),
-            (0.075, 0.1)
+            (2.0, 1.0),
+            (1.0, 0.1)
         ]
         self.ellipticity_velocity = [
             (5.0, 25.0),
-            (2.5, 15.0),
-            (1.0, 1),
-            (0.075, 0.1)
+            (2.0, 1.0),
+            (1.0, 0.1)
         ]
-        # self.azimuth_velocity = [
-        #     (2.5, 25.0),
-        #     (1.5, 20.0),
-        #     (1, 15.0),
-        #     (0.5, 5.0),
-        #     (0.1, 1.0),
-        #     (0.05, 0.5)
-        # ]
-
-        # self.ellipticity_velocity = [
-        #     (5.0, 25.0),
-        #     (3.5, 20.0),
-        #     (2.5, 15.0),
-        #     (1.0, 5.0),
-        #     (0.1, 1.0),
-        #     (0.075, 0.5)
-        # ]
 
         self.control_group = ControlGroup(
-            polarimeter_box=polarimeter_box,
+            polarisation_box=polarimeter_box,
             motor_controllers=motor_controllers,
             set_enable_compensation_callback=self.set_enable_compensation,
             get_enable_compensation_callback=self.get_enable_compensation,
@@ -647,7 +640,8 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        self.polarisation_box.polarimeter.disconnect()
+        if type(self.polarisation_box) == polarimeter_box.PolarimeterBox:
+            self.polarisation_box.polarimeter.disconnect()
         for i in self.motor_controllers:
             i.motor_controls_group.motor.stop()
         return False
@@ -666,5 +660,6 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        app.win.polarisation_box.polarimeter.disconnect()
+        if type(app.win.polarisation_box) == polarimeter_box.PolarimeterBox:
+            app.win.polarisation_box.polarimeter.disconnect()
         print('App crashed with an exception:', e)
