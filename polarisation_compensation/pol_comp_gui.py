@@ -117,8 +117,8 @@ class CurveBox(Gtk.Box):
 
 class ControlGroup(Adw.PreferencesGroup):
     class MotorWP(enum.Enum):
-        QWP = 55353314  # azimuth
-        HWP = 55356974  # ellipticity
+        QWP = '55353314'  # azimuth
+        HWP = '55356974'  # ellipticity
 
     class MotorDirection(enum.Enum):
         FORWARD = '+'
@@ -286,6 +286,7 @@ class ControlGroup(Adw.PreferencesGroup):
         self.available_motors = [
             m.motor for m in self.motor_controllers if m.manual_motor_control == False
         ]
+        print(self.available_motors)
 
     def pol_comp(self) -> bool:
         if not self.get_enable_compensation():
@@ -587,7 +588,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.motor_controllers.append(
                 motor_box.MotorControlPage(
                     motor=thorlabs_motor.Motor(
-                        serial_number=m.serial_number
+                        serial_number=m.device_info.serial_number
                     )
                 )
             )

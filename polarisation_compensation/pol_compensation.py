@@ -7,12 +7,13 @@ sys.path.append(
         os.path.pardir
     ))
 )
+import motor.base_motor as base_motor
 import motor.thorlabs_motor as thorlabs_motor
 
 def pol_comp(
         motor_list: list[thorlabs_motor.Motor],
-        motor_qwp_serial_no: str | int,
-        motor_hwp_serial_no: str | int,
+        motor_qwp_serial_no: str,
+        motor_hwp_serial_no: str,
         target_azimuth: float,
         target_ellipticity: float,
         azimuth_velocities: list[tuple[float, float]],
@@ -20,8 +21,8 @@ def pol_comp(
         current_azimuth: float,
         current_ellipticity: float
 ) -> bool:
-    motor_qwp_index = next((i for i, m in enumerate(motor_list) if m.serial_no == motor_qwp_serial_no), -1)
-    motor_hwp_index = next((i for i, m in enumerate(motor_list) if m.serial_no == motor_hwp_serial_no), -1)
+    motor_qwp_index = next((i for i, m in enumerate(motor_list) if m.device_info.serial_number == motor_qwp_serial_no), -1)
+    motor_hwp_index = next((i for i, m in enumerate(motor_list) if m.device_info.serial_number == motor_hwp_serial_no), -1)
 
     def adjust_motor(
             motor_list: list[thorlabs_motor.Motor],
@@ -40,7 +41,7 @@ def pol_comp(
 
         if motor.direction.value != direction:
             motor.stop()
-            motor.direction = motor.MotorDirection(direction)
+            motor.direction = base_motor.MotorDirection(direction)
 
         abs_delta = abs(delta)
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
@@ -57,7 +58,8 @@ def pol_comp(
                 # )
                 # break
                 motor.jog(
-                    direction=motor.MotorDirection(direction),
+                    direction=motor.direction,
+                    acceleration=20.0,
                     max_velocity=velocity
                 )
                 break
