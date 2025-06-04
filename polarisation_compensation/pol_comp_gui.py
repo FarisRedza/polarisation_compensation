@@ -15,18 +15,23 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
-import pol_compensation
-
+sys.path.append(
+    os.path.abspath(os.path.join(
+        os.path.dirname(__file__),
+        os.path.pardir
+    ))
+)
+import polarisation_compensation.pol_compensation as pol_compensation
 import polarimeter.polarimeter_box as polarimeter_box
 import bb84.qutag_box as qutag_box
 import motor.motor_box as motor_box
+import motor.base_motor as base_motor
 import motor.thorlabs_motor as thorlabs_motor
 import motor.remote_motor as remote_motor
 
 class CurveBox(Gtk.Box):
     def __init__(
             self,
-            # angle_velocity: list[tuple]
             set_angle_velocity_callback: typing.Callable,
             get_angle_velocity_callback: typing.Callable
     ) -> None:
@@ -43,12 +48,6 @@ class CurveBox(Gtk.Box):
 
         self.selected_index = None
 
-        # self.angle = numpy.array(
-        #     [angle for angle, acceleration in self.get_angle_velocity()]
-        # )
-        # self.acceleration = numpy.array(
-        #     [acceleration for angle, acceleration in self.get_angle_velocity()]
-        # )
         self.angle, self.acceleration = map(
             numpy.array,
             zip(*self.get_angle_velocity())
@@ -129,10 +128,6 @@ class ControlGroup(Adw.PreferencesGroup):
         QWP = '55353314'  # azimuth
         HWP = '55356974'  # ellipticity
 
-    class MotorDirection(enum.Enum):
-        FORWARD = '+'
-        BACKWARD = '-'
-        IDLE = None
     def __init__(
             self,
             polarisation_box: polarimeter_box.PolarimeterBox | qutag_box.QuTAGBox,
@@ -206,11 +201,11 @@ class ControlGroup(Adw.PreferencesGroup):
         self.azimuth_motor_step_size = 0
         self.azimuth_motor_acceleration = 0
         self.azimuth_motor_max_velocity = 0
-        self.azimuth_motor_direction = self.MotorDirection.IDLE
+        self.azimuth_motor_direction = base_motor.MotorDirection.IDLE
         self.ellipticity_motor_step_size = 0
         self.ellipticity_motor_acceleration = 0
         self.ellipticity_motor_max_velocity = 0
-        self.ellipticity_motor_direction = self.MotorDirection.IDLE
+        self.ellipticity_motor_direction = base_motor.MotorDirection.IDLE
 
         self.pol_comp_time = 0.1
 
