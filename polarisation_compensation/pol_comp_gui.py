@@ -43,12 +43,17 @@ class CurveBox(Gtk.Box):
 
         self.selected_index = None
 
-        self.angle = numpy.array(
-            [angle for angle, acceleration in self.get_angle_velocity()]
+        # self.angle = numpy.array(
+        #     [angle for angle, acceleration in self.get_angle_velocity()]
+        # )
+        # self.acceleration = numpy.array(
+        #     [acceleration for angle, acceleration in self.get_angle_velocity()]
+        # )
+        self.angle, self.acceleration = map(
+            numpy.array,
+            zip(*self.get_angle_velocity())
         )
-        self.acceleration = numpy.array(
-            [acceleration for angle, acceleration in self.get_angle_velocity()]
-        )
+
 
         self.acceleration_curve = self.ax.plot(
             self.angle,
@@ -82,7 +87,7 @@ class CurveBox(Gtk.Box):
 
         self.append(child=Gtk.Frame(child=self.canvas))
 
-    def on_press(self, event: matplotlib.backend_bases.MouseEvent):
+    def on_press(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # discount mouse events outside of axes
         if event.inaxes != self.ax:
             return
@@ -98,7 +103,7 @@ class CurveBox(Gtk.Box):
         print(f'angle: {self.angle}')
         print(f'acceleration: {self.acceleration}')
 
-    def on_motion(self, event: matplotlib.backend_bases.MouseEvent):
+    def on_motion(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # discount if no selection or mouse events outside of axes
         if self.selected_index is None or event.inaxes != self.ax:
             return
@@ -207,7 +212,7 @@ class ControlGroup(Adw.PreferencesGroup):
         self.ellipticity_motor_max_velocity = 0
         self.ellipticity_motor_direction = self.MotorDirection.IDLE
 
-        motor_poling_interval = 1000
+        self.pol_comp_time = 0.1
 
         # enable compensation
         enable_compensation_row = Adw.ActionRow(
@@ -262,10 +267,13 @@ class ControlGroup(Adw.PreferencesGroup):
         #     interval=motor_poling_interval,
         #     function=self.pol_comp
         # )
-        self._pol_comp_thread = threading.Thread(target=self._pol_comp_loop, daemon=True)
+        self._pol_comp_thread = threading.Thread(
+            target=self._pol_comp_loop,
+            daemon=True
+        )
         self._pol_comp_thread.start()
 
-    def _pol_comp_loop(self):
+    def _pol_comp_loop(self) -> None:
         while True:
             if self.get_enable_compensation():
                 pol_compensation.pol_comp(
@@ -279,7 +287,7 @@ class ControlGroup(Adw.PreferencesGroup):
                     current_azimuth=self.polarimeter_box.data.azimuth,
                     current_ellipticity=self.polarimeter_box.data.ellipticity
                 )
-            time.sleep(0.1)  # Or slightly faster/slower depending on responsiveness
+            time.sleep(self.pol_comp_time)
 
 
     def on_set_target_azimuth(self, entry: Gtk.Entry):
@@ -578,7 +586,7 @@ class PolCompPage(Adw.PreferencesPage):
         return self.ellipticity_velocity
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.set_title(title='Polarisation Compensation')
         self.set_default_size(width=1300, height=800)
@@ -649,11 +657,11 @@ class MainWindow(Adw.ApplicationWindow):
         return False
     
 class App(Adw.Application):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 
-    def on_activate(self, app):
+    def on_activate(self, app) -> None:
         self.win = MainWindow(application=app)
         self.win.present()
 
