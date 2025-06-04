@@ -6,15 +6,14 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-import qutag_box
-
 sys.path.append(
     os.path.abspath(os.path.join(
         os.path.dirname(__file__),
         os.path.pardir
     ))
 )
-import qutag
+import bb84.timetagger_box as timetagger_box
+import bb84.qutag as qutag
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
@@ -34,7 +33,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### qutag box
         try:
-            self.qutag_box = qutag_box.QuTAGBox()
+            self.qutag_box = timetagger_box.TimeTaggerBox()
         except:
             main_box.append(
                 child=Gtk.Label(
@@ -48,7 +47,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         try:
-            self.qutag_box.qutag._qutag.deInitialize()
+            if type(self.qutag_box.timetagger) == qutag.Qutag:
+                self.qutag_box.timetagger._qutag.deInitialize()
         except Exception as e:
             print('Error: QuTAG already disconnected')
         return False
@@ -67,5 +67,6 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        app.win.qutag_box.qutag._qutag.deInitialize()
+        if type(app.win.qutag_box.timetagger) == qutag.Qutag:
+            app.win.qutag_box.timetagger._qutag.deInitialize()
         print('App crashed with an exception:', e)

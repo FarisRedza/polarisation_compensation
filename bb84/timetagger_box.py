@@ -18,6 +18,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
+import bb84.timetagger as timetagger
 import bb84.qutag as qutag
 
 class PolEllipseGroup(Adw.PreferencesGroup):
@@ -58,7 +59,7 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.add(child=Gtk.Frame(child=self.canvas))
 
     def update_plot(self) -> None:
-        data: qutag.Data = self.get_data_callback()
+        data: timetagger.Data = self.get_data_callback()
 
         theta = numpy.radians(data.azimuth)
         eta = numpy.radians(data.ellipticity)
@@ -172,7 +173,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
 
     def update_point(self) -> None:
-        data: qutag.Data = self.get_data_callback()
+        data: timetagger.Data = self.get_data_callback()
 
         x = data.normalised_s1
         y = data.normalised_s2
@@ -298,8 +299,8 @@ class CountsGroup(Adw.PreferencesGroup):
         )
         data_value_box.append(child=self.l_value_label)
 
-    def update_qutag_info(self):
-        raw_data: qutag.RawData = self.get_raw_data_callback()
+    def update_timetagger_info(self):
+        raw_data: timetagger.RawData = self.get_raw_data_callback()
 
         self.h_value_label.set_text(f'{raw_data.singles_h}')
         self.v_value_label.set_text(f'{raw_data.singles_v}')
@@ -415,7 +416,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         # data_value_box.append(child=self.qber_value_label)
 
     def update_qutag_info(self):
-        data: qutag.Data = self.get_data_callback()
+        data: timetagger.Data = self.get_data_callback()
 
         # self.wavelength_value_label.set_text(f'{data.wavelength} m')
         self.azimuth_value_label.set_text(f'{data.azimuth:.2f} °')
@@ -472,13 +473,13 @@ class ColumnTwo(Adw.PreferencesPage):
         )
         self.add(group=self.measurement_group)
 
-class QuTAGBox(Gtk.Box):
+class TimeTaggerBox(Gtk.Box):
     def __init__(self) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
-        self.qutag = qutag.Qutag()
-        self.raw_data = qutag.RawData()
-        self.data = qutag.Data()
+        self.timetagger = timetagger.TimeTagger()
+        self.raw_data = timetagger.RawData()
+        self.data = timetagger.Data()
 
         self.columnone = ColumnOne(get_data_callback=self.get_data)
         self.append(child=self.columnone)
@@ -491,17 +492,17 @@ class QuTAGBox(Gtk.Box):
 
         GLib.timeout_add(
             interval=125,
-            function=self.update_from_qutag
+            function=self.update_from_timetagger
         )
 
-    def get_raw_data(self) -> qutag.RawData:
+    def get_raw_data(self) -> timetagger.RawData:
         return self.raw_data
 
-    def get_data(self) -> qutag.Data:
+    def get_data(self) -> timetagger.Data:
         return self.data
         
-    def update_from_qutag(self) -> bool:
-        self.raw_data = self.qutag.measure()
+    def update_from_timetagger(self) -> bool:
+        self.raw_data = self.timetagger.measure()
         self.data = self.raw_data.to_data()
         self.set_qutag_data()
         return True
@@ -509,5 +510,5 @@ class QuTAGBox(Gtk.Box):
     def set_qutag_data(self) -> None:
         self.columnone.plot_ellipse_group.update_plot()
         self.columnone.plot_bloch_group.update_point()
-        self.columntwo.counts_group.update_qutag_info()
+        self.columntwo.counts_group.update_timetagger_info()
         self.columntwo.measurement_group.update_qutag_info()

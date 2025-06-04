@@ -23,7 +23,8 @@ sys.path.append(
 )
 import polarisation_compensation.pol_compensation as pol_compensation
 import polarimeter.polarimeter_box as polarimeter_box
-import bb84.qutag_box as qutag_box
+import bb84.timetagger as timetagger
+import bb84.timetagger_box as timetagger_box
 import motor.motor_box as motor_box
 import motor.base_motor as base_motor
 import motor.thorlabs_motor as thorlabs_motor
@@ -130,7 +131,7 @@ class ControlGroup(Adw.PreferencesGroup):
 
     def __init__(
             self,
-            polarisation_box: polarimeter_box.PolarimeterBox | qutag_box.QuTAGBox,
+            polarisation_box: polarimeter_box.PolarimeterBox | timetagger_box.TimeTaggerBox,
             motor_controllers: list[motor_box.MotorControlPage],
             set_enable_compensation_callback: typing.Callable,
             get_enable_compensation_callback: typing.Callable,
@@ -457,7 +458,7 @@ class DevicesGroup(Adw.PreferencesGroup):
 class PolCompPage(Adw.PreferencesPage):
     def __init__(
             self,
-            polarimeter_box: polarimeter_box.PolarimeterBox,
+            polarimeter_box: polarimeter_box.PolarimeterBox | timetagger_box.TimeTaggerBox,
             motor_controllers: list[motor_box.MotorControlPage]
     ) -> None:
         super().__init__()
@@ -605,7 +606,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### polarimeter box
         # self.polarisation_box = polarimeter_box.PolarimeterBox()
-        self.polarisation_box = qutag_box.QuTAGBox()
+        self.polarisation_box = timetagger_box.TimeTaggerBox()
         self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes

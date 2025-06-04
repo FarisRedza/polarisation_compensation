@@ -1,9 +1,6 @@
 import sys
 import os
 import time
-import dataclasses
-import typing
-import math
 
 import numpy
 
@@ -13,86 +10,10 @@ sys.path.append(
         os.path.pardir
     ))
 )
+import bb84.timetagger as timetagger
 import quTAG.QuTAG_HR as QuTAG_HR
 
-Percent = typing.NewType('Percent', float)
-Degrees = typing.NewType('Degrees', float)
-Radians = typing.NewType('Radians', float)
-Watts = typing.NewType('Watts', float)
-Metres = typing.NewType('Metres', float)
-DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
-
-C_H = 0
-C_V = 1
-# C_D = 2
-# C_A = 3
-C_R = 2
-C_L = 3
-
-@dataclasses.dataclass
-class Data:
-    # timestamp = float(0.0)
-    # wavelength = Metres(0.0)
-    azimuth: float = 0.0
-    ellipticity: float = 0.0
-    # degree_of_polarisation = Percent(0.0)
-    # degree_of_linear_polarisation = Percent(0.0)
-    # degree_of_circular_polarisation = Percent(0.0)
-    # power = DecibelMilliwatts(0.0)
-    # power_polarised = DecibelMilliwatts(0.0)
-    # power_unpolarised = DecibelMilliwatts(0.0)
-    normalised_s1: float = 0.0
-    normalised_s2: float = 0.0
-    normalised_s3: float = 0.0
-    # S0 = Watts(0.0)
-    # S1 = Watts(0.0)
-    # S2 = Watts(0.0)
-    # S3 = Watts(0.0)
-    # power_split_ratio: float = 0.0
-    # phase_difference = Degrees(0.0)
-    # circularity = Percent(0.0)
-
-@dataclasses.dataclass
-class RawData:
-    singles_h: int = 0
-    singles_v: int = 0
-    singles_d: int = 0
-    singles_a: int = 0
-    singles_r: int = 0
-    singles_l: int = 0
-
-    def to_data(self) -> Data:
-        try:
-            s1 = (self.singles_h - self.singles_v)/(self.singles_h + self.singles_v)
-        except:
-            s1 = 0
-        try:
-            s2 = (self.singles_d - self.singles_a)/(self.singles_d + self.singles_a)
-        except:
-            s2 = 0
-        try:
-            s3 = (self.singles_r - self.singles_l)/(self.singles_r + self.singles_l)
-        except:
-            s3 = 0
-
-        try:
-            eta = math.asin(s1)/2
-        except:
-            eta = 0
-        try:
-            theta = math.acos(s3/math.cos(2*eta))/2
-        except:
-            theta = 0
-
-        return Data(
-            azimuth=math.degrees(theta),
-            ellipticity=math.degrees(eta),
-            normalised_s1=s1,
-            normalised_s2=s2,
-            normalised_s3=s3
-        )
-
-class Qutag:
+class Qutag(timetagger.TimeTagger):
     def __init__(self):
         self._qutag = QuTAG_HR.QuTAG()
         for channel in range(4, 9):
@@ -108,8 +29,8 @@ class Qutag:
     def __del__(self):
         self._qutag.deInitialize()
 
-    def measure(self) -> RawData:
-        data = RawData()
+    def measure(self) -> timetagger.RawData:
+        data = timetagger.RawData()
         
         self._qutag.getLastTimestamps(reset=True)
         time.sleep(0.1)
@@ -119,12 +40,12 @@ class Qutag:
 
         singles = numpy.bincount(channels, minlength=8)[4:]
 
-        data.singles_h=int(singles[C_H])
-        data.singles_v=int(singles[C_V])
-        # data.singles_d=int(singles[C_D])
-        # data.singles_a=int(singles[C_A])
-        data.singles_r=int(singles[C_R])
-        data.singles_l=int(singles[C_L])
+        data.singles_h=int(singles[timetagger.C_H])
+        data.singles_v=int(singles[timetagger.C_V])
+        # data.singles_d=int(singles[timetagger.C_D])
+        # data.singles_a=int(singles[timetagger.C_A])
+        data.singles_r=int(singles[timetagger.C_R])
+        data.singles_l=int(singles[timetagger.C_L])
 
         return data
 
