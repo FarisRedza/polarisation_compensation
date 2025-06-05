@@ -33,7 +33,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### qutag box
         try:
-            self.qutag_box = timetagger_box.TimeTaggerBox()
+            self.timetagger_box = timetagger_box.TimeTaggerBox()
         except:
             main_box.append(
                 child=Gtk.Label(
@@ -43,12 +43,12 @@ class MainWindow(Adw.ApplicationWindow):
                 )
             )
         else:
-            main_box.append(child=self.qutag_box)
+            main_box.append(child=self.timetagger_box)
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         try:
-            if type(self.qutag_box.timetagger) == qutag.Qutag:
-                self.qutag_box.timetagger._qutag.deInitialize()
+            if type(self.timetagger_box.timetagger) == qutag.Qutag:
+                self.timetagger_box.timetagger._qutag.deInitialize()
         except Exception as e:
             print('Error: QuTAG already disconnected')
         return False
@@ -67,6 +67,6 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        if type(app.win.qutag_box.timetagger) == qutag.Qutag:
-            app.win.qutag_box.timetagger._qutag.deInitialize()
+        if type(app.win.timetagger_box.timetagger) == qutag.Qutag:
+            app.win.timetagger_box.timetagger._qutag.deInitialize()
         print('App crashed with an exception:', e)

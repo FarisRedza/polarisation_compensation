@@ -477,7 +477,7 @@ class TimeTaggerBox(Gtk.Box):
     def __init__(self) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
-        self.timetagger = timetagger.TimeTagger()
+        self.timetagger = qutag.Qutag()
         self.raw_data = timetagger.RawData()
         self.data = timetagger.Data()
 
