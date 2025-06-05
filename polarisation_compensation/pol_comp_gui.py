@@ -54,7 +54,6 @@ class CurveBox(Gtk.Box):
             zip(*self.get_angle_velocity())
         )
 
-
         self.acceleration_curve = self.ax.plot(
             self.angle,
             self.acceleration,
@@ -108,8 +107,8 @@ class CurveBox(Gtk.Box):
         if self.selected_index is None or event.inaxes != self.ax:
             return
        
-        self.angle[self.selected_index] = round(event.xdata,2)
-        self.acceleration[self.selected_index] = round(event.ydata,2)
+        self.angle[self.selected_index] = round(event.xdata, 2)
+        self.acceleration[self.selected_index] = round(event.ydata, 2)
 
         sorted_indices = numpy.argsort(self.angle)
         self.angle = self.angle[sorted_indices]
@@ -119,7 +118,10 @@ class CurveBox(Gtk.Box):
         self.acceleration_points.set_data(self.angle, self.acceleration)
 
         self.set_angle_velocity(
-            value=list(zip([float(f) for f in self.angle],[float(f) for f in self.acceleration]))
+            value=list(zip(
+                [float(f) for f in self.angle],
+                [float(f) for f in self.acceleration]
+            ))
         )
 
         self.canvas.draw()
@@ -172,7 +174,6 @@ class ControlGroup(Adw.PreferencesGroup):
         self.get_azimuth_velocity = get_azimuth_velocity_callback
         self.set_ellipticity_velocity = set_ellipticity_velocity_callback
         self.get_ellipticity_velocity = get_ellipticity_velocity_callback
-
 
         self.set_qwp_motor(value=self.MotorWP.QWP.value)
         self.set_hwp_motor(value=self.MotorWP.HWP.value)
@@ -612,7 +613,7 @@ class MainWindow(Adw.ApplicationWindow):
         ### init motor control boxes
         # self.motors = thorlabs_motor.list_motors()
         self.motors = remote_motor.list_motors(
-            ip_address=remote_motor.server_ip,
+            host=remote_motor.server_host,
             port=remote_motor.server_port
         )
         self.motor_controllers: list[motor_box.MotorControlPage] = []
@@ -626,7 +627,7 @@ class MainWindow(Adw.ApplicationWindow):
                 motor_box.MotorControlPage(
                     motor=remote_motor.Motor(
                         serial_number=m.device_info.serial_number,
-                        ip_address=remote_motor.server_ip,
+                        host=remote_motor.server_host,
                         port=remote_motor.server_port
                     )
                 )

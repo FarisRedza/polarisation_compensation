@@ -46,15 +46,16 @@ def pol_comp(
             motor.stop()
             return
 
-        taget_direction = '-' if delta > 0 else '+'
+        # target_direction = '-' if delta > 0 else '+'
+        target_direction = base_motor.MotorDirection.FORWARD if delta > 0 else base_motor.MotorDirection.BACKWARD
         abs_delta = abs(delta)
 
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
             if abs_delta > threshold:
-                if (motor.direction.value != taget_direction or
+                if (motor.direction != target_direction or
                         motor.max_velocity != velocity):
                     motor.stop()
-                    motor.direction = base_motor.MotorDirection(taget_direction)
+                    motor.direction = target_direction
                     motor.jog(
                         direction=motor.direction,
                         acceleration=20.0,
