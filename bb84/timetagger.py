@@ -52,22 +52,35 @@ class RawData:
         try:
             s1 = (self.singles_h - self.singles_v)/(self.singles_h + self.singles_v)
         except:
-            s1 = 0
+            s1 = None
         try:
             s2 = (self.singles_d - self.singles_a)/(self.singles_d + self.singles_a)
         except:
-            s2 = 0
+            s2 = None
         try:
             s3 = (self.singles_r - self.singles_l)/(self.singles_r + self.singles_l)
         except:
-            s3 = 0
+            s3 = None
+
+        match (s1, s2, s3):
+            case (float(), None, float()):
+                s2 = math.sqrt(1 - s1**2 - s3**2)
+
+            case (None, float(), float()):
+                s1 = math.sqrt(1 - s2**2 - s3**2)
+
+            case (float(), float(), None):
+                s3 = math.sqrt(1 - s1**2 - s2**2)
+
+            case _:
+                raise RuntimeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
 
         try:
-            eta = math.asin(s1)/2
+            eta = math.asin(s3)/2
         except:
             eta = 0
         try:
-            theta = math.acos(s3/math.cos(2*eta))/2
+            theta = math.acos(s1/math.cos(2*eta))/2
         except:
             theta = 0
 
