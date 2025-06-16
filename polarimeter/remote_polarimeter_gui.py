@@ -7,6 +7,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
 import polarimeter_box as polarimeter_box
+import remote_polarimeter as remote_polarimeter
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -33,8 +34,9 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=header_bar)
 
         ### polarimeter box
-        self.polarimeter = thorlabs_polarimeter.Polarimeter(
-            id='1313:8031',
+        self.polarimeter = remote_polarimeter.Polarimeter(
+            host=remote_polarimeter.server_host,
+            port=remote_polarimeter.server_port,
             serial_number='M00910360'
         )
         try:

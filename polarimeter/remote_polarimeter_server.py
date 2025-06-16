@@ -42,7 +42,7 @@ def handle_client(connection: socket.socket, address) -> None:
                 connection.sendall(json.dumps({'error': str(e)}).encode())
                 break
 
-def start_server(host: str = '0.0.0.0', port: int = 5002) -> None:
+def start_server(host: str = '0.0.0.0', port: int = 5003) -> None:
     server = socket.socket(
         family=socket.AF_INET,
         type=socket.SOCK_STREAM
@@ -50,7 +50,7 @@ def start_server(host: str = '0.0.0.0', port: int = 5002) -> None:
     try:
         server.bind((host, port))
         server.listen()
-        print(f'Timetagger server listening on {host}:{port}')
+        print(f'Polarimeter server listening on {host}:{port}')
         while True:
             conn, addr = server.accept()
             threading.Thread(
@@ -62,6 +62,8 @@ def start_server(host: str = '0.0.0.0', port: int = 5002) -> None:
         server.close()
 
 if __name__ == '__main__':
-    # qt = qutag.Qutag()
-    pax = thorlabs_polarimeter.Polarimeter()
+    pax = thorlabs_polarimeter.Polarimeter(
+        id='1313:8031',
+        serial_number='M00910360'
+    )
     start_server()
