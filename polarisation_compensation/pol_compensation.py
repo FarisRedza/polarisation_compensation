@@ -42,9 +42,9 @@ def pol_comp(
         motor = motor_list[motor_index]
         delta = target_value - current_value
 
-        if abs(delta) < 1e-3:  # small error threshold to prevent jitter
-            motor.stop()
-            return
+        # if abs(delta) < 1e-3:  # small error threshold to prevent jitter
+        #     motor.stop()
+        #     return
 
         # target_direction = '-' if delta > 0 else '+'
         target_direction = base_motor.MotorDirection.FORWARD if delta > 0 else base_motor.MotorDirection.BACKWARD
@@ -54,7 +54,7 @@ def pol_comp(
             if abs_delta > threshold:
                 if (motor.direction != target_direction or
                         motor.max_velocity != velocity):
-                    motor.stop()
+                    # motor.stop()
                     motor.direction = target_direction
                     motor.jog(
                         direction=motor.direction,
@@ -62,8 +62,11 @@ def pol_comp(
                         max_velocity=velocity
                     )
                 break
-        else:
-            motor.stop()
+            # elif motor.is_moving == True:
+            #     motor.stop()
+            else:
+                # pass
+                motor.stop()
 
 
     adjust_motor(

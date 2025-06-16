@@ -23,6 +23,7 @@ sys.path.append(
 )
 import polarisation_compensation.pol_compensation as pol_compensation
 import polarimeter.polarimeter_box as polarimeter_box
+import polarimeter.remote_polarimeter as remote_polarimeter
 import bb84.timetagger as timetagger
 import bb84.timetagger_box as timetagger_box
 import motor.motor_box as motor_box
@@ -485,17 +486,25 @@ class PolCompPage(Adw.PreferencesPage):
         #     (1.0, 1),
         #     (0.075, 0.1)
         # ]
+        # self.azimuth_velocity = [
+        #     (5.0, 25.0),
+        #     (2.5, 15.0),
+        #     (1.0, 5.0),
+        #     (0.075, 0.1)
+        # ]
+        # self.ellipticity_velocity = [
+        #     (5.0, 25.0),
+        #     (2.5, 15.0),
+        #     (1.0, 1),
+        #     (0.075, 0.1)
+        # ]
         self.azimuth_velocity = [
             (5.0, 25.0),
             (2.5, 15.0),
-            (1.0, 5.0),
-            (0.075, 0.1)
         ]
         self.ellipticity_velocity = [
             (5.0, 25.0),
             (2.5, 15.0),
-            (1.0, 1),
-            (0.075, 0.1)
         ]
 
         self.control_group = ControlGroup(
@@ -607,7 +616,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### polarimeter box
         # self.polarisation_box = polarimeter_box.PolarimeterBox()
-        self.polarisation_box = timetagger_box.TimeTaggerBox()
+        self.polarisation_box = polarimeter_box.PolarimeterBox(
+            polarimeter=remote_polarimeter.Polarimeter(
+                host='137.195.89.222',
+                port=5003,
+                serial_number='M00910360'
+            )
+        )
+        # self.polarisation_box = timetagger_box.TimeTaggerBox()
         self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes

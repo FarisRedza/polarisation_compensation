@@ -116,7 +116,12 @@ class BlochSphere2D(Gtk.Box):
         self.ax.axis('off')
 
         # circle
-        circle = matplotlib.pyplot.Circle((0, 0), 1.0, color='gray', fill=False)
+        circle = matplotlib.pyplot.Circle(
+            xy=(0, 0),
+            radius=1.0,
+            color='gray',
+            fill=False
+        )
         self.ax.add_patch(circle)
         self.ax.plot([-1, 1], [0, 0], color='gray', linewidth=1)
         self.ax.plot([0, 0], [-1, 1], color='gray', linewidth=1)
@@ -130,7 +135,9 @@ class BlochSphere2D(Gtk.Box):
             for _ in range(self.max_trail_length)
         ]
 
-        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
+            figure=self.fig
+        )
         self.canvas.set_size_request(300, 300)
         self.append(self.canvas)
 

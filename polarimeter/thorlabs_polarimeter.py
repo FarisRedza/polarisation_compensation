@@ -15,9 +15,9 @@ DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
 def decibel_milliwatts(power: Watts) -> DecibelMilliwatts:
     if power > 0:
-        return 10 * math.log10(power / 1e-3)
+        return DecibelMilliwatts(10 * math.log10(power / 1e-3))
     else:
-        return 0.0
+        return DecibelMilliwatts(0.0)
 
 @dataclasses.dataclass
 class DeviceInfo:
@@ -147,25 +147,25 @@ class SCPIDevice:
 @dataclasses.dataclass
 class Data:
     timestamp: float = 0.0
-    wavelength: Metres = 0.0
-    azimuth: Degrees = 0.0
-    ellipticity: Degrees = 0.0
-    degree_of_polarisation: Percent = 0.0
-    degree_of_linear_polarisation: Percent = 0.0
-    degree_of_circular_polarisation: Percent = 0.0
-    power: DecibelMilliwatts = 0.0
-    power_polarised: DecibelMilliwatts = 0.0
-    power_unpolarised: DecibelMilliwatts = 0.0
+    wavelength: Metres = Metres(0.0)
+    azimuth: Degrees = Degrees(0.0)
+    ellipticity: Degrees = Degrees(0.0)
+    degree_of_polarisation: Percent = Percent(0.0)
+    degree_of_linear_polarisation: Percent = Percent(0.0)
+    degree_of_circular_polarisation: Percent = Percent(0.0)
+    power: DecibelMilliwatts = DecibelMilliwatts(0.0)
+    power_polarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
+    power_unpolarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
     normalised_s1: float = 0.0
     normalised_s2: float = 0.0
     normalised_s3: float = 0.0
-    S0: Watts = 0.0
-    S1: Watts = 0.0
-    S2: Watts = 0.0
-    S3: Watts = 0.0
+    S0: Watts = Watts(0.0)
+    S1: Watts = Watts(0.0)
+    S2: Watts = Watts(0.0)
+    S3: Watts = Watts(0.0)
     power_split_ratio: float = 0.0
-    phase_difference: Degrees = 0.0
-    circularity: Percent = 0.0
+    phase_difference: Degrees = Degrees(0.0)
+    circularity: Percent = Percent(0.0)
 
 @dataclasses.dataclass
 class RawData:
@@ -200,7 +200,7 @@ class RawData:
     ptotal: str
     
     def to_data(self) -> Data:
-        wavelength = float(self.wavelength)
+        wavelength = Metres(float(self.wavelength))
         revs = float(self.revs)
         timestamp = float(self.timestamp)
         paxOpMode = float(self.paxOpMode)
@@ -224,24 +224,24 @@ class RawData:
         return Data(
             timestamp=timestamp,
             wavelength=wavelength,
-            azimuth=math.degrees(theta),
-            ellipticity=math.degrees(eta),
-            degree_of_polarisation=dop * 100,
-            degree_of_linear_polarisation=math.sqrt(S1**2 + S2**2)/S0 * 100,
-            degree_of_circular_polarisation=abs(S3)/S0 * 100,
-            power=decibel_milliwatts(ptotal),
-            power_polarised=decibel_milliwatts(dop*ptotal),
-            power_unpolarised=decibel_milliwatts((1-dop)*ptotal),
+            azimuth=Degrees(math.degrees(theta)),
+            ellipticity=Degrees(math.degrees(eta)),
+            degree_of_polarisation=Percent(dop * 100),
+            degree_of_linear_polarisation=Percent(math.sqrt(S1**2 + S2**2)/S0 * 100),
+            degree_of_circular_polarisation=Percent(abs(S3)/S0 * 100),
+            power=decibel_milliwatts(Watts(ptotal)),
+            power_polarised=decibel_milliwatts(Watts(dop*ptotal)),
+            power_unpolarised=decibel_milliwatts(Watts((1-dop)*ptotal)),
             normalised_s1=S1/S0,
             normalised_s2=S2/S0,
             normalised_s3=S3/S0,
-            S0=S0,
-            S1=S1,
-            S2=S2,
-            S3=S3,
+            S0=Watts(S0),
+            S1=Watts(S1),
+            S2=Watts(S2),
+            S3=Watts(S3),
             power_split_ratio=math.tan(eta)**2,
-            phase_difference=math.degrees(math.atan2(S3,S2)),
-            circularity=abs(math.tan(eta)) * 100
+            phase_difference=Degrees(math.degrees(math.atan2(S3,S2))),
+            circularity=Percent(abs(math.tan(eta)) * 100)
         )
 
 
@@ -392,8 +392,5 @@ class Polarimeter(SCPIDevice):
 if __name__ == '__main__':
     pax = Polarimeter(id='1313:8031', serial_number='M00910360')
     pprint.pprint(pax.device_info)
-    pax.set_wavelength(wavelength=6.350000000000001e-07)
-    print(pax.measure().wavelength)
-    pax.set_wavelength(wavelength=7.000000000000001e-07)
     print(pax.measure().wavelength)
     
