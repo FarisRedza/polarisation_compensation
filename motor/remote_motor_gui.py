@@ -1,28 +1,20 @@
 import sys
-import os
 
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-import motor_box as motor_box
-
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
-import motor.motor as thorlabs_motor
+import motor_box
+import remote_motor
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.set_title(title='Motor Controller')
         self.set_default_size(width=400, height=350)
         self.set_size_request(width=400, height=350)
-        self.connect("close-request", self.on_close_request)
+        self.connect('close-request', self.on_close_request)
 
         # main box
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -32,10 +24,15 @@ class MainWindow(Adw.ApplicationWindow):
         header_bar = Adw.HeaderBar()
         main_box.append(child=header_bar)
 
-        self.main_stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        self.main_stack = Gtk.Stack(
+            transition_type=Gtk.StackTransitionType.CROSSFADE
+        )
         main_box.append(child=self.main_stack)
 
-        motors = thorlabs_motor.list_thorlabs_motors()
+        motors = remote_motor.list_motors(
+            host=remote_motor.server_host,
+            port=remote_motor.server_port
+        )
         if len(motors) == 0:
             main_box.append(
                 child=Gtk.Label(
@@ -56,8 +53,8 @@ class MainWindow(Adw.ApplicationWindow):
             add_motor_page.add(add_motor_group)
             for i in motors:
                 add_motor_row = Adw.ActionRow(
-                    title=i.get_device_info().notes,
-                    subtitle=i.get_device_info().serial_no
+                    title=i.device_info.device_name,
+                    subtitle=i.device_info.serial_number
                 )
                 add_motor_group.add(add_motor_row)
                 add_motor_button = Gtk.Button(
@@ -67,13 +64,12 @@ class MainWindow(Adw.ApplicationWindow):
                 add_motor_button.connect(
                     'clicked',
                     lambda widget,
-                    serial_number=i.get_device_info().serial_no: self.on_add_motor(
+                    serial_number=i.device_info.serial_number: self.on_add_motor(
                         widget,
                         serial_number
                     )
                 )
                 add_motor_row.add_suffix(widget=add_motor_button)
-                add_motor_row.set_activatable_widget(widget=add_motor_button)
 
         ## add motor
         add_motor_button = Gtk.Button(
@@ -83,9 +79,13 @@ class MainWindow(Adw.ApplicationWindow):
         )
         add_motor_button.connect('clicked', self.on_add_motor)
 
-    def on_add_motor(self, button: Gtk.Button, serial_number):
+    def on_add_motor(self, button: Gtk.Button, serial_number) -> None:
         self.motor_control_box = motor_box.MotorControlPage(
-            motor=thorlabs_motor.Motor(serial_number=serial_number)
+            motor=remote_motor.Motor(
+                host=remote_motor.server_host,
+                port=remote_motor.server_port,
+                serial_number=serial_number
+            )
         )
         self.main_stack.add_titled(
             child=self.motor_control_box,
@@ -93,16 +93,17 @@ class MainWindow(Adw.ApplicationWindow):
             title='test'
         )
         self.main_stack.set_visible_child(child=self.motor_control_box)
+        pass
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         return False
 
 class App(Adw.Application):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 
-    def on_activate(self, app):
+    def on_activate(self, app) -> None:
         self.win = MainWindow(application=app)
         self.win.present()
 

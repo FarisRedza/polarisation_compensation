@@ -2,10 +2,10 @@ import time
 import threading
 import pprint
 
-import polarimeter.polarimeter as scpi_polarimeter
-import motor.motor as thorlabs_motor
+import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
+import motor.thorlabs_motor as thorlabs_motor
 
-def polarimeter_measure(pax: scpi_polarimeter.Polarimeter, data: list[scpi_polarimeter.Data]) -> None:
+def polarimeter_measure(pax: thorlabs_polarimeter.Polarimeter, data: list[thorlabs_polarimeter.Data]) -> None:
     while True:
         for i in range(len(data)):
             data[i] = pax.measure().to_data()
@@ -15,7 +15,7 @@ def polarimeter_measure(pax: scpi_polarimeter.Polarimeter, data: list[scpi_polar
     pax.disconnect()
     print('Stop taking data')
 
-def move_motor(motor: thorlabs_motor.Motor, data: list[scpi_polarimeter.Data]) -> None:
+def move_motor(motor: thorlabs_motor.Motor, data: list[thorlabs_polarimeter.Data]) -> None:
     while True:
         if data[0].azimuth > 0:
             print('moving motor cw')
@@ -29,7 +29,7 @@ def move_motor(motor: thorlabs_motor.Motor, data: list[scpi_polarimeter.Data]) -
     
 
 def main():
-    pax = scpi_polarimeter.Polarimeter(
+    pax = thorlabs_polarimeter.Polarimeter(
         id='1313:8031',
         serial_number='M00910360'
     )

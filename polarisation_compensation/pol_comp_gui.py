@@ -2,6 +2,8 @@ import sys
 import os
 import enum
 import typing
+import threading
+import time
 
 import numpy
 import matplotlib.pyplot
@@ -13,23 +15,24 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
-import polarisation_box
-import gui.motor_box as motor_box
-import pol_compensation
-
 sys.path.append(
     os.path.abspath(os.path.join(
         os.path.dirname(__file__),
         os.path.pardir
     ))
 )
-import polarimeter.polarimeter as scpi_polarimeter
-import motor.motor as thorlabs_motor
+import polarisation_compensation.pol_compensation as pol_compensation
+import polarimeter.polarimeter_box as polarimeter_box
+import bb84.timetagger as timetagger
+import bb84.timetagger_box as timetagger_box
+import motor.motor_box as motor_box
+import motor.base_motor as base_motor
+import motor.thorlabs_motor as thorlabs_motor
+import motor.remote_motor as remote_motor
 
 class CurveBox(Gtk.Box):
     def __init__(
             self,
-            # angle_velocity: list[tuple]
             set_angle_velocity_callback: typing.Callable,
             get_angle_velocity_callback: typing.Callable
     ) -> None:
@@ -46,11 +49,9 @@ class CurveBox(Gtk.Box):
 
         self.selected_index = None
 
-        self.angle = numpy.array(
-            [angle for angle, acceleration in self.get_angle_velocity()]
-        )
-        self.acceleration = numpy.array(
-            [acceleration for angle, acceleration in self.get_angle_velocity()]
+        self.angle, self.acceleration = map(
+            numpy.array,
+            zip(*self.get_angle_velocity())
         )
 
         self.acceleration_curve = self.ax.plot(
@@ -85,7 +86,7 @@ class CurveBox(Gtk.Box):
 
         self.append(child=Gtk.Frame(child=self.canvas))
 
-    def on_press(self, event: matplotlib.backend_bases.MouseEvent):
+    def on_press(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # discount mouse events outside of axes
         if event.inaxes != self.ax:
             return
@@ -101,13 +102,13 @@ class CurveBox(Gtk.Box):
         print(f'angle: {self.angle}')
         print(f'acceleration: {self.acceleration}')
 
-    def on_motion(self, event: matplotlib.backend_bases.MouseEvent):
+    def on_motion(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # discount if no selection or mouse events outside of axes
         if self.selected_index is None or event.inaxes != self.ax:
             return
        
-        self.angle[self.selected_index] = round(event.xdata,2)
-        self.acceleration[self.selected_index] = round(event.ydata,2)
+        self.angle[self.selected_index] = round(event.xdata, 2)
+        self.acceleration[self.selected_index] = round(event.ydata, 2)
 
         sorted_indices = numpy.argsort(self.angle)
         self.angle = self.angle[sorted_indices]
@@ -117,23 +118,22 @@ class CurveBox(Gtk.Box):
         self.acceleration_points.set_data(self.angle, self.acceleration)
 
         self.set_angle_velocity(
-            value=list(zip([float(f) for f in self.angle],[float(f) for f in self.acceleration]))
+            value=list(zip(
+                [float(f) for f in self.angle],
+                [float(f) for f in self.acceleration]
+            ))
         )
 
         self.canvas.draw()
 
 class ControlGroup(Adw.PreferencesGroup):
     class MotorWP(enum.Enum):
-        QWP = 55353314  # azimuth
-        HWP = 55356974  # ellipticity
+        QWP = '55353314'  # azimuth
+        HWP = '55356974'  # ellipticity
 
-    class MotorDirection(enum.Enum):
-        FORWARD = '+'
-        BACKWARD = '-'
-        IDLE = None
     def __init__(
             self,
-            polarimeter_box: polarisation_box.PolarimeterBox,
+            polarisation_box: polarimeter_box.PolarimeterBox | timetagger_box.TimeTaggerBox,
             motor_controllers: list[motor_box.MotorControlPage],
             set_enable_compensation_callback: typing.Callable,
             get_enable_compensation_callback: typing.Callable,
@@ -153,7 +153,7 @@ class ControlGroup(Adw.PreferencesGroup):
             get_ellipticity_velocity_callback: typing.Callable,
     ) -> None:
         super().__init__(title='Polarisation Compensation')
-        self.polarimeter_box = polarimeter_box
+        self.polarimeter_box = polarisation_box
         self.motor_controllers = [m.motor_controls_group for m in motor_controllers]
 
         self.set_enable_compensation = set_enable_compensation_callback
@@ -175,12 +175,16 @@ class ControlGroup(Adw.PreferencesGroup):
         self.set_ellipticity_velocity = set_ellipticity_velocity_callback
         self.get_ellipticity_velocity = get_ellipticity_velocity_callback
 
-
         self.set_qwp_motor(value=self.MotorWP.QWP.value)
         self.set_hwp_motor(value=self.MotorWP.HWP.value)
-        self.set_polarimeter(
-            value=self.polarimeter_box.polarimeter.device_info.serial_number
-        )
+        if type(self.polarimeter_box) == polarimeter_box.PolarimeterBox:
+            self.set_polarimeter(
+                value=self.polarimeter_box.polarimeter.device_info.serial_number
+            )
+        else:
+            self.set_polarimeter(
+                value='N/A'
+            )
 
         for mc in self.motor_controllers:
             mc.enable_controls_switch.connect(
@@ -199,11 +203,13 @@ class ControlGroup(Adw.PreferencesGroup):
         self.azimuth_motor_step_size = 0
         self.azimuth_motor_acceleration = 0
         self.azimuth_motor_max_velocity = 0
-        self.azimuth_motor_direction = self.MotorDirection.IDLE
+        self.azimuth_motor_direction = base_motor.MotorDirection.IDLE
         self.ellipticity_motor_step_size = 0
         self.ellipticity_motor_acceleration = 0
         self.ellipticity_motor_max_velocity = 0
-        self.ellipticity_motor_direction = self.MotorDirection.IDLE
+        self.ellipticity_motor_direction = base_motor.MotorDirection.IDLE
+
+        self.pol_comp_time = 0.1
 
         # enable compensation
         enable_compensation_row = Adw.ActionRow(
@@ -254,10 +260,32 @@ class ControlGroup(Adw.PreferencesGroup):
             self.on_set_target_ellipticity
         )
 
-        GLib.timeout_add(
-            interval=100,
-            function=self.pol_comp
+        # GLib.timeout_add(
+        #     interval=motor_poling_interval,
+        #     function=self.pol_comp
+        # )
+        self._pol_comp_thread = threading.Thread(
+            target=self._pol_comp_loop,
+            daemon=True
         )
+        self._pol_comp_thread.start()
+
+    def _pol_comp_loop(self) -> None:
+        while True:
+            if self.get_enable_compensation():
+                pol_compensation.pol_comp(
+                    motor_list=self.available_motors,
+                    motor_qwp_serial_no=self.MotorWP.QWP.value,
+                    motor_hwp_serial_no=self.MotorWP.HWP.value,
+                    target_azimuth=self.get_target_azimuth(),
+                    target_ellipticity=self.get_target_ellipticity(),
+                    azimuth_velocities=self.get_azimuth_velocity(),
+                    ellipticity_velocities=self.get_ellipticity_velocity(),
+                    current_azimuth=self.polarimeter_box.data.azimuth,
+                    current_ellipticity=self.polarimeter_box.data.ellipticity
+                )
+            time.sleep(self.pol_comp_time)
+
 
     def on_set_target_azimuth(self, entry: Gtk.Entry):
         try:
@@ -291,10 +319,9 @@ class ControlGroup(Adw.PreferencesGroup):
         self.available_motors = [
             m.motor for m in self.motor_controllers if m.manual_motor_control == False
         ]
+        print(self.available_motors)
 
-    def pol_comp(
-            self
-    ) -> bool:
+    def pol_comp(self) -> bool:
         if not self.get_enable_compensation():
             return True
         pol_compensation.pol_comp(
@@ -303,12 +330,11 @@ class ControlGroup(Adw.PreferencesGroup):
             motor_hwp_serial_no=self.MotorWP.HWP.value,
             target_azimuth=self.target_azimuth,
             target_ellipticity=self.target_ellipticity,
-            azimuth_thresholds_velocities=self.get_azimuth_velocity(),
-            ellipticity_thresholds_velocities=self.get_ellipticity_velocity(),
+            azimuth_velocities=self.get_azimuth_velocity(),
+            ellipticity_velocities=self.get_ellipticity_velocity(),
             current_azimuth=self.polarimeter_box.data.azimuth,
             current_ellipticity=self.polarimeter_box.data.ellipticity
         )
-
         return True
 
 class DevicesGroup(Adw.PreferencesGroup):
@@ -343,17 +369,17 @@ class DevicesGroup(Adw.PreferencesGroup):
             subtitle='QWP Motor'
         )
         self.add(child=qwp_motor_row)
-        qwp_motor_curve_button = Gtk.Button(
-            icon_name='settings-symbolic',
-            valign=Gtk.Align.CENTER
-        )
-        qwp_motor_curve_button.connect(
-            'clicked',
-            self.on_qwp_motor_settings
-        )
-        qwp_motor_row.add_suffix(
-            widget=qwp_motor_curve_button
-        )
+        # qwp_motor_curve_button = Gtk.Button(
+        #     icon_name='settings-symbolic',
+        #     valign=Gtk.Align.CENTER
+        # )
+        # qwp_motor_curve_button.connect(
+        #     'clicked',
+        #     self.on_qwp_motor_settings
+        # )
+        # qwp_motor_row.add_suffix(
+        #     widget=qwp_motor_curve_button
+        # )
         qwp_motor_label = Gtk.Label(
             label=self.get_qwp_motor(),
             valign=Gtk.Align.CENTER
@@ -367,17 +393,17 @@ class DevicesGroup(Adw.PreferencesGroup):
             subtitle='HWP Motor'
         )
         self.add(child=hwp_motor_row)
-        hwp_motor_curve_button = Gtk.Button(
-            icon_name='settings-symbolic',
-            valign=Gtk.Align.CENTER
-        )
-        hwp_motor_curve_button.connect(
-            'clicked',
-            self.on_hwp_motor_settings
-        )
-        hwp_motor_row.add_suffix(
-            widget=hwp_motor_curve_button
-        )
+        # hwp_motor_curve_button = Gtk.Button(
+        #     icon_name='settings-symbolic',
+        #     valign=Gtk.Align.CENTER
+        # )
+        # hwp_motor_curve_button.connect(
+        #     'clicked',
+        #     self.on_hwp_motor_settings
+        # )
+        # hwp_motor_row.add_suffix(
+        #     widget=hwp_motor_curve_button
+        # )
         hwp_motor_label = Gtk.Label(
             label=self.get_hwp_motor(),
             valign=Gtk.Align.CENTER
@@ -433,7 +459,7 @@ class DevicesGroup(Adw.PreferencesGroup):
 class PolCompPage(Adw.PreferencesPage):
     def __init__(
             self,
-            polarimeter_box: polarisation_box.PolarimeterBox,
+            polarimeter_box: polarimeter_box.PolarimeterBox | timetagger_box.TimeTaggerBox,
             motor_controllers: list[motor_box.MotorControlPage]
     ) -> None:
         super().__init__()
@@ -447,21 +473,33 @@ class PolCompPage(Adw.PreferencesPage):
         self.polarimeter = None
 
         ## thresholds (descending order)
+        # self.azimuth_velocity = [
+        #     (5.0, 25.0),
+        #     (2.5, 15.0),
+        #     (1.0, 5.0),
+        #     (0.075, 0.1)
+        # ]
+        # self.ellipticity_velocity = [
+        #     (5.0, 25.0),
+        #     (2.5, 15.0),
+        #     (1.0, 1),
+        #     (0.075, 0.1)
+        # ]
         self.azimuth_velocity = [
             (5.0, 25.0),
             (2.5, 15.0),
             (1.0, 5.0),
-            (0.075, 0.5)
+            (0.075, 0.1)
         ]
         self.ellipticity_velocity = [
             (5.0, 25.0),
             (2.5, 15.0),
-            (1.0, 5.0),
-            (0.075, 0.5)
+            (1.0, 1),
+            (0.075, 0.1)
         ]
 
         self.control_group = ControlGroup(
-            polarimeter_box=polarimeter_box,
+            polarisation_box=polarimeter_box,
             motor_controllers=motor_controllers,
             set_enable_compensation_callback=self.set_enable_compensation,
             get_enable_compensation_callback=self.get_enable_compensation,
@@ -545,7 +583,7 @@ class PolCompPage(Adw.PreferencesPage):
         return self.ellipticity_velocity
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.set_title(title='Polarisation Compensation')
         self.set_default_size(width=1300, height=800)
@@ -568,24 +606,36 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=self.content_box)
 
         ### polarimeter box
-        self.polarimeter_box = polarisation_box.PolarimeterBox()
-        self.content_box.append(child=self.polarimeter_box)
+        # self.polarisation_box = polarimeter_box.PolarimeterBox()
+        self.polarisation_box = timetagger_box.TimeTaggerBox()
+        self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes
-        self.motors = thorlabs_motor.list_thorlabs_motors()
+        # self.motors = thorlabs_motor.list_motors()
+        self.motors = remote_motor.list_motors(
+            host=remote_motor.server_host,
+            port=remote_motor.server_port
+        )
         self.motor_controllers: list[motor_box.MotorControlPage] = []
         for i, m in enumerate(self.motors):
             self.motor_controllers.append(
+                # motor_box.MotorControlPage(
+                #     motor=thorlabs_motor.Motor(
+                #         serial_number=m.device_info.serial_number
+                #     )
+                # )
                 motor_box.MotorControlPage(
-                    motor=thorlabs_motor.Motor(
-                        serial_number=m.get_device_info().serial_no
+                    motor=remote_motor.Motor(
+                        serial_number=m.device_info.serial_number,
+                        host=remote_motor.server_host,
+                        port=remote_motor.server_port
                     )
                 )
             )
 
         ### pol comp
         self.pol_comp_page = PolCompPage(
-            polarimeter_box=self.polarimeter_box,
+            polarimeter_box=self.polarisation_box,
             motor_controllers=self.motor_controllers
         )
         self.content_box.append(child=self.pol_comp_page)
@@ -597,17 +647,18 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        self.polarimeter_box.polarimeter.disconnect()
+        if type(self.polarisation_box) == polarimeter_box.PolarimeterBox:
+            self.polarisation_box.polarimeter.disconnect()
         for i in self.motor_controllers:
-            i.motor_controls_group.motor._motor.stop()
+            i.motor_controls_group.motor.stop()
         return False
     
 class App(Adw.Application):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 
-    def on_activate(self, app):
+    def on_activate(self, app) -> None:
         self.win = MainWindow(application=app)
         self.win.present()
 
@@ -616,5 +667,6 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        app.win.polarimeter_box.polarimeter.disconnect()
+        if type(app.win.polarisation_box) == polarimeter_box.PolarimeterBox:
+            app.win.polarisation_box.polarimeter.disconnect()
         print('App crashed with an exception:', e)

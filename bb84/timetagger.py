@@ -1,0 +1,98 @@
+import dataclasses
+import typing
+import math
+
+Percent = typing.NewType('Percent', float)
+Degrees = typing.NewType('Degrees', float)
+Radians = typing.NewType('Radians', float)
+Watts = typing.NewType('Watts', float)
+Metres = typing.NewType('Metres', float)
+DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
+
+C_H = 0
+C_V = 1
+# C_D = 2
+# C_A = 3
+C_R = 2
+C_L = 3
+
+@dataclasses.dataclass
+class Data:
+    # timestamp = float(0.0)
+    # wavelength = Metres(0.0)
+    azimuth: float = 0.0
+    ellipticity: float = 0.0
+    # degree_of_polarisation = Percent(0.0)
+    # degree_of_linear_polarisation = Percent(0.0)
+    # degree_of_circular_polarisation = Percent(0.0)
+    # power = DecibelMilliwatts(0.0)
+    # power_polarised = DecibelMilliwatts(0.0)
+    # power_unpolarised = DecibelMilliwatts(0.0)
+    normalised_s1: float = 0.0
+    normalised_s2: float = 0.0
+    normalised_s3: float = 0.0
+    # S0 = Watts(0.0)
+    # S1 = Watts(0.0)
+    # S2 = Watts(0.0)
+    # S3 = Watts(0.0)
+    # power_split_ratio: float = 0.0
+    # phase_difference = Degrees(0.0)
+    # circularity = Percent(0.0)
+
+@dataclasses.dataclass
+class RawData:
+    singles_h: int = 0
+    singles_v: int = 0
+    singles_d: int = 0
+    singles_a: int = 0
+    singles_r: int = 0
+    singles_l: int = 0
+
+    def to_data(self) -> Data:
+        try:
+            s1 = (self.singles_h - self.singles_v)/(self.singles_h + self.singles_v)
+        except:
+            s1 = None
+        try:
+            s2 = (self.singles_d - self.singles_a)/(self.singles_d + self.singles_a)
+        except:
+            s2 = None
+        try:
+            s3 = (self.singles_r - self.singles_l)/(self.singles_r + self.singles_l)
+        except:
+            s3 = None
+
+        match (s1, s2, s3):
+            case (float(), None, float()):
+                s2 = math.sqrt(1 - s1**2 - s3**2)
+
+            case (None, float(), float()):
+                s1 = math.sqrt(1 - s2**2 - s3**2)
+
+            case (float(), float(), None):
+                s3 = math.sqrt(1 - s1**2 - s2**2)
+
+            case _:
+                raise RuntimeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
+
+        try:
+            eta = math.asin(s3)/2
+        except:
+            eta = 0
+        try:
+            theta = math.acos(s1/math.cos(2*eta))/2
+        except:
+            theta = 0
+
+        return Data(
+            azimuth=math.degrees(theta),
+            ellipticity=math.degrees(eta),
+            normalised_s1=s1,
+            normalised_s2=s2,
+            normalised_s3=s3
+        )
+
+class TimeTagger:
+    def measure(self) -> RawData:
+        data = RawData()
+        return data
