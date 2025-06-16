@@ -18,7 +18,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.thorlabs_polarimeter as polarimeter
+import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(
@@ -58,7 +58,7 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.add(child=Gtk.Frame(child=self.canvas))
 
     def update_plot(self) -> None:
-        data: polarimeter.Data = self.get_data_callback()
+        data: thorlabs_polarimeter.Data = self.get_data_callback()
 
         theta = numpy.radians(data.azimuth)
         eta = numpy.radians(data.ellipticity)
@@ -134,7 +134,7 @@ class BlochSphere2D(Gtk.Box):
         self.canvas.set_size_request(300, 300)
         self.append(self.canvas)
 
-    def update_point(self, data: polarimeter.Data):
+    def update_point(self, data: thorlabs_polarimeter.Data):
         x = data.normalised_s1
         y = data.normalised_s2
         z = data.normalised_s3
@@ -234,7 +234,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
 
     def update_point(self) -> None:
-        data: polarimeter.Data = self.get_data_callback()
+        data: thorlabs_polarimeter.Data = self.get_data_callback()
 
         x = data.normalised_s1
         y = data.normalised_s2
@@ -546,7 +546,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         data_value_box.append(child=self.circularity_value_label)
 
     def update_polarimeter_info(self):
-        data: polarimeter.Data = self.get_data_callback()
+        data: thorlabs_polarimeter.Data = self.get_data_callback()
 
         self.wavelength_value_label.set_text(f'{data.wavelength} m')
         self.azimuth_value_label.set_text(f'{data.azimuth:.2f} °')
@@ -656,7 +656,7 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
             get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__(title='Polarimeter Info')
-        device_info: polarimeter.DeviceInfo = get_device_info_callback()
+        device_info: thorlabs_polarimeter.DeviceInfo = get_device_info_callback()
 
         # serial number
         serial_no_row = Adw.ActionRow(title='Serial number')
@@ -712,17 +712,21 @@ class ColumnTwo(Adw.PreferencesPage):
         self.add(group=self.polarimeter_group)
 
 class PolarimeterBox(Gtk.Box):
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            polarimeter: thorlabs_polarimeter.Polarimeter
+    ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
-        self.polarimeter = polarimeter.Polarimeter(
-            id='1313:8031',
-            serial_number='M00910360'
-        )
+        # self.polarimeter = thorlabs_polarimeter.Polarimeter(
+        #     id='1313:8031',
+        #     serial_number='M00910360'
+        # )
+        self.polarimeter = polarimeter
         try:
             self.data = self.polarimeter.measure().to_data()
         except:
-            self.data = polarimeter.Data()
+            self.data = thorlabs_polarimeter.Data()
         self.enable_polarimeter = True
 
         self.plot_box = ColumnOne(
@@ -768,10 +772,10 @@ class PolarimeterBox(Gtk.Box):
     def get_poling_interval(self) -> int:
         return self.poling_interval
 
-    def get_data(self) -> polarimeter.Data:
+    def get_data(self) -> thorlabs_polarimeter.Data:
         return self.data
     
-    def get_device_info(self) -> polarimeter.DeviceInfo:
+    def get_device_info(self) -> thorlabs_polarimeter.DeviceInfo:
         return self.polarimeter.device_info
 
     def update_from_polarimeter(self) -> bool:
