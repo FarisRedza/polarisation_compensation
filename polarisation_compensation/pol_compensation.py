@@ -61,12 +61,14 @@ def pol_comp(
                         acceleration=20.0,
                         max_velocity=velocity
                     )
+                # print(f'{motor.device_info.serial_number} moving: {motor.is_moving}')
                 break
-            # elif motor.is_moving == True:
-            #     motor.stop()
-            else:
-                # pass
+            elif motor.is_moving == True:
                 motor.stop()
+            else:
+                pass
+                # print(f'{motor.device_info.serial_number} moving: {motor.is_moving}')
+                # motor.stop()
 
 
     adjust_motor(
