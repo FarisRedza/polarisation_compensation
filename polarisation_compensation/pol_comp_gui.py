@@ -618,9 +618,8 @@ class MainWindow(Adw.ApplicationWindow):
         # self.polarisation_box = polarimeter_box.PolarimeterBox()
         self.polarisation_box = polarimeter_box.PolarimeterBox(
             polarimeter=remote_polarimeter.Polarimeter(
-                # host='137.195.89.222',
-                host='127.0.0.1',
-                port=5003,
+                host=remote_polarimeter.server_host,
+                port=remote_polarimeter.server_port,
                 serial_number='M00910360'
             )
         )

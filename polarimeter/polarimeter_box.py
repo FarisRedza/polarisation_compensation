@@ -104,75 +104,6 @@ class PolEllipseGroup(Adw.PreferencesGroup):
 
         self.canvas.draw_idle()
 
-class BlochSphere2D(Gtk.Box):
-    def __init__(self, max_trail_length=30):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL)
-        self.max_trail_length = max_trail_length
-        self.history = []  # Stores (x, y, z)
-
-        self.fig, self.ax = matplotlib.pyplot.subplots()
-        self.ax.set_title('Bloch Sphere (2D projection)')
-        self.ax.set_aspect('equal')
-        self.ax.axis('off')
-
-        # circle
-        circle = matplotlib.pyplot.Circle(
-            xy=(0, 0),
-            radius=1.0,
-            color='gray',
-            fill=False
-        )
-        self.ax.add_patch(circle)
-        self.ax.plot([-1, 1], [0, 0], color='gray', linewidth=1)
-        self.ax.plot([0, 0], [-1, 1], color='gray', linewidth=1)
-
-        # dot
-        self.point = self.ax.plot(0, 0, 'o', color='blue', markersize=10)[0]
-
-        # trail dots
-        self.trail_points = [
-            self.ax.plot([], [], 'o', color='blue', markersize=4, alpha=0)[0]
-            for _ in range(self.max_trail_length)
-        ]
-
-        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
-            figure=self.fig
-        )
-        self.canvas.set_size_request(300, 300)
-        self.append(self.canvas)
-
-    def update_point(self, data: thorlabs_polarimeter.Data):
-        x = data.normalised_s1
-        y = data.normalised_s2
-        z = data.normalised_s3
-
-        norm = numpy.sqrt(x**2 + y**2 + z**2)
-        if norm > 1e-6:
-            x, y, z = x / norm, y / norm, z / norm
-
-        # dot history
-        self.history.append((x, y, z))
-        if len(self.history) > self.max_trail_length:
-            self.history.pop(0)
-
-        # dot
-        self.point.set_data([x], [y])
-        self.point.set_alpha(1.0 if z >= 0 else 0.3 + 0.7 * (1 + z))
-
-        # update trail points
-        for i, (tx, ty, tz) in enumerate(self.history[:-1]):
-            age = i / self.max_trail_length
-            alpha = (1 - age) * (1.0 if tz >= 0 else 0.3 + 0.7 * (1 + tz))
-            self.trail_points[i].set_data([tx], [ty])
-            self.trail_points[i].set_alpha(alpha)
-
-        # clear unused trail points
-        for i in range(len(self.history) - 1, self.max_trail_length):
-            self.trail_points[i].set_alpha(0)
-
-        self.canvas.draw_idle()
-
-
 class BlochSphere3D(Adw.PreferencesGroup):
     def __init__(
             self,
@@ -201,15 +132,43 @@ class BlochSphere3D(Adw.PreferencesGroup):
         x = numpy.outer(a=numpy.cos(u), b=numpy.sin(v))
         y = numpy.outer(a=numpy.sin(u), b=numpy.sin(v))
         z = numpy.outer(a=numpy.ones_like(u), b=numpy.cos(v))
-        self.ax.plot_wireframe(x, y, z, color='lightgray', linewidth=0.5, alpha=0.3)
+        self.ax.plot_wireframe(
+            x,
+            y,
+            z,
+            color='lightgray',
+            linewidth=0.5,
+            alpha=0.3
+        )
 
-        self.ax.plot3D([-1, 1], [0, 0], [0, 0], color='gray', linestyle='--', linewidth=1)
+        self.ax.plot3D(
+            [-1, 1],
+            [0, 0],
+            [0, 0],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
 
         # D–A axis s2
-        self.ax.plot3D([0, 0], [-1, 1], [0, 0], color='gray', linestyle='--', linewidth=1)
+        self.ax.plot3D(
+            [0, 0],
+            [-1, 1],
+            [0, 0],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
 
         # R–L axis s3
-        self.ax.plot3D([0, 0], [0, 0], [-1, 1], color='gray', linestyle='--', linewidth=1)
+        self.ax.plot3D(
+            [0, 0],
+            [0, 0],
+            [-1, 1],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
 
         # polarisation basis labels
         self.ax.text(1.05, 0, 0, 'H', ha='center', va='center', fontsize=10)
@@ -222,9 +181,18 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.ax.text(0, 0, -1.05, 'L', ha='center', va='center', fontsize=10)
 
         # dot
-        self.point = self.ax.plot([0], [0], [0], 'o', color='blue', markersize=6)[0]
+        self.point = self.ax.plot(
+            [0],
+            [0],
+            [0],
+            'o',
+            color='blue',
+            markersize=6
+        )[0]
 
-        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
+            figure=self.fig
+        )
         self.canvas.set_size_request(width=200, height=200)
         self.add(child=Gtk.Frame(child=self.canvas))
 
