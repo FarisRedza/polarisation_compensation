@@ -26,6 +26,13 @@ class Qutag(timetagger.TimeTagger):
             self._qutag.setChannelDelay(channel=channel, delays=0)
             self._qutag.setExposureTime(expTime=100)
 
+        self.device_info = timetagger.DeviceInfo(
+            manufacturer = 'qutools',
+            model = 'quTAG',
+            serial_number = 'N/A',
+            firmware_version = 'N/A'
+        )
+
     def __del__(self):
         self._qutag.deInitialize()
 

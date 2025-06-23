@@ -34,6 +34,13 @@ class UQD(timetagger.TimeTagger):
     def __init__(self):
         self._uqd = tt.TTBuffer(buffernumber=tt.getfreebuffer()-1)
 
+        self.device_info = timetagger.DeviceInfo(
+            manufacturer = 'UQDevices',
+            model = 'Logic-16',
+            serial_number = 'N/A',
+            firmware_version = 'N/A'
+        )
+
     def measure(self) -> timetagger.RawData:
         data = timetagger.RawData()
 

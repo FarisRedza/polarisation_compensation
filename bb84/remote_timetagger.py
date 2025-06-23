@@ -10,7 +10,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
+import bb84.timetagger as timetagger
 
 server_host = '127.0.0.1'
 server_host = '137.195.89.222'
@@ -57,56 +57,55 @@ def send_request(
 def list_device_info(
         host: str,
         port: int
-) -> list[thorlabs_polarimeter.DeviceInfo]:
+) -> list[timetagger.DeviceInfo]:
     result = send_request(
         host=host,
         port=port,
         command='list_devices'
     )
-    return [thorlabs_polarimeter.DeviceInfo(**dev) for dev in result['devices']]
+    return [timetagger.DeviceInfo(**dev) for dev in result['devices']]
 
-class Polarimeter(thorlabs_polarimeter.Polarimeter):
+class Timetagger(timetagger.TimeTagger):
     def __init__(
             self,
             host: str,
             port: int,
-            serial_number: str
     ) -> None:
         self.host = host
         self.port = port
 
-        self._get_polarimeter(serial_number=serial_number)
+        self._get_timetagger()
 
-    def _get_polarimeter(
-            self,
-            serial_number: str
+    def _get_timetagger(
+            self
     ) -> None:
         devices = list_device_info(
             host=self.host,
             port=self.port
         )
-        dev_index = next(
-            (i for i, dev in enumerate(devices) if str(dev.serial_number) == serial_number),
-            None
-        )
-        if dev_index is None:
-            raise Exception
-        else:
-            self.device_info = devices[dev_index]
+        # dev_index = next(
+        #     (i for i, dev in enumerate(devices) if str(dev.serial_number) == serial_number),
+        #     None
+        # )
+        # if dev_index is None:
+        #     raise Exception
+        # else:
+        #     self.device_info = devices[dev_index]
 
-    def measure(self) -> thorlabs_polarimeter.RawData:
+        self.device_info = devices[0]
+
+    def measure(self) -> timetagger.RawData:
         result = send_request(
             host=self.host,
             port=self.port,
             command='measure'
         )
-        rawdata = thorlabs_polarimeter.RawData(**result['rawdata'])
+        rawdata = timetagger.RawData(**result['rawdata'])
         return rawdata
 
 if __name__ == '__main__':
-    pax = Polarimeter(
+    tt = Timetagger(
         host=server_host,
-        port=server_port,
-        serial_number='M00910360'
+        port=server_port
     )
-    print(pax.measure().to_data())
+    print(tt.measure().to_data())

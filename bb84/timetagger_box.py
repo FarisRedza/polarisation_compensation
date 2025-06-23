@@ -18,7 +18,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import bb84.timetagger as timetagger
+import bb84.timetagger as tt
 import bb84.qutag as qutag
 
 class PolEllipseGroup(Adw.PreferencesGroup):
@@ -300,7 +300,7 @@ class CountsGroup(Adw.PreferencesGroup):
         data_value_box.append(child=self.l_value_label)
 
     def update_timetagger_info(self):
-        raw_data: timetagger.RawData = self.get_raw_data_callback()
+        raw_data: tt.RawData = self.get_raw_data_callback()
 
         self.h_value_label.set_text(f'{raw_data.singles_h}')
         self.v_value_label.set_text(f'{raw_data.singles_v}')
@@ -416,7 +416,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         # data_value_box.append(child=self.qber_value_label)
 
     def update_qutag_info(self):
-        data: timetagger.Data = self.get_data_callback()
+        data: tt.Data = self.get_data_callback()
 
         # self.wavelength_value_label.set_text(f'{data.wavelength} m')
         self.azimuth_value_label.set_text(f'{data.azimuth:.2f} °')
@@ -474,12 +474,15 @@ class ColumnTwo(Adw.PreferencesPage):
         self.add(group=self.measurement_group)
 
 class TimeTaggerBox(Gtk.Box):
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            timetagger: tt.TimeTagger
+    ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
-        self.timetagger = qutag.Qutag()
-        self.raw_data = timetagger.RawData()
-        self.data = timetagger.Data()
+        self.timetagger = timetagger
+        self.raw_data = tt.RawData()
+        self.data = tt.Data()
 
         self.columnone = ColumnOne(get_data_callback=self.get_data)
         self.append(child=self.columnone)
@@ -495,10 +498,10 @@ class TimeTaggerBox(Gtk.Box):
             function=self.update_from_timetagger
         )
 
-    def get_raw_data(self) -> timetagger.RawData:
+    def get_raw_data(self) -> tt.RawData:
         return self.raw_data
 
-    def get_data(self) -> timetagger.Data:
+    def get_data(self) -> tt.Data:
         return self.data
         
     def update_from_timetagger(self) -> bool:

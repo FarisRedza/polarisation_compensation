@@ -17,6 +17,13 @@ C_R = 2
 C_L = 3
 
 @dataclasses.dataclass
+class DeviceInfo:
+    manufacturer: str
+    model: str
+    serial_number: str
+    firmware_version: str
+
+@dataclasses.dataclass
 class Data:
     # timestamp = float(0.0)
     # wavelength = Metres(0.0)
