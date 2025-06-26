@@ -44,14 +44,21 @@ class UQD(timetagger.TimeTagger):
     def measure(self) -> timetagger.RawData:
         data = timetagger.RawData()
 
-        singles = self._uqd.singles(1)[0:4]
+        singles = self._uqd.singles(1)
 
-        data.singles_h=int(singles[timetagger.C_H])
-        data.singles_v=int(singles[timetagger.C_V])
-        # data.singles_d=int(singles[timetagger.C_D])
-        # data.singles_a=int(singles[timetagger.C_A])
-        data.singles_r=int(singles[timetagger.C_R])
-        data.singles_l=int(singles[timetagger.C_L])
+        data.singles_780_h=int(singles[timetagger.C_780_H])
+        data.singles_780_v=int(singles[timetagger.C_780_V])
+        # data.singles_780_d=int(singles[timetagger.C_780_D])
+        # data.singles_780_a=int(singles[timetagger.C_780_A])
+        data.singles_780_r=int(singles[timetagger.C_780_R])
+        data.singles_780_l=int(singles[timetagger.C_780_L])
+
+        data.singles_1550_h=int(singles[timetagger.C_1550_H])
+        data.singles_1550_v=int(singles[timetagger.C_1550_V])
+        # data.singles_1550_d=int(singles[timetagger.C_1550_D])
+        # data.singles_1550_a=int(singles[timetagger.C_1550_A])
+        data.singles_1550_r=int(singles[timetagger.C_1550_R])
+        data.singles_1550_l=int(singles[timetagger.C_1550_L])
 
         return data
         

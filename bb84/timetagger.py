@@ -9,19 +9,26 @@ Watts = typing.NewType('Watts', float)
 Metres = typing.NewType('Metres', float)
 DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
-C_H = 0
-C_V = 1
-# C_D = 2
-# C_A = 3
-C_R = 2
-C_L = 3
+C_780_H = 0
+C_780_V = 1
+# C_780_D = 2
+# C_780_A = 3
+C_780_R = 2
+C_780_L = 3
+
+C_1550_H = 4
+C_1550_V = 5
+# C_1550_D = 6
+# C_1550_A = 7
+C_1550_R = 6
+C_1550_L = 7
 
 @dataclasses.dataclass
 class DeviceInfo:
-    manufacturer: str
-    model: str
-    serial_number: str
-    firmware_version: str
+    manufacturer: str = 'N/A'
+    model: str = 'N/A'
+    serial_number: str = 'N/A'
+    firmware_version: str = 'N/A'
 
 @dataclasses.dataclass
 class Data:
@@ -48,24 +55,31 @@ class Data:
 
 @dataclasses.dataclass
 class RawData:
-    singles_h: int = 0
-    singles_v: int = 0
-    singles_d: int = 0
-    singles_a: int = 0
-    singles_r: int = 0
-    singles_l: int = 0
+    singles_780_h: int = 0
+    singles_780_v: int = 0
+    singles_780_d: int = 0
+    singles_780_a: int = 0
+    singles_780_r: int = 0
+    singles_780_l: int = 0
+
+    singles_1550_h: int = 0
+    singles_1550_v: int = 0
+    singles_1550_d: int = 0
+    singles_1550_a: int = 0
+    singles_1550_r: int = 0
+    singles_1550_l: int = 0
 
     def to_data(self) -> Data:
         try:
-            s1 = (self.singles_h - self.singles_v)/(self.singles_h + self.singles_v)
+            s1 = (self.singles_780_h - self.singles_780_v)/(self.singles_780_h + self.singles_780_v)
         except:
             s1 = None
         try:
-            s2 = (self.singles_d - self.singles_a)/(self.singles_d + self.singles_a)
+            s2 = (self.singles_780_d - self.singles_780_a)/(self.singles_780_d + self.singles_780_a)
         except:
             s2 = None
         try:
-            s3 = (self.singles_r - self.singles_l)/(self.singles_r + self.singles_l)
+            s3 = (self.singles_780_r - self.singles_780_l)/(self.singles_780_r + self.singles_780_l)
         except:
             s3 = None
 
@@ -100,6 +114,9 @@ class RawData:
         )
 
 class TimeTagger:
+    def __init__(self):
+        self.device_info = DeviceInfo()
+
     def measure(self) -> RawData:
         data = RawData()
         return data

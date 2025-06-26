@@ -302,12 +302,12 @@ class CountsGroup(Adw.PreferencesGroup):
     def update_timetagger_info(self):
         raw_data: tt.RawData = self.get_raw_data_callback()
 
-        self.h_value_label.set_text(f'{raw_data.singles_h}')
-        self.v_value_label.set_text(f'{raw_data.singles_v}')
-        self.d_value_label.set_text(f'{raw_data.singles_d}')
-        self.a_value_label.set_text(f'{raw_data.singles_a}')
-        self.r_value_label.set_text(f'{raw_data.singles_r}')
-        self.l_value_label.set_text(f'{raw_data.singles_l}')
+        self.h_value_label.set_text(f'{raw_data.singles_780_h}')
+        self.v_value_label.set_text(f'{raw_data.singles_780_v}')
+        self.d_value_label.set_text(f'{raw_data.singles_780_d}')
+        self.a_value_label.set_text(f'{raw_data.singles_780_a}')
+        self.r_value_label.set_text(f'{raw_data.singles_780_r}')
+        self.l_value_label.set_text(f'{raw_data.singles_780_l}')
 
 class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(
@@ -439,6 +439,32 @@ class MeasurementGroup(Adw.PreferencesGroup):
         # self.phase_difference_value_label.set_text(f'{data.phase_difference:3.2f}')
         # self.circularity_value_label.set_text(f'{data.circularity:.2f} %')
 
+class DeviceInfoGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            get_device_info_callback: typing.Callable
+    ) -> None:
+        super().__init__(title='Polarimeter Info')
+        device_info: tt.DeviceInfo = get_device_info_callback()
+
+        # serial number
+        serial_no_row = Adw.ActionRow(title='Serial number')
+        self.add(child=serial_no_row)
+        serial_no_label = Gtk.Label(label=device_info.serial_number)
+        serial_no_row.add_suffix(widget=serial_no_label)
+
+        # model number
+        model_no_row = Adw.ActionRow(title='Model number')
+        self.add(child=model_no_row)
+        model_no_label = Gtk.Label(label=device_info.model)
+        model_no_row.add_suffix(widget=model_no_label)
+
+        # firmware
+        fw_ver_row = Adw.ActionRow(title='Firmware version')
+        self.add(child=fw_ver_row)
+        fw_ver_label = Gtk.Label(label=device_info.firmware_version)
+        fw_ver_row.add_suffix(widget=fw_ver_label)
+
 class ColumnOne(Adw.PreferencesPage):
     def __init__(
             self,
@@ -460,7 +486,8 @@ class ColumnTwo(Adw.PreferencesPage):
     def __init__(
             self,
             get_raw_data_callback: typing.Callable,
-            get_data_callback: typing.Callable
+            get_data_callback: typing.Callable,
+            get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__()
         self.counts_group = CountsGroup(
@@ -472,6 +499,11 @@ class ColumnTwo(Adw.PreferencesPage):
             get_data_callback=get_data_callback
         )
         self.add(group=self.measurement_group)
+
+        self.timetagger_group = DeviceInfoGroup(
+            get_device_info_callback=get_device_info_callback
+        )
+        self.add(group=self.timetagger_group)
 
 class TimeTaggerBox(Gtk.Box):
     def __init__(
@@ -489,7 +521,8 @@ class TimeTaggerBox(Gtk.Box):
 
         self.columntwo = ColumnTwo(
             get_raw_data_callback=self.get_raw_data,
-            get_data_callback=self.get_data
+            get_data_callback=self.get_data,
+            get_device_info_callback=self.get_device_info
         )
         self.append(child=self.columntwo)
 
@@ -503,6 +536,9 @@ class TimeTaggerBox(Gtk.Box):
 
     def get_data(self) -> tt.Data:
         return self.data
+    
+    def get_device_info(self) -> tt.DeviceInfo:
+        return self.timetagger.device_info
         
     def update_from_timetagger(self) -> bool:
         self.raw_data = self.timetagger.measure()

@@ -47,12 +47,12 @@ class Qutag(timetagger.TimeTagger):
 
         singles = numpy.bincount(channels, minlength=8)[4:]
 
-        data.singles_h=int(singles[timetagger.C_H])
-        data.singles_v=int(singles[timetagger.C_V])
+        data.singles_780_h=int(singles[timetagger.C_780_H])
+        data.singles_780_v=int(singles[timetagger.C_780_V])
         # data.singles_d=int(singles[timetagger.C_D])
         # data.singles_a=int(singles[timetagger.C_A])
-        data.singles_r=int(singles[timetagger.C_R])
-        data.singles_l=int(singles[timetagger.C_L])
+        data.singles_780_r=int(singles[timetagger.C_780_R])
+        data.singles_780_l=int(singles[timetagger.C_780_L])
 
         return data
 

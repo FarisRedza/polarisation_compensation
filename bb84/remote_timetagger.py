@@ -13,7 +13,7 @@ sys.path.append(
 import bb84.timetagger as timetagger
 
 server_host = '127.0.0.1'
-server_host = '137.195.89.222'
+# server_host = '137.195.89.222'
 server_port = 5003
 
 def send_request(
