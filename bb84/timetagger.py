@@ -9,19 +9,19 @@ Watts = typing.NewType('Watts', float)
 Metres = typing.NewType('Metres', float)
 DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
-C_780_H = 0
-C_780_V = 1
-# C_780_D = 2
-# C_780_A = 3
-C_780_R = 2
-C_780_L = 3
+C_1550_H = 0
+C_1550_V = 1
+# C_1550_D = 2
+# C_1550_A = 3
+C_1550_R = 2
+C_1550_L = 3
 
-C_1550_H = 4
-C_1550_V = 5
-# C_1550_D = 6
-# C_1550_A = 7
-C_1550_R = 6
-C_1550_L = 7
+C_780_H = 4
+C_780_V = 5
+# C_780_D = 6
+# C_780_A = 7
+C_780_R = 6
+C_780_L = 7
 
 @dataclasses.dataclass
 class DeviceInfo:
