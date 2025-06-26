@@ -34,7 +34,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### polarimeter box
         self.polarimeter = thorlabs_polarimeter.Polarimeter(
-            id='1313:8031',
             serial_number='M00910360'
         )
         try:

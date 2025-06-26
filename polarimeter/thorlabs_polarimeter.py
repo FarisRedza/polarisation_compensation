@@ -268,7 +268,7 @@ class Polarimeter(SCPIDevice):
 
     def __init__(
             self,
-            id: str | None = None,
+            id: str | None = '1313:8031',
             serial_number: str | None = None,
             waveplate_rotation: WaveplateRotation = WaveplateRotation.ON,
             averaging_mode: AveragingMode = AveragingMode.F1024
