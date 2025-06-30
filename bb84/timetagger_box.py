@@ -173,7 +173,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
 
     def update_point(self) -> None:
-        data: timetagger.Data = self.get_data_callback()
+        data: tt.Data = self.get_data_callback()
 
         x = data.normalised_s1
         y = data.normalised_s2
@@ -193,12 +193,12 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
         self.canvas.draw_idle()
 
-class CountsGroup(Adw.PreferencesGroup):
+class CountsGroup780(Adw.PreferencesGroup):
     def __init__(
             self,
             get_raw_data_callback: typing.Callable
     ) -> None:
-        super().__init__(title='Counts')
+        super().__init__(title='Counts 780')
         self.get_raw_data_callback = get_raw_data_callback
 
         data_row = Adw.ActionRow()
@@ -301,13 +301,135 @@ class CountsGroup(Adw.PreferencesGroup):
 
     def update_timetagger_info(self):
         raw_data: tt.RawData = self.get_raw_data_callback()
+        singles = [int(val) for channel, val in raw_data.__dict__.items()]
 
-        self.h_value_label.set_text(f'{raw_data.singles_780_h}')
-        self.v_value_label.set_text(f'{raw_data.singles_780_v}')
-        self.d_value_label.set_text(f'{raw_data.singles_780_d}')
-        self.a_value_label.set_text(f'{raw_data.singles_780_a}')
-        self.r_value_label.set_text(f'{raw_data.singles_780_r}')
-        self.l_value_label.set_text(f'{raw_data.singles_780_l}')
+        self.h_value_label.set_text(f'{singles[tt.C_780_H]}' if tt.C_780_H is not None else '0')
+        self.v_value_label.set_text(f'{singles[tt.C_780_V]}' if tt.C_780_V is not None else '0')
+        self.d_value_label.set_text(f'{singles[tt.C_780_D]}' if tt.C_780_D is not None else '0')
+        self.a_value_label.set_text(f'{singles[tt.C_780_A]}' if tt.C_780_A is not None else '0')
+        self.r_value_label.set_text(f'{singles[tt.C_780_R]}' if tt.C_780_R is not None else '0')
+        self.l_value_label.set_text(f'{singles[tt.C_780_L]}' if tt.C_780_L is not None else '0')
+
+class CountsGroup1550(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            get_raw_data_callback: typing.Callable
+    ) -> None:
+        super().__init__(title='Counts 1550')
+        self.get_raw_data_callback = get_raw_data_callback
+
+        data_row = Adw.ActionRow()
+        self.add(child=data_row)
+
+        margin = 6
+        box_spacing = 6
+        width_chars = 9
+
+        data_header_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            margin_top=margin,
+            margin_bottom=margin,
+            valign=Gtk.Align.CENTER,
+            spacing=box_spacing
+        )
+        data_row.add_prefix(widget=data_header_box)
+
+        data_value_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            margin_top=margin,
+            margin_bottom=margin,
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.END,
+            spacing=box_spacing,
+        )
+        data_row.add_suffix(widget=data_value_box)
+
+        # h
+        h_label = Gtk.Label(
+            label='H',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=h_label)
+        self.h_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.h_value_label)
+
+        # v
+        v_label = Gtk.Label(
+            label='V',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=v_label)
+        self.v_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.v_value_label)
+
+        # d
+        d_label = Gtk.Label(
+            label='D',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=d_label)
+        self.d_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.d_value_label)
+
+        # a
+        a_label = Gtk.Label(
+            label='A',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=a_label)
+        self.a_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.a_value_label)
+
+        # r
+        r_label = Gtk.Label(
+            label='R',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=r_label)
+        self.r_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.r_value_label)
+
+        # l
+        h_label = Gtk.Label(
+            label='L',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=h_label)
+        self.l_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.l_value_label)
+
+    def _safe_int(self,x, default=0):
+        return int(x) if x is not None else default
+
+    def update_timetagger_info(self):
+        raw_data: tt.RawData = self.get_raw_data_callback()
+        singles = [int(val) for channel, val in raw_data.__dict__.items()]
+
+        self.h_value_label.set_text(f'{singles[tt.C_1550_H]}' if tt.C_1550_H is not None else '0')
+        self.v_value_label.set_text(f'{singles[tt.C_1550_V]}' if tt.C_1550_V is not None else '0')
+        self.d_value_label.set_text(f'{singles[tt.C_1550_D]}' if tt.C_1550_D is not None else '0')
+        self.a_value_label.set_text(f'{singles[tt.C_1550_A]}' if tt.C_1550_A is not None else '0')
+        self.r_value_label.set_text(f'{singles[tt.C_1550_R]}' if tt.C_1550_R is not None else '0')
+        self.l_value_label.set_text(f'{singles[tt.C_1550_L]}' if tt.C_1550_R is not None else '0')
+
 
 class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(
@@ -490,10 +612,15 @@ class ColumnTwo(Adw.PreferencesPage):
             get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__()
-        self.counts_group = CountsGroup(
+        self.counts_group_780 = CountsGroup780(
             get_raw_data_callback=get_raw_data_callback
         )
-        self.add(group=self.counts_group)
+        self.add(group=self.counts_group_780)
+
+        self.counts_group_1550 = CountsGroup1550(
+            get_raw_data_callback=get_raw_data_callback
+        )
+        self.add(group=self.counts_group_1550)
 
         self.measurement_group = MeasurementGroup(
             get_data_callback=get_data_callback
@@ -542,12 +669,19 @@ class TimeTaggerBox(Gtk.Box):
         
     def update_from_timetagger(self) -> bool:
         self.raw_data = self.timetagger.measure()
-        self.data = self.raw_data.to_data()
+        # self.data = self.raw_data.to_data()
+        try:
+            self.data = tt.Data().from_raw_data(
+                raw_data=self.raw_data
+            )
+        except:
+            self.data = tt.Data()
         self.set_qutag_data()
         return True
     
     def set_qutag_data(self) -> None:
         self.columnone.plot_ellipse_group.update_plot()
         self.columnone.plot_bloch_group.update_point()
-        self.columntwo.counts_group.update_timetagger_info()
+        self.columntwo.counts_group_780.update_timetagger_info()
+        self.columntwo.counts_group_1550.update_timetagger_info()
         self.columntwo.measurement_group.update_qutag_info()

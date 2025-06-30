@@ -108,4 +108,4 @@ if __name__ == '__main__':
         host=server_host,
         port=server_port
     )
-    print(tt.measure().to_data())
+    print(timetagger.Data().from_raw_data(tt.measure()))

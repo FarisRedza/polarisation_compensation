@@ -699,7 +699,8 @@ class PolarimeterBox(Gtk.Box):
         # )
         self.polarimeter = polarimeter
         try:
-            self.data = self.polarimeter.measure().to_data()
+            # self.data = self.polarimeter.measure().to_data()
+            self.data = thorlabs_polarimeter.Data().from_raw_data(self.polarimeter.measure())
         except:
             self.data = thorlabs_polarimeter.Data()
         self.enable_polarimeter = True
@@ -735,10 +736,12 @@ class PolarimeterBox(Gtk.Box):
         return self.enable_polarimeter
     
     def set_wavelength(self, value: float) -> None:
-        self.polarimeter.set_wavelength(wavelength=value)
+        self.polarimeter.set_wavelength(
+            wavelength=thorlabs_polarimeter.Metres(value)
+        )
 
     def get_wavelength(self) -> float:
-        return self.polarimeter.measure().to_data().wavelength
+        return float(self.polarimeter.measure().wavelength)
 
     def set_poling_interval(self, value: int) -> None:
         self.poling_interval = value
@@ -755,7 +758,10 @@ class PolarimeterBox(Gtk.Box):
 
     def update_from_polarimeter(self) -> bool:
         if self.enable_polarimeter == True:
-            self.data = self.polarimeter.measure().to_data()
+            # self.data = self.polarimeter.measure().to_data()
+            self.data = thorlabs_polarimeter.Data().from_raw_data(
+                raw_data=self.polarimeter.measure()
+            )
             self.set_polarimeter_data()
         return True
 

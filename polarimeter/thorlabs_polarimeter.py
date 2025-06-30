@@ -144,28 +144,105 @@ class SCPIDevice:
     # def rdt(self) -> str:
     #     return str(self._instrument.query('*RDT?')
 
-@dataclasses.dataclass
-class Data:
-    timestamp: float = 0.0
-    wavelength: Metres = Metres(0.0)
-    azimuth: Degrees = Degrees(0.0)
-    ellipticity: Degrees = Degrees(0.0)
-    degree_of_polarisation: Percent = Percent(0.0)
-    degree_of_linear_polarisation: Percent = Percent(0.0)
-    degree_of_circular_polarisation: Percent = Percent(0.0)
-    power: DecibelMilliwatts = DecibelMilliwatts(0.0)
-    power_polarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
-    power_unpolarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
-    normalised_s1: float = 0.0
-    normalised_s2: float = 0.0
-    normalised_s3: float = 0.0
-    S0: Watts = Watts(0.0)
-    S1: Watts = Watts(0.0)
-    S2: Watts = Watts(0.0)
-    S3: Watts = Watts(0.0)
-    power_split_ratio: float = 0.0
-    phase_difference: Degrees = Degrees(0.0)
-    circularity: Percent = Percent(0.0)
+# @dataclasses.dataclass
+# class Data:
+#     timestamp: float = 0.0
+#     wavelength: Metres = Metres(0.0)
+#     azimuth: Degrees = Degrees(0.0)
+#     ellipticity: Degrees = Degrees(0.0)
+#     degree_of_polarisation: Percent = Percent(0.0)
+#     degree_of_linear_polarisation: Percent = Percent(0.0)
+#     degree_of_circular_polarisation: Percent = Percent(0.0)
+#     power: DecibelMilliwatts = DecibelMilliwatts(0.0)
+#     power_polarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
+#     power_unpolarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
+#     normalised_s1: float = 0.0
+#     normalised_s2: float = 0.0
+#     normalised_s3: float = 0.0
+#     S0: Watts = Watts(0.0)
+#     S1: Watts = Watts(0.0)
+#     S2: Watts = Watts(0.0)
+#     S3: Watts = Watts(0.0)
+#     power_split_ratio: float = 0.0
+#     phase_difference: Degrees = Degrees(0.0)
+#     circularity: Percent = Percent(0.0)
+
+# @dataclasses.dataclass
+# class RawData:
+#     """
+#     wavelength (m)
+#     revs: number of measurement cycles
+#     timestamp: milliseconds since start?
+#     paxOpMode: operation mode of the polarimeter
+#     paxFlags: status and error flags
+#     paxTIARange: current setting of the transimpedance amplifier TIA - indicates gain level (e.g low/medium/high sensitivity)
+#     adcMin/Max: min and max raw ADC values across detectors - for monitor saturation or signal range
+#     revTime: time for one measurement cycle
+#     misAdj: misalignment adjustment metric/quality metric
+#     theta: orientation angle of the polarisation ellipse
+#     eta: ellipticity angle of the polarisation ellipse
+#     dop: degree of polarisation
+#     ptotal: total optical power
+#     """
+#     wavelength: str
+#     revs: str
+#     timestamp: str
+#     paxOpMode: str
+#     paxFlags: str
+#     paxTIARange: str
+#     adcMin: str
+#     adcMax: str
+#     revTime: str
+#     misAdj: str
+#     theta: str
+#     eta: str
+#     dop: str
+#     ptotal: str
+    
+#     def to_data(self) -> Data:
+#         wavelength = Metres(float(self.wavelength))
+#         revs = float(self.revs)
+#         timestamp = float(self.timestamp)
+#         paxOpMode = float(self.paxOpMode)
+#         paxFlags = float(self.paxFlags)
+#         paxTIARange = float(self.paxTIARange)
+#         adcMin = float(self.adcMin)
+#         adcMax = float(self.adcMax)
+#         revTime = float(self.revTime)
+#         misAdj = float(self.misAdj)
+#         theta = float(self.theta)
+#         eta = float(self.eta)
+#         dop = float(self.dop)
+#         ptotal = float(self.ptotal)
+
+#         S0 = ptotal
+#         S1 = ptotal * math.cos(2*theta) * math.cos(2*eta)
+#         S2 = ptotal * math.sin(2*theta) * math.cos(2*eta)
+#         S3 = ptotal * math.sin(2*eta)
+
+
+#         return Data(
+#             timestamp=timestamp,
+#             wavelength=wavelength,
+#             azimuth=Degrees(math.degrees(theta)),
+#             ellipticity=Degrees(math.degrees(eta)),
+#             degree_of_polarisation=Percent(dop * 100),
+#             degree_of_linear_polarisation=Percent(math.sqrt(S1**2 + S2**2)/S0 * 100),
+#             degree_of_circular_polarisation=Percent(abs(S3)/S0 * 100),
+#             power=decibel_milliwatts(Watts(ptotal)),
+#             power_polarised=decibel_milliwatts(Watts(dop*ptotal)),
+#             power_unpolarised=decibel_milliwatts(Watts((1-dop)*ptotal)),
+#             normalised_s1=S1/S0,
+#             normalised_s2=S2/S0,
+#             normalised_s3=S3/S0,
+#             S0=Watts(S0),
+#             S1=Watts(S1),
+#             S2=Watts(S2),
+#             S3=Watts(S3),
+#             power_split_ratio=math.tan(eta)**2,
+#             phase_difference=Degrees(math.degrees(math.atan2(S3,S2))),
+#             circularity=Percent(abs(math.tan(eta)) * 100)
+#         )
 
 @dataclasses.dataclass
 class RawData:
@@ -198,22 +275,46 @@ class RawData:
     eta: str
     dop: str
     ptotal: str
-    
-    def to_data(self) -> Data:
-        wavelength = Metres(float(self.wavelength))
-        revs = float(self.revs)
-        timestamp = float(self.timestamp)
-        paxOpMode = float(self.paxOpMode)
-        paxFlags = float(self.paxFlags)
-        paxTIARange = float(self.paxTIARange)
-        adcMin = float(self.adcMin)
-        adcMax = float(self.adcMax)
-        revTime = float(self.revTime)
-        misAdj = float(self.misAdj)
-        theta = float(self.theta)
-        eta = float(self.eta)
-        dop = float(self.dop)
-        ptotal = float(self.ptotal)
+
+@dataclasses.dataclass
+class Data:
+    timestamp: float = 0.0
+    wavelength: Metres = Metres(0.0)
+    azimuth: Degrees = Degrees(0.0)
+    ellipticity: Degrees = Degrees(0.0)
+    degree_of_polarisation: Percent = Percent(0.0)
+    degree_of_linear_polarisation: Percent = Percent(0.0)
+    degree_of_circular_polarisation: Percent = Percent(0.0)
+    power: DecibelMilliwatts = DecibelMilliwatts(0.0)
+    power_polarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
+    power_unpolarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
+    normalised_s1: float = 0.0
+    normalised_s2: float = 0.0
+    normalised_s3: float = 0.0
+    S0: Watts = Watts(0.0)
+    S1: Watts = Watts(0.0)
+    S2: Watts = Watts(0.0)
+    S3: Watts = Watts(0.0)
+    power_split_ratio: float = 0.0
+    phase_difference: Degrees = Degrees(0.0)
+    circularity: Percent = Percent(0.0)
+
+    @classmethod
+    def from_raw_data(cls, raw_data: RawData) -> "Data":
+        wavelength = Metres(float(raw_data.wavelength))
+        revs = float(raw_data.revs)
+        timestamp = float(raw_data.timestamp)
+        paxOpMode = float(raw_data.paxOpMode)
+        paxFlags = float(raw_data.paxFlags)
+        paxTIARange = float(raw_data.paxTIARange)
+        adcMin = float(raw_data.adcMin)
+        adcMax = float(raw_data.adcMax)
+        revTime = float(raw_data.revTime)
+        misAdj = float(raw_data.misAdj)
+        theta = float(raw_data.theta)
+        eta = float(raw_data.eta)
+        dop = float(raw_data.dop)
+        ptotal = float(raw_data.ptotal)
 
         S0 = ptotal
         S1 = ptotal * math.cos(2*theta) * math.cos(2*eta)
@@ -221,7 +322,7 @@ class RawData:
         S3 = ptotal * math.sin(2*eta)
 
 
-        return Data(
+        return cls(
             timestamp=timestamp,
             wavelength=wavelength,
             azimuth=Degrees(math.degrees(theta)),
@@ -243,7 +344,6 @@ class RawData:
             phase_difference=Degrees(math.degrees(math.atan2(S3,S2))),
             circularity=Percent(abs(math.tan(eta)) * 100)
         )
-
 
 class Polarimeter(SCPIDevice):
     class WaveplateRotation(enum.Enum):
@@ -392,5 +492,5 @@ class Polarimeter(SCPIDevice):
 if __name__ == '__main__':
     pax = Polarimeter(id='1313:8031', serial_number='M00910360')
     pprint.pprint(pax.device_info)
-    print(pax.measure().wavelength)
+    print(pax.measure().to_data().wavelength)
     

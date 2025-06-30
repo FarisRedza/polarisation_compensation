@@ -61,4 +61,3 @@ class UQD(timetagger.TimeTagger):
         data.singles_1550_l=int(singles[timetagger.C_1550_L])
 
         return data
-        
