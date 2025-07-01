@@ -13,7 +13,7 @@ sys.path.append(
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 
 server_host = '127.0.0.1'
-server_host = '137.195.89.222'
+# server_host = '137.195.89.222'
 server_port = 5003
 
 def send_request(
@@ -109,4 +109,4 @@ if __name__ == '__main__':
         port=server_port,
         serial_number='M00910360'
     )
-    print(pax.measure().to_data())
+    print(thorlabs_polarimeter.Data().from_raw_data(raw_data=pax.measure()))

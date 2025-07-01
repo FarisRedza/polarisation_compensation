@@ -3,6 +3,7 @@ import dataclasses
 import typing
 import pprint
 import enum
+import struct
 
 import pyvisa
 
@@ -25,6 +26,34 @@ class DeviceInfo:
     model: str
     serial_number: str
     firmware_version: str
+
+    def serialise(self) -> bytes:
+        def encode_string(s: str):
+            b = s.encode()
+            return struct.pack(f"I{len(b)}s", len(b), b)
+
+        return (
+            encode_string(self.manufacturer) +
+            encode_string(self.model) +
+            encode_string(self.serial_number) +
+            encode_string(self.firmware_version)
+        )
+    
+    @classmethod
+    def deserialise(cls, payload: bytes) -> 'DeviceInfo':
+        offset = 0
+        fields = []
+        for _ in range(4):
+            length = struct.unpack_from("I", payload, offset)[0]
+            offset += 4
+            value = struct.unpack_from(
+                f"{length}s",
+                payload,
+                offset
+            )[0].decode()
+            offset += length
+            fields.append(value)
+        return DeviceInfo(*fields)
 
 class SCPIDevice:
     def __init__(
@@ -144,106 +173,6 @@ class SCPIDevice:
     # def rdt(self) -> str:
     #     return str(self._instrument.query('*RDT?')
 
-# @dataclasses.dataclass
-# class Data:
-#     timestamp: float = 0.0
-#     wavelength: Metres = Metres(0.0)
-#     azimuth: Degrees = Degrees(0.0)
-#     ellipticity: Degrees = Degrees(0.0)
-#     degree_of_polarisation: Percent = Percent(0.0)
-#     degree_of_linear_polarisation: Percent = Percent(0.0)
-#     degree_of_circular_polarisation: Percent = Percent(0.0)
-#     power: DecibelMilliwatts = DecibelMilliwatts(0.0)
-#     power_polarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
-#     power_unpolarised: DecibelMilliwatts = DecibelMilliwatts(0.0)
-#     normalised_s1: float = 0.0
-#     normalised_s2: float = 0.0
-#     normalised_s3: float = 0.0
-#     S0: Watts = Watts(0.0)
-#     S1: Watts = Watts(0.0)
-#     S2: Watts = Watts(0.0)
-#     S3: Watts = Watts(0.0)
-#     power_split_ratio: float = 0.0
-#     phase_difference: Degrees = Degrees(0.0)
-#     circularity: Percent = Percent(0.0)
-
-# @dataclasses.dataclass
-# class RawData:
-#     """
-#     wavelength (m)
-#     revs: number of measurement cycles
-#     timestamp: milliseconds since start?
-#     paxOpMode: operation mode of the polarimeter
-#     paxFlags: status and error flags
-#     paxTIARange: current setting of the transimpedance amplifier TIA - indicates gain level (e.g low/medium/high sensitivity)
-#     adcMin/Max: min and max raw ADC values across detectors - for monitor saturation or signal range
-#     revTime: time for one measurement cycle
-#     misAdj: misalignment adjustment metric/quality metric
-#     theta: orientation angle of the polarisation ellipse
-#     eta: ellipticity angle of the polarisation ellipse
-#     dop: degree of polarisation
-#     ptotal: total optical power
-#     """
-#     wavelength: str
-#     revs: str
-#     timestamp: str
-#     paxOpMode: str
-#     paxFlags: str
-#     paxTIARange: str
-#     adcMin: str
-#     adcMax: str
-#     revTime: str
-#     misAdj: str
-#     theta: str
-#     eta: str
-#     dop: str
-#     ptotal: str
-    
-#     def to_data(self) -> Data:
-#         wavelength = Metres(float(self.wavelength))
-#         revs = float(self.revs)
-#         timestamp = float(self.timestamp)
-#         paxOpMode = float(self.paxOpMode)
-#         paxFlags = float(self.paxFlags)
-#         paxTIARange = float(self.paxTIARange)
-#         adcMin = float(self.adcMin)
-#         adcMax = float(self.adcMax)
-#         revTime = float(self.revTime)
-#         misAdj = float(self.misAdj)
-#         theta = float(self.theta)
-#         eta = float(self.eta)
-#         dop = float(self.dop)
-#         ptotal = float(self.ptotal)
-
-#         S0 = ptotal
-#         S1 = ptotal * math.cos(2*theta) * math.cos(2*eta)
-#         S2 = ptotal * math.sin(2*theta) * math.cos(2*eta)
-#         S3 = ptotal * math.sin(2*eta)
-
-
-#         return Data(
-#             timestamp=timestamp,
-#             wavelength=wavelength,
-#             azimuth=Degrees(math.degrees(theta)),
-#             ellipticity=Degrees(math.degrees(eta)),
-#             degree_of_polarisation=Percent(dop * 100),
-#             degree_of_linear_polarisation=Percent(math.sqrt(S1**2 + S2**2)/S0 * 100),
-#             degree_of_circular_polarisation=Percent(abs(S3)/S0 * 100),
-#             power=decibel_milliwatts(Watts(ptotal)),
-#             power_polarised=decibel_milliwatts(Watts(dop*ptotal)),
-#             power_unpolarised=decibel_milliwatts(Watts((1-dop)*ptotal)),
-#             normalised_s1=S1/S0,
-#             normalised_s2=S2/S0,
-#             normalised_s3=S3/S0,
-#             S0=Watts(S0),
-#             S1=Watts(S1),
-#             S2=Watts(S2),
-#             S3=Watts(S3),
-#             power_split_ratio=math.tan(eta)**2,
-#             phase_difference=Degrees(math.degrees(math.atan2(S3,S2))),
-#             circularity=Percent(abs(math.tan(eta)) * 100)
-#         )
-
 @dataclasses.dataclass
 class RawData:
     """
@@ -275,6 +204,44 @@ class RawData:
     eta: str
     dop: str
     ptotal: str
+
+    def serialise(self) -> bytes:
+        def encode_string(s: str):
+            b = s.encode()
+            return struct.pack(f"I{len(b)}s", len(b), b)
+
+        return (
+            encode_string(self.wavelength) +
+            encode_string(self.revs) +
+            encode_string(self.timestamp) +
+            encode_string(self.paxOpMode) +
+            encode_string(self.paxFlags) +
+            encode_string(self.paxTIARange) +
+            encode_string(self.adcMin) +
+            encode_string(self.adcMax) +
+            encode_string(self.revTime) +
+            encode_string(self.misAdj) +
+            encode_string(self.theta) +
+            encode_string(self.eta) +
+            encode_string(self.dop) +
+            encode_string(self.ptotal)
+        )
+    
+    @classmethod
+    def deserialise(cls, payload: bytes) -> 'RawData':
+        offset = 0
+        fields = []
+        for _ in range(14):
+            length = struct.unpack_from("I", payload, offset)[0]
+            offset += 4
+            value = struct.unpack_from(
+                f"{length}s",
+                payload,
+                offset
+            )[0].decode()
+            offset += length
+            fields.append(value)
+        return RawData(*fields)
 
 @dataclasses.dataclass
 class Data:
