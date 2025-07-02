@@ -19,8 +19,8 @@ sys.path.append(
     ))
 )
 import bb84.timetagger as timetagger
-import bb84.qutag as qutag
-import bb84.uqd as uqd
+# import bb84.qutag as qutag
+# import bb84.uqd as uqd
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(
@@ -199,7 +199,7 @@ class Counts(Adw.PreferencesGroup):
             self,
             get_raw_data_callback: typing.Callable
     ) -> None:
-        super().__init__(title='Counts 780')
+        super().__init__(title='Counts')
         self.get_raw_data_callback = get_raw_data_callback
 
         data_row = Adw.ActionRow()
@@ -302,7 +302,8 @@ class Counts(Adw.PreferencesGroup):
 
     def update_timetagger_info(self):
         raw_data: timetagger.RawData = self.get_raw_data_callback()
-        singles = [int(val) for channel, val in raw_data.__dict__.items()]
+        singles = numpy.bincount(raw_data.channels, minlength=8)
+        # singles = [int(val) for channel, val in raw_data.__dict__.items()]
 
         self.h_value_label.set_text(f'{singles[timetagger.C_780_H]}' if timetagger.C_780_H is not None else '0')
         self.v_value_label.set_text(f'{singles[timetagger.C_780_V]}' if timetagger.C_780_V is not None else '0')
@@ -515,7 +516,7 @@ class TimeTaggerBox(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
         self.timetagger = tt
-        self.raw_data = timetagger.RawData()
+        # self.raw_data = timetagger.RawData()
         self.data = timetagger.Data()
 
         self.columnone = ColumnOne(get_data_callback=self.get_data)

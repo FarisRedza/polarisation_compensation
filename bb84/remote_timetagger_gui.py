@@ -13,7 +13,8 @@ sys.path.append(
     ))
 )
 import bb84.timetagger_box as timetagger_box
-import bb84.remote_timetagger as remote_timetagger
+# import bb84.remote_timetagger as remote_timetagger
+import server_struct.remote_timetagger as remote_timetagger
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:
@@ -32,12 +33,13 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=header_bar)
 
         ### timetagger box
+        tt = remote_timetagger.Timetagger(
+            host=remote_timetagger.server_host,
+            port=remote_timetagger.server_port
+        )
         try:
             self.timetagger_box = timetagger_box.TimeTaggerBox(
-                    tt=remote_timetagger.Timetagger(
-                        host=remote_timetagger.server_host,
-                        port=remote_timetagger.server_port
-                    )
+                    tt=tt
                 )
         except:
             main_box.append(

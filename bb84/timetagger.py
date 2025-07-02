@@ -15,17 +15,17 @@ DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
 C_1550_H = 0
 C_1550_V = 1
-C_1550_D = None
-C_1550_A = None
-C_1550_R = 2
-C_1550_L = 3
+C_1550_D = 2
+C_1550_A = 3
+C_1550_R = None
+C_1550_L = None
 
 C_780_H = 4
 C_780_V = 5
-C_780_D = None
-C_780_A = None
-C_780_R = 6
-C_780_L = 7
+C_780_D = 6
+C_780_A = 7
+C_780_R = None
+C_780_L = None
 
 @dataclasses.dataclass
 class DeviceInfo:
@@ -132,6 +132,9 @@ class RawData:
     timetags: list[int]
     channels: list[int]
 
+    # timetags: numpy.ndarray
+    # channels: numpy.ndarray
+
     def serialise(self) -> bytes:
         n_data_points = len(self.timetags)
 
@@ -163,6 +166,15 @@ class RawData:
             payload[channels_start:channels_end]
         ))
 
+        # timetags = numpy.ndarray(struct.unpack(
+        #     f'!{n_data_points}I',
+        #     payload[timetags_start:timetags_end]
+        # ))
+        # channels = numpy.ndarray(struct.unpack(
+        #     f'!{n_data_points}I',
+        #     payload[channels_start:channels_end]
+        # ))
+
         return RawData(timetags=timetags, channels=channels)
 
 @dataclasses.dataclass
@@ -186,7 +198,8 @@ class Data:
         except:
             s2 = None
         try:
-            s3 = (singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L])
+            s3 = None
+            # s3 = (singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L])
         except:
             s3 = None
 
