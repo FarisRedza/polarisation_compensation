@@ -1,6 +1,10 @@
 import dataclasses
 import typing
 import math
+import struct
+import random
+
+import numpy
 
 Percent = typing.NewType('Percent', float)
 Degrees = typing.NewType('Degrees', float)
@@ -30,56 +34,66 @@ class DeviceInfo:
     serial_number: str = 'N/A'
     firmware_version: str = 'N/A'
 
-# @dataclasses.dataclass
-# class Data:
-#     # timestamp = float(0.0)
-#     # wavelength = Metres(0.0)
-#     azimuth: float = 0.0
-#     ellipticity: float = 0.0
-#     # degree_of_polarisation = Percent(0.0)
-#     # degree_of_linear_polarisation = Percent(0.0)
-#     # degree_of_circular_polarisation = Percent(0.0)
-#     # power = DecibelMilliwatts(0.0)
-#     # power_polarised = DecibelMilliwatts(0.0)
-#     # power_unpolarised = DecibelMilliwatts(0.0)
-#     normalised_s1: float = 0.0
-#     normalised_s2: float = 0.0
-#     normalised_s3: float = 0.0
-#     # S0 = Watts(0.0)
-#     # S1 = Watts(0.0)
-#     # S2 = Watts(0.0)
-#     # S3 = Watts(0.0)
-#     # power_split_ratio: float = 0.0
-#     # phase_difference = Degrees(0.0)
-#     # circularity = Percent(0.0)
+    def serialise(self) -> bytes:
+        def encode_string(s: str):
+            b = s.encode()
+            return struct.pack(f'I{len(b)}s', len(b), b)
+
+        return (
+            encode_string(self.manufacturer) +
+            encode_string(self.model) +
+            encode_string(self.serial_number) +
+            encode_string(self.firmware_version)
+        )
+    
+    @classmethod
+    def deserialise(cls, payload: bytes) -> 'DeviceInfo':
+        offset = 0
+        fields = []
+        for _ in range(4):
+            length = struct.unpack_from('I', payload, offset)[0]
+            offset += 4
+            value = struct.unpack_from(
+                f'{length}s',
+                payload,
+                offset
+            )[0].decode()
+            offset += length
+            fields.append(value)
+        return DeviceInfo(*fields)
 
 # @dataclasses.dataclass
 # class RawData:
-#     singles_780_h: int = 0
-#     singles_780_v: int = 0
-#     singles_780_d: int = 0
-#     singles_780_a: int = 0
-#     singles_780_r: int = 0
-#     singles_780_l: int = 0
+#     channel_1: int = 0
+#     channel_2: int = 0
+#     channel_3: int = 0
+#     channel_4: int = 0
+#     channel_5: int = 0
+#     channel_6: int = 0
+#     channel_7: int = 0
+#     channel_8: int = 0
 
-#     singles_1550_h: int = 0
-#     singles_1550_v: int = 0
-#     singles_1550_d: int = 0
-#     singles_1550_a: int = 0
-#     singles_1550_r: int = 0
-#     singles_1550_l: int = 0
+# @dataclasses.dataclass
+# class Data:
+#     azimuth: float = 0.0
+#     ellipticity: float = 0.0
+#     normalised_s1: float = 0.0
+#     normalised_s2: float = 0.0
+#     normalised_s3: float = 0.0
 
-#     def to_data(self) -> Data:
+#     @classmethod
+#     def from_raw_data(cls, raw_data: RawData) -> 'Data':
+#         singles = [int(val) for channel, val in raw_data.__dict__.items()]
 #         try:
-#             s1 = (self.singles_780_h - self.singles_780_v)/(self.singles_780_h + self.singles_780_v)
+#             s1 = (singles[C_780_H] - singles[C_780_V])/(singles[C_780_H]+ singles[C_780_V])
 #         except:
 #             s1 = None
 #         try:
-#             s2 = (self.singles_780_d - self.singles_780_a)/(self.singles_780_d + self.singles_780_a)
+#             s2 = (singles[C_780_D] - singles[C_780_A])/(singles[C_780_D] + singles[C_780_A])
 #         except:
 #             s2 = None
 #         try:
-#             s3 = (self.singles_780_r - self.singles_780_l)/(self.singles_780_r + self.singles_780_l)
+#             s3 = (singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L])
 #         except:
 #             s3 = None
 
@@ -105,7 +119,7 @@ class DeviceInfo:
 #         except:
 #             theta = 0
 
-#         return Data(
+#         return cls(
 #             azimuth=math.degrees(theta),
 #             ellipticity=math.degrees(eta),
 #             normalised_s1=s1,
@@ -115,14 +129,41 @@ class DeviceInfo:
 
 @dataclasses.dataclass
 class RawData:
-    channel_1: int = 0
-    channel_2: int = 0
-    channel_3: int = 0
-    channel_4: int = 0
-    channel_5: int = 0
-    channel_6: int = 0
-    channel_7: int = 0
-    channel_8: int = 0
+    timetags: list[int]
+    channels: list[int]
+
+    def serialise(self) -> bytes:
+        n_data_points = len(self.timetags)
+
+        header = struct.pack('!II', n_data_points, n_data_points)
+        timetags_bytes = struct.pack(f'!{n_data_points}I', *self.timetags)
+        channels_bytes = struct.pack(f'!{n_data_points}I', *self.channels)
+
+        return header + timetags_bytes + channels_bytes
+
+    @classmethod
+    def deserialise(cls, payload: bytes) -> 'RawData':
+        header_size = struct.calcsize('!II')
+        n_data_points, _ = struct.unpack('!II', payload[:header_size])
+
+        timetags_size = n_data_points * 4
+        channels_size = timetags_size
+
+        timetags_start = header_size
+        timetags_end = timetags_start + timetags_size
+        channels_start = timetags_end
+        channels_end = channels_start + channels_size
+
+        timetags = list(struct.unpack(
+            f'!{n_data_points}I',
+            payload[timetags_start:timetags_end]
+        ))
+        channels = list(struct.unpack(
+            f'!{n_data_points}I',
+            payload[channels_start:channels_end]
+        ))
+
+        return RawData(timetags=timetags, channels=channels)
 
 @dataclasses.dataclass
 class Data:
@@ -133,8 +174,9 @@ class Data:
     normalised_s3: float = 0.0
 
     @classmethod
-    def from_raw_data(cls, raw_data: RawData) -> "Data":
-        singles = [int(val) for channel, val in raw_data.__dict__.items()]
+    def from_raw_data(cls, raw_data: RawData) -> 'Data':
+        singles = numpy.bincount(raw_data.channels, minlength=8)
+
         try:
             s1 = (singles[C_780_H] - singles[C_780_V])/(singles[C_780_H]+ singles[C_780_V])
         except:
@@ -183,5 +225,21 @@ class TimeTagger:
         self.device_info = DeviceInfo()
 
     def measure(self) -> RawData:
-        data = RawData()
-        return data
+        data_size = 100000
+        timetags = list(range(0,data_size))
+        channels = [random.randint(1,8) for _ in range(data_size)]
+        raw_data = RawData(
+            timetags=timetags,
+            channels=channels
+        )
+        return raw_data
+    
+    def disconnect(self) -> None:
+        pass
+
+if __name__ == '__main__':
+    tt = TimeTagger()
+    for _ in range(100):
+        payload = tt.measure().serialise()
+        data = RawData.deserialise(payload=payload)
+        # print(data)

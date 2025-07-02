@@ -28,9 +28,13 @@ class DeviceInfo:
     firmware_version: str
 
     def serialise(self) -> bytes:
-        def encode_string(s: str):
+        def encode_string(s: str) -> bytes:
             b = s.encode()
-            return struct.pack(f"I{len(b)}s", len(b), b)
+            return struct.pack(
+                f'I{len(b)}s',
+                len(b),
+                b
+            )
 
         return (
             encode_string(self.manufacturer) +
@@ -44,10 +48,10 @@ class DeviceInfo:
         offset = 0
         fields = []
         for _ in range(4):
-            length = struct.unpack_from("I", payload, offset)[0]
+            length = struct.unpack_from('I', payload, offset)[0]
             offset += 4
             value = struct.unpack_from(
-                f"{length}s",
+                f'{length}s',
                 payload,
                 offset
             )[0].decode()
@@ -175,7 +179,7 @@ class SCPIDevice:
 
 @dataclasses.dataclass
 class RawData:
-    """
+    '''
     wavelength (m)
     revs: number of measurement cycles
     timestamp: milliseconds since start?
@@ -189,7 +193,7 @@ class RawData:
     eta: ellipticity angle of the polarisation ellipse
     dop: degree of polarisation
     ptotal: total optical power
-    """
+    '''
     wavelength: str
     revs: str
     timestamp: str
@@ -208,7 +212,7 @@ class RawData:
     def serialise(self) -> bytes:
         def encode_string(s: str):
             b = s.encode()
-            return struct.pack(f"I{len(b)}s", len(b), b)
+            return struct.pack(f'I{len(b)}s', len(b), b)
 
         return (
             encode_string(self.wavelength) +
@@ -232,10 +236,10 @@ class RawData:
         offset = 0
         fields = []
         for _ in range(14):
-            length = struct.unpack_from("I", payload, offset)[0]
+            length = struct.unpack_from('I', payload, offset)[0]
             offset += 4
             value = struct.unpack_from(
-                f"{length}s",
+                f'{length}s',
                 payload,
                 offset
             )[0].decode()
@@ -267,7 +271,7 @@ class Data:
     circularity: Percent = Percent(0.0)
 
     @classmethod
-    def from_raw_data(cls, raw_data: RawData) -> "Data":
+    def from_raw_data(cls, raw_data: RawData) -> 'Data':
         wavelength = Metres(float(raw_data.wavelength))
         revs = float(raw_data.revs)
         timestamp = float(raw_data.timestamp)

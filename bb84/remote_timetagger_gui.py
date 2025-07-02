@@ -16,12 +16,12 @@ import bb84.timetagger_box as timetagger_box
 import bb84.remote_timetagger as remote_timetagger
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.set_title(title='Timetagger Viewer')
         self.set_default_size(width=600, height=500)
         self.set_size_request(width=450, height=150)
-        self.connect("close-request", self.on_close_request)
+        self.connect('close-request', self.on_close_request)
 
         # main box
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -31,10 +31,10 @@ class MainWindow(Adw.ApplicationWindow):
         header_bar = Adw.HeaderBar()
         main_box.append(child=header_bar)
 
-        ### qutag box
+        ### timetagger box
         try:
             self.timetagger_box = timetagger_box.TimeTaggerBox(
-                    timetagger=remote_timetagger.Timetagger(
+                    tt=remote_timetagger.Timetagger(
                         host=remote_timetagger.server_host,
                         port=remote_timetagger.server_port
                     )
@@ -42,7 +42,7 @@ class MainWindow(Adw.ApplicationWindow):
         except:
             main_box.append(
                 child=Gtk.Label(
-                    label='No QuTAG found',
+                    label='No timetagger found',
                     valign=Gtk.Align.CENTER,
                     vexpand=True
                 )
@@ -68,7 +68,7 @@ class App(Adw.Application):
         self.win.present()
 
 if __name__ == '__main__':
-    app = App(application_id='com.github.FarisRedza.QuTAGViewer')
+    app = App(application_id='com.github.FarisRedza.TimeTaggerViewer')
     try:
         app.run(sys.argv)
     except Exception as e:

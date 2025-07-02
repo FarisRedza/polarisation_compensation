@@ -18,8 +18,9 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import bb84.timetagger as tt
+import bb84.timetagger as timetagger
 import bb84.qutag as qutag
+import bb84.uqd as uqd
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(
@@ -173,7 +174,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
 
     def update_point(self) -> None:
-        data: tt.Data = self.get_data_callback()
+        data: timetagger.Data = self.get_data_callback()
 
         x = data.normalised_s1
         y = data.normalised_s2
@@ -193,7 +194,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
         self.canvas.draw_idle()
 
-class CountsGroup780(Adw.PreferencesGroup):
+class Counts(Adw.PreferencesGroup):
     def __init__(
             self,
             get_raw_data_callback: typing.Callable
@@ -300,136 +301,15 @@ class CountsGroup780(Adw.PreferencesGroup):
         data_value_box.append(child=self.l_value_label)
 
     def update_timetagger_info(self):
-        raw_data: tt.RawData = self.get_raw_data_callback()
+        raw_data: timetagger.RawData = self.get_raw_data_callback()
         singles = [int(val) for channel, val in raw_data.__dict__.items()]
 
-        self.h_value_label.set_text(f'{singles[tt.C_780_H]}' if tt.C_780_H is not None else '0')
-        self.v_value_label.set_text(f'{singles[tt.C_780_V]}' if tt.C_780_V is not None else '0')
-        self.d_value_label.set_text(f'{singles[tt.C_780_D]}' if tt.C_780_D is not None else '0')
-        self.a_value_label.set_text(f'{singles[tt.C_780_A]}' if tt.C_780_A is not None else '0')
-        self.r_value_label.set_text(f'{singles[tt.C_780_R]}' if tt.C_780_R is not None else '0')
-        self.l_value_label.set_text(f'{singles[tt.C_780_L]}' if tt.C_780_L is not None else '0')
-
-class CountsGroup1550(Adw.PreferencesGroup):
-    def __init__(
-            self,
-            get_raw_data_callback: typing.Callable
-    ) -> None:
-        super().__init__(title='Counts 1550')
-        self.get_raw_data_callback = get_raw_data_callback
-
-        data_row = Adw.ActionRow()
-        self.add(child=data_row)
-
-        margin = 6
-        box_spacing = 6
-        width_chars = 9
-
-        data_header_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            margin_top=margin,
-            margin_bottom=margin,
-            valign=Gtk.Align.CENTER,
-            spacing=box_spacing
-        )
-        data_row.add_prefix(widget=data_header_box)
-
-        data_value_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            margin_top=margin,
-            margin_bottom=margin,
-            valign=Gtk.Align.CENTER,
-            halign=Gtk.Align.END,
-            spacing=box_spacing,
-        )
-        data_row.add_suffix(widget=data_value_box)
-
-        # h
-        h_label = Gtk.Label(
-            label='H',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=h_label)
-        self.h_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.h_value_label)
-
-        # v
-        v_label = Gtk.Label(
-            label='V',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=v_label)
-        self.v_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.v_value_label)
-
-        # d
-        d_label = Gtk.Label(
-            label='D',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=d_label)
-        self.d_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.d_value_label)
-
-        # a
-        a_label = Gtk.Label(
-            label='A',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=a_label)
-        self.a_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.a_value_label)
-
-        # r
-        r_label = Gtk.Label(
-            label='R',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=r_label)
-        self.r_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.r_value_label)
-
-        # l
-        h_label = Gtk.Label(
-            label='L',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=h_label)
-        self.l_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.l_value_label)
-
-    def _safe_int(self,x, default=0):
-        return int(x) if x is not None else default
-
-    def update_timetagger_info(self):
-        raw_data: tt.RawData = self.get_raw_data_callback()
-        singles = [int(val) for channel, val in raw_data.__dict__.items()]
-
-        self.h_value_label.set_text(f'{singles[tt.C_1550_H]}' if tt.C_1550_H is not None else '0')
-        self.v_value_label.set_text(f'{singles[tt.C_1550_V]}' if tt.C_1550_V is not None else '0')
-        self.d_value_label.set_text(f'{singles[tt.C_1550_D]}' if tt.C_1550_D is not None else '0')
-        self.a_value_label.set_text(f'{singles[tt.C_1550_A]}' if tt.C_1550_A is not None else '0')
-        self.r_value_label.set_text(f'{singles[tt.C_1550_R]}' if tt.C_1550_R is not None else '0')
-        self.l_value_label.set_text(f'{singles[tt.C_1550_L]}' if tt.C_1550_R is not None else '0')
-
+        self.h_value_label.set_text(f'{singles[timetagger.C_780_H]}' if timetagger.C_780_H is not None else '0')
+        self.v_value_label.set_text(f'{singles[timetagger.C_780_V]}' if timetagger.C_780_V is not None else '0')
+        self.d_value_label.set_text(f'{singles[timetagger.C_780_D]}' if timetagger.C_780_D is not None else '0')
+        self.a_value_label.set_text(f'{singles[timetagger.C_780_A]}' if timetagger.C_780_A is not None else '0')
+        self.r_value_label.set_text(f'{singles[timetagger.C_780_R]}' if timetagger.C_780_R is not None else '0')
+        self.l_value_label.set_text(f'{singles[timetagger.C_780_L]}' if timetagger.C_780_L is not None else '0')
 
 class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(
@@ -538,7 +418,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         # data_value_box.append(child=self.qber_value_label)
 
     def update_qutag_info(self):
-        data: tt.Data = self.get_data_callback()
+        data: timetagger.Data = self.get_data_callback()
 
         # self.wavelength_value_label.set_text(f'{data.wavelength} m')
         self.azimuth_value_label.set_text(f'{data.azimuth:.2f} °')
@@ -567,7 +447,7 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
             get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__(title='Polarimeter Info')
-        device_info: tt.DeviceInfo = get_device_info_callback()
+        device_info: timetagger.DeviceInfo = get_device_info_callback()
 
         # serial number
         serial_no_row = Adw.ActionRow(title='Serial number')
@@ -612,15 +492,10 @@ class ColumnTwo(Adw.PreferencesPage):
             get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__()
-        self.counts_group_780 = CountsGroup780(
+        self.counts_group = Counts(
             get_raw_data_callback=get_raw_data_callback
         )
-        self.add(group=self.counts_group_780)
-
-        self.counts_group_1550 = CountsGroup1550(
-            get_raw_data_callback=get_raw_data_callback
-        )
-        self.add(group=self.counts_group_1550)
+        self.add(group=self.counts_group)
 
         self.measurement_group = MeasurementGroup(
             get_data_callback=get_data_callback
@@ -635,13 +510,13 @@ class ColumnTwo(Adw.PreferencesPage):
 class TimeTaggerBox(Gtk.Box):
     def __init__(
             self,
-            timetagger: tt.TimeTagger
+            tt: timetagger.TimeTagger
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
-        self.timetagger = timetagger
-        self.raw_data = tt.RawData()
-        self.data = tt.Data()
+        self.timetagger = tt
+        self.raw_data = timetagger.RawData()
+        self.data = timetagger.Data()
 
         self.columnone = ColumnOne(get_data_callback=self.get_data)
         self.append(child=self.columnone)
@@ -658,30 +533,29 @@ class TimeTaggerBox(Gtk.Box):
             function=self.update_from_timetagger
         )
 
-    def get_raw_data(self) -> tt.RawData:
+    def get_raw_data(self) -> timetagger.RawData:
         return self.raw_data
 
-    def get_data(self) -> tt.Data:
+    def get_data(self) -> timetagger.Data:
         return self.data
     
-    def get_device_info(self) -> tt.DeviceInfo:
+    def get_device_info(self) -> timetagger.DeviceInfo:
         return self.timetagger.device_info
         
     def update_from_timetagger(self) -> bool:
         self.raw_data = self.timetagger.measure()
         # self.data = self.raw_data.to_data()
         try:
-            self.data = tt.Data().from_raw_data(
+            self.data = timetagger.Data().from_raw_data(
                 raw_data=self.raw_data
             )
         except:
-            self.data = tt.Data()
+            self.data = timetagger.Data()
         self.set_qutag_data()
         return True
     
     def set_qutag_data(self) -> None:
         self.columnone.plot_ellipse_group.update_plot()
         self.columnone.plot_bloch_group.update_point()
-        self.columntwo.counts_group_780.update_timetagger_info()
-        self.columntwo.counts_group_1550.update_timetagger_info()
+        self.columntwo.counts_group.update_timetagger_info()
         self.columntwo.measurement_group.update_qutag_info()

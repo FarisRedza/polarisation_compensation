@@ -6,23 +6,22 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-import polarimeter_box as polarimeter_box
-
 sys.path.append(
     os.path.abspath(os.path.join(
         os.path.dirname(__file__),
         os.path.pardir
     ))
 )
+import polarimeter.polarimeter_box as polarimeter_box
 import server_struct.remote_polarimeter as remote_polarimeter
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.set_title(title='Polarisation Viewer')
         self.set_default_size(width=600, height=500)
         self.set_size_request(width=450, height=150)
-        self.connect("close-request", self.on_close_request)
+        self.connect('close-request', self.on_close_request)
 
         # main box
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -33,14 +32,13 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=header_bar)
 
         ### polarimeter box
-        self.polarimeter = remote_polarimeter.Polarimeter(
-            host=remote_polarimeter.server_host,
-            port=remote_polarimeter.server_port,
-            serial_number='M00910360'
-        )
         try:
             self.polarimeter_box = polarimeter_box.PolarimeterBox(
-                polarimeter=self.polarimeter
+                polarimeter=remote_polarimeter.Polarimeter(
+                    host=remote_polarimeter.server_host,
+                    port=remote_polarimeter.server_port,
+                    serial_number='M00910360'
+                )
             )
         except:
             main_box.append(

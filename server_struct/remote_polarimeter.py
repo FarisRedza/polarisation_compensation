@@ -1,9 +1,7 @@
 import sys
 import os
 import socket
-import time
 import struct
-import enum
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -12,6 +10,7 @@ sys.path.append(
     ))
 )
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
+import server_struct.remote_measurement_server as remote_measurement_server
 
 server_host = '127.0.0.1'
 # server_host = '137.195.89.222'
@@ -21,18 +20,6 @@ def parse_status(payload: bytes) -> str:
     message_len = struct.unpack('I', payload[:4])[0]
     message = struct.unpack(f'{message_len}s', payload[4:])[0]
     return bytes(message).decode()
-
-class Command(enum.IntEnum):
-    LIST_DEVICES = 1
-    MEASURE_ONCE = 2
-    START_MEASURING = 3
-    STOP_MEASURING = 4
-
-class Response(enum.IntEnum):
-    ERROR = 0
-    DEVICE_INFO = 1
-    RAWDATA = 2
-    STATUS = 3
 
 class Polarimeter(thorlabs_polarimeter.Polarimeter):
     def __init__(
@@ -51,55 +38,44 @@ class Polarimeter(thorlabs_polarimeter.Polarimeter):
         self._sock.connect((self.host, self.port))
         self._get_device_info(serial_number=serial_number)
 
-    def __del__(self):
-        self._sock.close()
+    def __del__(self) -> None:
+        self.disconnect()
 
     def measure(self) -> thorlabs_polarimeter.RawData:
-        self._send_command(Command.MEASURE_ONCE)
+        self._send_command(
+            command=remote_measurement_server.Command.MEASURE_ONCE
+        )
         resp_type, payload = self._receive_response()
-        if resp_type == Response.RAWDATA:
+        if resp_type == remote_measurement_server.Response.RAWDATA:
             return thorlabs_polarimeter.RawData.deserialise(
-                payload=payload)
+                payload=payload
+            )
         else:
             print('Unexpected response:', resp_type)
 
-    def start_measuring(self):
-        self._send_command(Command.START_MEASURING)
-        resp_type, payload = self._receive_response()
-        print('Start:', payload.decode())
-
-        # for _ in range(3):
-        #     resp_type, payload = self._receive_response()
-        #     if resp_type == Response.RAWDATA:
-        #         print(
-        #             thorlabs_polarimeter.RawData.deserialise(payload=payload).wavelength
-        #         )
-        #     elif resp_type == Response.ERROR:
-        #         print('Error:', parse_status(payload))
-        #         break
-
-        self._send_command(Command.STOP_MEASURING)
-        resp_type, payload = self._receive_response()
-        print('Stop:', payload.decode())
-
-    def disconnect(self):
+    def disconnect(self) -> None:
         self._sock.close()
 
     def _get_device_info(
             self,
             serial_number: str
-        ) -> None:
-        self._send_command(cmd_id=Command.LIST_DEVICES)
+    ) -> None:
+        self._send_command(
+            command=remote_measurement_server.Command.LIST_DEVICES
+        )
         resp_type, payload = self._receive_response()
-        if resp_type == Response.DEVICE_INFO:
+        if resp_type == remote_measurement_server.Response.DEVICE_INFO:
             self.device_info=thorlabs_polarimeter.DeviceInfo.deserialise(
                 payload=payload
             )
         else:
             print('Unexpected response:', resp_type)
 
-    def _send_command(self, cmd_id: Command):
-        self._sock.sendall(struct.pack('I', cmd_id))
+    def _send_command(
+            self,
+            command: remote_measurement_server.Command
+        ) -> None:
+        self._sock.sendall(struct.pack('I', command))
 
     def _recvall(self, size: int) -> bytes:
         data = bytearray()
@@ -123,6 +99,3 @@ if __name__ == '__main__':
         serial_number='M00910360'
     )
     print(pax.device_info)
-    time.sleep(1)
-    pax.start_measuring()
-    pax.disconnect()
