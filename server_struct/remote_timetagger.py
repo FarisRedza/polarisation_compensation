@@ -2,6 +2,9 @@ import sys
 import os
 import socket
 import struct
+import time
+
+import numpy
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -10,12 +13,9 @@ sys.path.append(
     ))
 )
 import bb84.timetagger as timetagger
-# import bb84.uqd as uqd
-# import bb84.qutag as qutag
 import server_struct.remote_measurement_server as remote_measurement_server
 
 server_host = '127.0.0.1'
-# server_host = '137.195.89.222'
 server_host = '137.195.63.6'
 server_port = 5003
 
@@ -54,6 +54,10 @@ class Timetagger(timetagger.TimeTagger):
             )
         else:
             print('Unexpected response:', resp_type)
+            return timetagger.RawData(
+                timetags=numpy.empty(0),
+
+            )
 
     def disconnect(self) -> None:
         self._sock.close()
@@ -92,8 +96,6 @@ class Timetagger(timetagger.TimeTagger):
         return resp_type, payload
 
 if __name__ == '__main__':
-    import time
-    import numpy
     tt = Timetagger(
         host=server_host,
         port=server_port
@@ -101,6 +103,6 @@ if __name__ == '__main__':
     print(tt.device_info)
     for _ in range(10):
         raw_data = tt.measure()
-        # singles = numpy.bincount(raw_data.channels, minlength=8)
+        singles = numpy.bincount(raw_data.channels, minlength=9)[1:]
         print(raw_data.channels)
         time.sleep(1)
