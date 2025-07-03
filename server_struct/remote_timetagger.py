@@ -2,7 +2,8 @@ import sys
 import os
 import socket
 import struct
-
+import tomtag as tomt
+import numpy as np
 sys.path.append(
     os.path.abspath(os.path.join(
         os.path.dirname(__file__),
@@ -37,23 +38,25 @@ class Timetagger(timetagger.TimeTagger):
             socket.AF_INET,
             socket.SOCK_STREAM
         )
-        self._sock.connect((self.host, self.port))
-        self._get_device_info()
+        # self._sock.connect((self.host, self.port))
+        # self._get_device_info()
 
     def __del__(self) -> None:
         self.disconnect()
 
     def measure(self) -> timetagger.RawData:
-        self._send_command(
-            command=remote_measurement_server.Command.MEASURE_ONCE
-        )
-        resp_type, payload = self._receive_response()
-        if resp_type == remote_measurement_server.Response.RAWDATA:
-            return timetagger.RawData.deserialise(
-                payload=payload
-            )
-        else:
-            print('Unexpected response:', resp_type)
+
+        return timetagger.RawData(timetags = np.cumsum(np.random.randint(0, 300, size=1000)), channels = np.random.randint(0, 8, size=1000)) 
+        # self._send_command(
+        #     command=remote_measurement_server.Command.MEASURE_ONCE
+        # )
+        # resp_type, payload = self._receive_response()
+        # if resp_type == remote_measurement_server.Response.RAWDATA:
+        #     return timetagger.RawData.deserialise(
+        #         payload=payload
+        #     )
+        # else:
+        #     print('Unexpected response:', resp_type)
 
     def disconnect(self) -> None:
         self._sock.close()
@@ -91,6 +94,36 @@ class Timetagger(timetagger.TimeTagger):
         payload = self._recvall(total_len - 1)
         return resp_type, payload
 
+
+def get_qber(channels, timetags, delay=1642, tcc=15):
+    """
+    Assume that channels are HVDAHVDA
+    """
+    tags_H_1550 = timetags[channels == 0]
+    tags_V_1550 = timetags[channels == 1]
+    tags_D_1550 = timetags[channels == 2]
+    tags_A_1550 = timetags[channels == 3]
+    tags_H_780 = timetags[channels == 4] + delay
+    tags_V_780 = timetags[channels == 5] + delay
+    tags_D_780 = timetags[channels == 6] + delay
+    tags_A_780 = timetags[channels == 7] + delay
+
+    HH = tomt.count_twofolds(tags_H_1550, tags_H_780, len(tags_H_1550), len(tags_H_780),tcc)
+    HV = tomt.count_twofolds(tags_H_1550, tags_V_780, len(tags_H_1550), len(tags_V_780),tcc)
+    VH = tomt.count_twofolds(tags_V_1550, tags_H_780, len(tags_V_1550), len(tags_H_780),tcc)
+    VV = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
+
+    qber =  (VH + VH) / (HH + HV + VH + VV)
+
+    DD = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
+    DA = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
+    AD = tomt.count_twofolds(tags_A_1550, tags_D_780, len(tags_A_1550), len(tags_D_780),tcc)
+    AA = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
+
+    qx =  (DA + AD) / (DD + AD + DA + AA)
+
+    return qber, qx, HH+HV+VH+VV
+
 if __name__ == '__main__':
     import time
     import numpy
@@ -98,9 +131,11 @@ if __name__ == '__main__':
         host=server_host,
         port=server_port
     )
-    print(tt.device_info)
+    # print(tt.device_info)
     for _ in range(10):
         raw_data = tt.measure()
-        # singles = numpy.bincount(raw_data.channels, minlength=8)
-        print(raw_data.channels)
+        singles = numpy.bincount(raw_data.channels, minlength=8)
+        print('singles:', singles)
+        print('qber, qx, rawCC:', get_qber(raw_data.channels, raw_data.timetags))
+
         time.sleep(1)

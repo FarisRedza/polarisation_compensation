@@ -138,4 +138,4 @@ if __name__ == '__main__':
     #     serial_number='M00910360'
     # )
     measurement_device = timetagger.TimeTagger()
-    start_server()
+    # start_server()
