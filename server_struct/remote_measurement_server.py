@@ -134,8 +134,8 @@ def start_server(
         measurement_device.disconnect()
 
 if __name__ == '__main__':
-    measurement_device = thorlabs_polarimeter.Polarimeter(
-        serial_number='M00910360'
-    )
-    # measurement_device = timetagger.TimeTagger()
+    # measurement_device = thorlabs_polarimeter.Polarimeter(
+    #     serial_number='M00910360'
+    # )
+    measurement_device = timetagger.TimeTagger()
     start_server()

@@ -129,18 +129,19 @@ class DeviceInfo:
 
 @dataclasses.dataclass
 class RawData:
-    timetags: list[int]
-    channels: list[int]
+    # timetags: list[int]
+    # channels: list[int]
 
-    # timetags: numpy.ndarray
-    # channels: numpy.ndarray
+    timetags: numpy.ndarray
+    channels: numpy.ndarray
 
     def serialise(self) -> bytes:
         n_data_points = len(self.timetags)
 
         header = struct.pack('!II', n_data_points, n_data_points)
-        timetags_bytes = struct.pack(f'!{n_data_points}I', *self.timetags)
-        channels_bytes = struct.pack(f'!{n_data_points}I', *self.channels)
+        # timetags_bytes = struct.pack(f'!{n_data_points}I', *self.timetags)
+        timetags_bytes = self.timetags.astype(dtype='>i8').tobytes()  # >i8 = big-endian int64
+        channels_bytes = self.channels.astype(dtype='>u1').tobytes()  # >u1 = big-endian uint8
 
         return header + timetags_bytes + channels_bytes
 
@@ -157,23 +158,25 @@ class RawData:
         channels_start = timetags_end
         channels_end = channels_start + channels_size
 
-        timetags = list(struct.unpack(
-            f'!{n_data_points}I',
-            payload[timetags_start:timetags_end]
-        ))
-        channels = list(struct.unpack(
-            f'!{n_data_points}I',
-            payload[channels_start:channels_end]
-        ))
-
-        # timetags = numpy.ndarray(struct.unpack(
+        # timetags = list(struct.unpack(
         #     f'!{n_data_points}I',
         #     payload[timetags_start:timetags_end]
         # ))
-        # channels = numpy.ndarray(struct.unpack(
+        # channels = list(struct.unpack(
         #     f'!{n_data_points}I',
         #     payload[channels_start:channels_end]
         # ))
+
+        # Byte sizes
+        size_timetags = n_data_points * 8  # int64 = 8 bytes
+        size_channels = n_data_points * 1  # uint8 = 1 byte
+
+        offset_timetags = header_size
+        offset_channels = offset_timetags + size_timetags
+
+        # Extract and convert arrays back to native endianness
+        timetags = numpy.frombuffer(payload[offset_timetags:offset_channels], dtype='>i8').astype(numpy.int64)
+        channels = numpy.frombuffer(payload[offset_channels:offset_channels + size_channels], dtype='>u1').astype(numpy.uint8)
 
         return RawData(timetags=timetags, channels=channels)
 
@@ -238,9 +241,16 @@ class TimeTagger:
         self.device_info = DeviceInfo()
 
     def measure(self) -> RawData:
-        data_size = 100000
-        timetags = list(range(0,data_size))
-        channels = [random.randint(1,8) for _ in range(data_size)]
+        data_points = 10000
+        timetags = numpy.array(
+            object=range(data_points),
+            dtype=numpy.int64
+        )
+        channels = numpy.random.randint(
+            low=1,
+            high=8,
+            size=data_points
+        ).astype(dtype=numpy.uint8)
         raw_data = RawData(
             timetags=timetags,
             channels=channels
@@ -251,8 +261,22 @@ class TimeTagger:
         pass
 
 if __name__ == '__main__':
-    tt = TimeTagger()
-    for _ in range(100):
-        payload = tt.measure().serialise()
-        data = RawData.deserialise(payload=payload)
-        # print(data)
+    with open(file='30.12_dB_0_km_1_mW_72.32588510097698_s.txt') as file:
+        timetags = []
+        channels = []
+        for line in file:
+            parts = line.strip().split()
+
+            if len(parts) < 2:
+                continue
+            
+            timetag, channel = int(parts[0]), int(parts[1])
+            timetags.append(timetag)
+            channels.append(channel)
+
+    raw_data = RawData(
+        timetags=numpy.array(object=timetags, dtype=numpy.int64),
+        channels=numpy.array(object=channels, dtype=numpy.uint8),
+    )
+    print(raw_data.timetags[-1])
+

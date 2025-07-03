@@ -549,19 +549,19 @@ class PolCompPage(Adw.PreferencesPage):
 
     def get_enable_compensation(self) -> bool:
         return self.enable_compensation
-    
+
     def set_target_azimuth(self, value: float) -> None:
         self.target_azimuth = value
 
     def get_target_azimuth(self) -> float:
         return self.target_azimuth
-    
+
     def set_target_ellipticity(self, value: float) -> None:
         self.target_ellipticity = value
 
     def get_target_ellipticity(self) -> float:
         return self.target_ellipticity
-    
+
     def set_qwp_motor(self, value: str) -> None:
         self.qwp_motor = value
 
@@ -625,7 +625,7 @@ class MainWindow(Adw.ApplicationWindow):
         #     )
         # )
         self.polarisation_box = timetagger_box.TimeTaggerBox(
-            timetagger=remote_timetagger.Timetagger(
+            tt=remote_timetagger.Timetagger(
                 host=remote_timetagger.server_host,
                 port=remote_timetagger.server_port
             )
@@ -675,7 +675,7 @@ class MainWindow(Adw.ApplicationWindow):
         for i in self.motor_controllers:
             i.motor_controls_group.motor.stop()
         return False
-    
+
 class App(Adw.Application):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)

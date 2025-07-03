@@ -33,7 +33,7 @@ class Qutag(timetagger.TimeTagger):
             firmware_version = 'N/A'
         )
 
-    def __del__(self):
+    def __del__(self) -> None:
         self._qutag.deInitialize()
 
     def measure(self) -> timetagger.RawData:

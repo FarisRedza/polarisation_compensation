@@ -172,7 +172,6 @@ class BlochSphere3D(Adw.PreferencesGroup):
         # if z < 0, it's behind the viewer
         return transformed[2] < 0
 
-
     def update_point(self) -> None:
         data: timetagger.Data = self.get_data_callback()
 
@@ -418,7 +417,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         # )
         # data_value_box.append(child=self.qber_value_label)
 
-    def update_qutag_info(self):
+    def update_qutag_info(self) -> None:
         data: timetagger.Data = self.get_data_callback()
 
         # self.wavelength_value_label.set_text(f'{data.wavelength} m')
@@ -539,7 +538,7 @@ class TimeTaggerBox(Gtk.Box):
 
     def get_data(self) -> timetagger.Data:
         return self.data
-    
+
     def get_device_info(self) -> timetagger.DeviceInfo:
         return self.timetagger.device_info
         
