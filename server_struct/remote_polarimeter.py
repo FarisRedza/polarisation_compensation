@@ -13,7 +13,7 @@ import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 import server_struct.remote_measurement_server as remote_measurement_server
 
 server_host = '127.0.0.1'
-# server_host = '137.195.89.222'
+server_host = '137.195.89.222'
 server_port = 5003
 
 def parse_status(payload: bytes) -> str:
@@ -86,7 +86,7 @@ class Polarimeter(thorlabs_polarimeter.Polarimeter):
             data.extend(part)
         return data
 
-    def _receive_response(self):
+    def _receive_response(self) -> tuple[int, bytes]:
         header = self._recvall(size=5)
         total_len, resp_type = struct.unpack('IB', header)
         payload = self._recvall(total_len - 1)
@@ -94,8 +94,8 @@ class Polarimeter(thorlabs_polarimeter.Polarimeter):
 
 if __name__ == '__main__':
     pax = Polarimeter(
-        host='127.0.0.1',
-        port=5003,
+        host=server_host,
+        port=server_port,
         serial_number='M00910360'
     )
     print(pax.device_info)

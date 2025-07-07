@@ -62,76 +62,8 @@ class DeviceInfo:
             fields.append(value)
         return DeviceInfo(*fields)
 
-# @dataclasses.dataclass
-# class RawData:
-#     channel_1: int = 0
-#     channel_2: int = 0
-#     channel_3: int = 0
-#     channel_4: int = 0
-#     channel_5: int = 0
-#     channel_6: int = 0
-#     channel_7: int = 0
-#     channel_8: int = 0
-
-# @dataclasses.dataclass
-# class Data:
-#     azimuth: float = 0.0
-#     ellipticity: float = 0.0
-#     normalised_s1: float = 0.0
-#     normalised_s2: float = 0.0
-#     normalised_s3: float = 0.0
-
-#     @classmethod
-#     def from_raw_data(cls, raw_data: RawData) -> 'Data':
-#         singles = [int(val) for channel, val in raw_data.__dict__.items()]
-#         try:
-#             s1 = (singles[C_780_H] - singles[C_780_V])/(singles[C_780_H]+ singles[C_780_V])
-#         except:
-#             s1 = None
-#         try:
-#             s2 = (singles[C_780_D] - singles[C_780_A])/(singles[C_780_D] + singles[C_780_A])
-#         except:
-#             s2 = None
-#         try:
-#             s3 = (singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L])
-#         except:
-#             s3 = None
-
-#         match (s1, s2, s3):
-#             case (float(), None, float()):
-#                 s2 = math.sqrt(1 - s1**2 - s3**2)
-
-#             case (None, float(), float()):
-#                 s1 = math.sqrt(1 - s2**2 - s3**2)
-
-#             case (float(), float(), None):
-#                 s3 = math.sqrt(1 - s1**2 - s2**2)
-
-#             case _:
-#                 raise RuntimeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
-
-#         try:
-#             eta = math.asin(s3)/2
-#         except:
-#             eta = 0
-#         try:
-#             theta = math.acos(s1/math.cos(2*eta))/2
-#         except:
-#             theta = 0
-
-#         return cls(
-#             azimuth=math.degrees(theta),
-#             ellipticity=math.degrees(eta),
-#             normalised_s1=s1,
-#             normalised_s2=s2,
-#             normalised_s3=s3
-#         )
-
 @dataclasses.dataclass
 class RawData:
-    # timetags: list[int]
-    # channels: list[int]
-
     timetags: numpy.ndarray
     channels: numpy.ndarray
 
@@ -139,9 +71,8 @@ class RawData:
         n_data_points = len(self.timetags)
 
         header = struct.pack('!II', n_data_points, n_data_points)
-        # timetags_bytes = struct.pack(f'!{n_data_points}I', *self.timetags)
-        timetags_bytes = self.timetags.astype(dtype='>i8').tobytes()  # >i8 = big-endian int64
-        channels_bytes = self.channels.astype(dtype='>u1').tobytes()  # >u1 = big-endian uint8
+        timetags_bytes = self.timetags.astype(dtype='>i8').tobytes()
+        channels_bytes = self.channels.astype(dtype='>u1').tobytes()
 
         return header + timetags_bytes + channels_bytes
 
@@ -158,25 +89,14 @@ class RawData:
         channels_start = timetags_end
         channels_end = channels_start + channels_size
 
-        # timetags = list(struct.unpack(
-        #     f'!{n_data_points}I',
-        #     payload[timetags_start:timetags_end]
-        # ))
-        # channels = list(struct.unpack(
-        #     f'!{n_data_points}I',
-        #     payload[channels_start:channels_end]
-        # ))
-
-        # Byte sizes
-        size_timetags = n_data_points * 8  # int64 = 8 bytes
-        size_channels = n_data_points * 1  # uint8 = 1 byte
+        timetags_bytes = n_data_points * 8
+        channels_bytes = n_data_points
 
         offset_timetags = header_size
-        offset_channels = offset_timetags + size_timetags
+        offset_channels = offset_timetags + timetags_bytes
 
-        # Extract and convert arrays back to native endianness
         timetags = numpy.frombuffer(payload[offset_timetags:offset_channels], dtype='>i8').astype(numpy.int64)
-        channels = numpy.frombuffer(payload[offset_channels:offset_channels + size_channels], dtype='>u1').astype(numpy.uint8)
+        channels = numpy.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype='>u1').astype(numpy.uint8)
 
         return RawData(timetags=timetags, channels=channels)
 

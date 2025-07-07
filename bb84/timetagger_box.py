@@ -19,8 +19,6 @@ sys.path.append(
     ))
 )
 import bb84.timetagger as timetagger
-# import bb84.qutag as qutag
-# import bb84.uqd as uqd
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(
@@ -446,7 +444,7 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
             self,
             get_device_info_callback: typing.Callable
     ) -> None:
-        super().__init__(title='Polarimeter Info')
+        super().__init__(title='Device Info')
         device_info: timetagger.DeviceInfo = get_device_info_callback()
 
         # serial number
@@ -515,11 +513,20 @@ class TimeTaggerBox(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
         self.timetagger = tt
-        # self.raw_data = timetagger.RawData()
+        # self.raw_data = timetagger.RawData(
+        #     timetags=numpy.empty(0),
+        #     channels=numpy.empty(0)
+        # )
+        self.raw_data = self.timetagger.measure()
+        print(self.raw_data)
         self.data = timetagger.Data()
 
-        self.columnone = ColumnOne(get_data_callback=self.get_data)
+        self.columnone = ColumnOne(
+            get_data_callback=self.get_data
+        )
         self.append(child=self.columnone)
+
+        self.poling_interval = 100
 
         self.columntwo = ColumnTwo(
             get_raw_data_callback=self.get_raw_data,
@@ -529,7 +536,7 @@ class TimeTaggerBox(Gtk.Box):
         self.append(child=self.columntwo)
 
         GLib.timeout_add(
-            interval=125,
+            interval=self.poling_interval,
             function=self.update_from_timetagger
         )
 
@@ -544,7 +551,6 @@ class TimeTaggerBox(Gtk.Box):
         
     def update_from_timetagger(self) -> bool:
         self.raw_data = self.timetagger.measure()
-        # self.data = self.raw_data.to_data()
         try:
             self.data = timetagger.Data().from_raw_data(
                 raw_data=self.raw_data

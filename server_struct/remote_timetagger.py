@@ -56,7 +56,7 @@ class Timetagger(timetagger.TimeTagger):
             print('Unexpected response:', resp_type)
             return timetagger.RawData(
                 timetags=numpy.empty(0),
-
+                channels=numpy.empty(0)
             )
 
     def disconnect(self) -> None:
@@ -103,6 +103,6 @@ if __name__ == '__main__':
     print(tt.device_info)
     for _ in range(10):
         raw_data = tt.measure()
-        singles = numpy.bincount(raw_data.channels, minlength=9)[1:]
-        print(raw_data.channels)
+        singles = numpy.bincount(raw_data.channels, minlength=8)
+        print(singles)
         time.sleep(1)

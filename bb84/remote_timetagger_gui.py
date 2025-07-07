@@ -33,13 +33,12 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=header_bar)
 
         ### timetagger box
-        tt = remote_timetagger.Timetagger(
-            host=remote_timetagger.server_host,
-            port=remote_timetagger.server_port
-        )
         try:
             self.timetagger_box = timetagger_box.TimeTaggerBox(
-                    tt=tt
+                    tt=remote_timetagger.Timetagger(
+                        host=remote_timetagger.server_host,
+                        port=remote_timetagger.server_port
+                    )
                 )
         except:
             main_box.append(
