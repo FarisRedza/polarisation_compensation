@@ -25,7 +25,7 @@ import polarisation_compensation.pol_compensation as pol_compensation
 import polarimeter.polarimeter_box as polarimeter_box
 import polarimeter.remote_polarimeter as remote_polarimeter
 import bb84.timetagger as timetagger
-import bb84.remote_timetagger as remote_timetagger
+import server_struct.remote_timetagger as remote_timetagger
 import bb84.timetagger_box as timetagger_box
 import motor.motor_box as motor_box
 import motor.base_motor as base_motor

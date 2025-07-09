@@ -403,17 +403,17 @@ class MeasurementGroup(Adw.PreferencesGroup):
         )
         data_value_box.append(child=self.normalised_s3_value_label)
 
-        # # qber
-        # qber_label = Gtk.Label(
-        #     label='QBER',
-        #     halign=Gtk.Align.START
-        # )
-        # data_header_box.append(child=qber_label)
-        # self.qber_value_label = Gtk.Label(
-        #     halign=Gtk.Align.START,
-        #     width_chars=width_chars
-        # )
-        # data_value_box.append(child=self.qber_value_label)
+        # qber
+        qber_label = Gtk.Label(
+            label='QBER',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=qber_label)
+        self.qber_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.qber_value_label)
 
     def update_qutag_info(self) -> None:
         data: timetagger.Data = self.get_data_callback()
@@ -430,7 +430,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         self.normalised_s1_value_label.set_text(f'{data.normalised_s1:.2f}')
         self.normalised_s2_value_label.set_text(f'{data.normalised_s2:.2f}')
         self.normalised_s3_value_label.set_text(f'{data.normalised_s3:.2f}')
-        # self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
+        self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
         # self.S0_value_label.set_text(f'{data.S0:.2} W')
         # self.S1_value_label.set_text(f'{data.S1:.2} W')
         # self.S2_value_label.set_text(f'{data.S2:.2} W')

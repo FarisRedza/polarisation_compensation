@@ -113,16 +113,15 @@ class Data:
         singles = numpy.bincount(raw_data.channels, minlength=8)
 
         try:
-            s1 = (singles[C_780_H] - singles[C_780_V])/(singles[C_780_H]+ singles[C_780_V])
+            s1 = float((singles[C_780_H] - singles[C_780_V])/(singles[C_780_H] + singles[C_780_V]))
         except:
             s1 = None
         try:
-            s2 = (singles[C_780_D] - singles[C_780_A])/(singles[C_780_D] + singles[C_780_A])
+            s2 = float((singles[C_780_D] - singles[C_780_A])/(singles[C_780_D] + singles[C_780_A]))
         except:
             s2 = None
         try:
-            s3 = None
-            # s3 = (singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L])
+            s3 = float((singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L]))
         except:
             s3 = None
 
@@ -137,7 +136,7 @@ class Data:
                 s3 = math.sqrt(1 - s1**2 - s2**2)
 
             case _:
-                raise RuntimeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
+                raise TypeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
 
         try:
             eta = math.asin(s3)/2
@@ -157,7 +156,7 @@ class Data:
         )
 
 class TimeTagger:
-    def __init__(self):
+    def __init__(self) -> None:
         self.device_info = DeviceInfo()
 
     def measure(self) -> RawData:

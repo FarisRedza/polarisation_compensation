@@ -42,7 +42,6 @@ def handle_client(
         address
 ) -> None:
     print(f'Connected by {address}')
-
     with connection:
         try:
             while True:
@@ -51,8 +50,6 @@ def handle_client(
                     break
 
                 command = struct.unpack('I', cmd_data)[0]
-                # print(remote_polarimeter.Command(command).name)
-
                 match Command(command):
                     case Command.LIST_DEVICES:
                         payload = measurement_device.device_info.serialise()
@@ -101,7 +98,6 @@ def start_server(
         family=socket.AF_INET,
         type=socket.SOCK_STREAM
     )
-
     try:
         server.bind((host, port))
         server.listen()

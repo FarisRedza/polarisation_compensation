@@ -103,6 +103,7 @@ if __name__ == '__main__':
     print(tt.device_info)
     for _ in range(10):
         raw_data = tt.measure()
-        singles = numpy.bincount(raw_data.channels, minlength=8)
-        print(singles)
+        print(timetagger.Data.from_raw_data(raw_data=raw_data))
+        # singles = numpy.bincount(raw_data.channels, minlength=8)
+        # print(singles)
         time.sleep(1)
