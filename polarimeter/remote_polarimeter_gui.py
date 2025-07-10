@@ -13,7 +13,7 @@ sys.path.append(
     ))
 )
 import polarimeter.polarimeter_box as polarimeter_box
-import server_struct.remote_polarimeter as remote_polarimeter
+import polarimeter.remote_polarimeter as remote_polarimeter
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:

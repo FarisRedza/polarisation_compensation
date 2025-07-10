@@ -13,8 +13,7 @@ sys.path.append(
     ))
 )
 import bb84.timetagger_box as timetagger_box
-# import bb84.remote_timetagger as remote_timetagger
-import server_struct.remote_timetagger as remote_timetagger
+import bb84.remote_timetagger as remote_timetagger
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:

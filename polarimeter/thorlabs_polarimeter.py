@@ -292,7 +292,6 @@ class Data:
         S2 = ptotal * math.sin(2*theta) * math.cos(2*eta)
         S3 = ptotal * math.sin(2*eta)
 
-
         return cls(
             timestamp=timestamp,
             wavelength=wavelength,
@@ -343,7 +342,7 @@ class Polarimeter(SCPIDevice):
             serial_number: str | None = None,
             waveplate_rotation: WaveplateRotation = WaveplateRotation.ON,
             averaging_mode: AveragingMode = AveragingMode.F1024
-        ):
+        ) -> None:
         super().__init__(
             id=id,
             serial_number=serial_number
@@ -463,5 +462,5 @@ class Polarimeter(SCPIDevice):
 if __name__ == '__main__':
     pax = Polarimeter(id='1313:8031', serial_number='M00910360')
     pprint.pprint(pax.device_info)
-    print(pax.measure().to_data().wavelength)
+    print(Data().from_raw_data(raw_data=pax.measure()))
     

@@ -2,8 +2,7 @@ import sys
 import os
 import socket
 import threading
-import json
-import dataclasses
+import struct
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -11,40 +10,76 @@ sys.path.append(
         os.path.pardir
     ))
 )
+import bb84.remote_timetagger_protocol as remote_timetagger_protocol
 import bb84.timetagger as timetagger
-import bb84.qutag as qutag
 import bb84.uqd as uqd
+# import bb84.qutag as qutag
 
-def handle_client(connection: socket.socket, address) -> None:
+def pack_status(message: str):
+    b = message.encode()
+    return struct.pack(
+        f'I{len(b)}s',
+        len(b),
+        b
+    )
+
+def handle_client(
+        connection: socket.socket,
+        address
+) -> None:
     print(f'Connected by {address}')
     with connection:
-        while True:
-            try:
-                data = connection.recv(1024).decode()
-                if not data:
+        try:
+            while True:
+                cmd_data = connection.recv(4)
+                if not cmd_data:
                     break
 
-                request = json.loads(data)
-                command = str(request['command'])
-                print(f'Command received: {command}')
-                match command:
-                    case 'list_devices':
-                        response = {'devices': [dataclasses.asdict(tt.device_info)]}
+                command = struct.unpack('I', cmd_data)[0]
+                match remote_timetagger_protocol.Command(command):
+                    case remote_timetagger_protocol.Command.LIST_DEVICES:
+                        payload = measurement_device.device_info.serialise()
+                        header = struct.pack(
+                            'IB',
+                            len(payload) + 1,
+                            remote_timetagger_protocol.Response.DEVICE_INFO
+                        )
+                        connection.sendall(header + payload)
 
-                    case 'measure':
-                        response = {'rawdata': dataclasses.asdict(tt.measure())}
+                    case remote_timetagger_protocol.Command.MEASURE_ONCE:
+                        payload = measurement_device.measure().serialise()
+                        header = struct.pack(
+                            'IB',
+                            len(payload) + 1,
+                            remote_timetagger_protocol.Response.RAWDATA
+                        )
+                        connection.sendall(header + payload)
 
                     case _:
-                        response = {'error': 'Unkown command'}
+                        message = f'Unkown command: {command}'
+                        payload = struct.pack(
+                            f'I{len(message)}s',
+                            len(message),
+                            message.encode()
+                        )
+                        header = struct.pack(
+                            'IB',
+                            len(payload) + 1,
+                            remote_timetagger_protocol.Response.ERROR
+                        )
+                        connection.sendall(header + payload)
 
-                print(response)
-                connection.sendall((json.dumps(response) + '\n').encode())
+        except ConnectionResetError:
+            print(f'Connection lost with {address}')
 
-            except Exception as e:
-                connection.sendall(json.dumps({'error': str(e)}).encode())
-                break
+        finally:
+            connection.close()
+            print(f'Disconnected from {address}')
 
-def start_server(host: str = '0.0.0.0', port: int = 5003) -> None:
+def start_server(
+        host: str = '0.0.0.0',
+        port: int = 5003
+) -> None:
     server = socket.socket(
         family=socket.AF_INET,
         type=socket.SOCK_STREAM
@@ -52,17 +87,32 @@ def start_server(host: str = '0.0.0.0', port: int = 5003) -> None:
     try:
         server.bind((host, port))
         server.listen()
-        print(f'Timetagger server listening on {host}:{port}')
+
+        match type(measurement_device):
+            case timetagger.TimeTagger:
+                print(f'TimeTagger server listening on {host}:{port}')
+
+            case uqd.UQD:
+                print(f'UQD server listening on {host}:{port}')
+
+            # case qutag.Qutag:
+            #     print(f'Qutag server listening on {host}:{port}')
+
+            case _:
+                print('Unknown device')
+                raise TypeError
+
         while True:
             conn, addr = server.accept()
             threading.Thread(
                 target=handle_client,
-                args=(conn, addr),
-                # daemon=True
+                args=(conn, addr)
             ).start()
     except KeyboardInterrupt:
         server.close()
+        measurement_device.disconnect()
 
 if __name__ == '__main__':
-    tt = qutag.Qutag()
+    # measurement_device = timetagger.TimeTagger()
+    measurement_device = uqd.UQD()
     start_server()

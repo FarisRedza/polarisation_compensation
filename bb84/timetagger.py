@@ -112,18 +112,19 @@ class Data:
     def from_raw_data(cls, raw_data: RawData) -> 'Data':
         singles = numpy.bincount(raw_data.channels, minlength=8)
 
-        try:
-            s1 = float((singles[C_780_H] - singles[C_780_V])/(singles[C_780_H] + singles[C_780_V]))
-        except:
-            s1 = None
-        try:
-            s2 = float((singles[C_780_D] - singles[C_780_A])/(singles[C_780_D] + singles[C_780_A]))
-        except:
-            s2 = None
-        try:
-            s3 = float((singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L]))
-        except:
-            s3 = None
+        with numpy.errstate(invalid='ignore'):
+            try:
+                s1 = float((singles[C_780_H] - singles[C_780_V])/(singles[C_780_H] + singles[C_780_V]))
+            except:
+                s1 = None
+            try:
+                s2 = float((singles[C_780_D] - singles[C_780_A])/(singles[C_780_D] + singles[C_780_A]))
+            except:
+                s2 = None
+            try:
+                s3 = float((singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L]))
+            except:
+                s3 = None
 
         match (s1, s2, s3):
             case (float(), None, float()):
