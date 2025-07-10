@@ -511,14 +511,8 @@ class TimeTaggerBox(Gtk.Box):
             tt: timetagger.TimeTagger
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
-
         self.timetagger = tt
-        # self.raw_data = timetagger.RawData(
-        #     timetags=numpy.empty(0),
-        #     channels=numpy.empty(0)
-        # )
         self.raw_data = self.timetagger.measure()
-        print(self.raw_data)
         self.data = timetagger.Data()
 
         self.columnone = ColumnOne(

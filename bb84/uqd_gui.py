@@ -16,7 +16,7 @@ import bb84.timetagger_box as timetagger_box
 import bb84.uqd as uqd
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.set_title(title='UQD Viewer')
         self.set_default_size(width=600, height=500)
@@ -31,13 +31,15 @@ class MainWindow(Adw.ApplicationWindow):
         header_bar = Adw.HeaderBar()
         main_box.append(child=header_bar)
 
-        ### qutag box
+        ### timetagger box
         try:
-            self.timetagger_box = timetagger_box.TimeTaggerBox()
+            self.timetagger_box = timetagger_box.TimeTaggerBox(
+                tt=uqd.UQD()
+            )
         except:
             main_box.append(
                 child=Gtk.Label(
-                    label='No QuTAG found',
+                    label='No UQD found',
                     valign=Gtk.Align.CENTER,
                     vexpand=True
                 )
@@ -55,7 +57,7 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
 class App(Adw.Application):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 

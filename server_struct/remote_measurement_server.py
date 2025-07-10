@@ -14,7 +14,7 @@ sys.path.append(
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 
 import bb84.timetagger as timetagger
-# import bb84.uqd as uqd
+import bb84.uqd as uqd
 # import bb84.qutag as qutag
 
 class Command(enum.IntEnum):
@@ -109,8 +109,8 @@ def start_server(
             case timetagger.TimeTagger:
                 print(f'TimeTagger server listening on {host}:{port}')
 
-            # case uqd.UQD:
-            #     print(f'UQD server listening on {host}:{port}')
+            case uqd.UQD:
+                print(f'UQD server listening on {host}:{port}')
 
             # case qutag.Qutag:
             #     print(f'Qutag server listening on {host}:{port}')
@@ -133,5 +133,6 @@ if __name__ == '__main__':
     # measurement_device = thorlabs_polarimeter.Polarimeter(
     #     serial_number='M00910360'
     # )
-    measurement_device = timetagger.TimeTagger()
+    # measurement_device = timetagger.TimeTagger()
+    measurement_device = uqd.UQD()
     start_server()

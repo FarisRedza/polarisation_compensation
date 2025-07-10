@@ -2,8 +2,6 @@ import sys
 import os
 import pathlib
 
-import numpy
-
 sys.path.append(
     os.path.abspath(os.path.join(
         os.path.dirname(__file__),
@@ -11,6 +9,8 @@ sys.path.append(
     ))
 )
 import bb84.timetagger as timetagger
+import ttag.python.ttag as ttag
+import timetag.python.timetag as timetag
 
 os.environ['TTAG'] = str(pathlib.Path(
     os.environ['HOME'],
@@ -19,9 +19,6 @@ os.environ['TTAG'] = str(pathlib.Path(
     'ttag',
     'python'
 ))
-# sys.path.append(os.environ['TTAG'])
-# import ttag.python.ttag as libttag
-
 os.environ['TIMETAG'] = str(pathlib.Path(
     os.environ['HOME'],
     'Projects',
@@ -29,20 +26,9 @@ os.environ['TIMETAG'] = str(pathlib.Path(
     'timetag',
     'python'
 ))
-# sys.path.append(os.environ['TIMETAG'])
-# import timetag.python.timetag as libtimetag
-
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
-import ttag.python.ttag as ttag
-import timetag.python.timetag as timetag
 
 class UQD(timetagger.TimeTagger):
-    def __init__(self):
+    def __init__(self) -> None:
         self._uqd = ttag.TTBuffer(buffernumber=ttag.getfreebuffer()-1)
         # self._uqd = timetag.CTimeTag()
 
@@ -55,10 +41,9 @@ class UQD(timetagger.TimeTagger):
 
         # self._uqd.Open()
 
-    def __del__(self) -> None:
+    # def __del__(self) -> None:
         # if self._uqd.IsOpen():
         #     self._uqd.Close()
-        pass
 
     def measure(self) -> timetagger.RawData:
         # self._uqd.StartTimetags()
@@ -72,7 +57,6 @@ class UQD(timetagger.TimeTagger):
         return raw_data
     
 if __name__ == '__main__':
-    import time
     tt = UQD()
     raw_data = tt.measure()
     print(raw_data)

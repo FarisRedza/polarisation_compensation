@@ -3,6 +3,8 @@ import os
 import socket
 import struct
 import time
+import typing
+import pprint
 
 import numpy
 
@@ -89,7 +91,7 @@ class Timetagger(timetagger.TimeTagger):
             data.extend(part)
         return data
 
-    def _receive_response(self):
+    def _receive_response(self) -> tuple[typing.Any, bytes]:
         header = self._recvall(size=5)
         total_len, resp_type = struct.unpack('IB', header)
         payload = self._recvall(total_len - 1)
@@ -101,9 +103,10 @@ if __name__ == '__main__':
         port=server_port
     )
     print(tt.device_info)
-    for _ in range(10):
-        raw_data = tt.measure()
-        print(timetagger.Data.from_raw_data(raw_data=raw_data))
-        # singles = numpy.bincount(raw_data.channels, minlength=8)
-        # print(singles)
-        time.sleep(1)
+    # for _ in range(10):
+    #     raw_data = tt.measure()
+    #     # print(timetagger.Data.from_raw_data(raw_data=raw_data))
+    #     # singles = numpy.bincount(raw_data.channels, minlength=8)
+    #     # print(singles)
+    #     pprint.pprint(raw_data)
+    #     time.sleep(1)
