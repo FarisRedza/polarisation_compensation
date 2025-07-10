@@ -229,23 +229,6 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
         self.canvas.draw_idle()
 
-class ColumnOne(Adw.PreferencesPage):
-    def __init__(
-            self,
-            get_data_callback: typing.Callable        
-    ) -> None:
-        super().__init__()
-
-        self.plot_ellipse_group = PolEllipseGroup(
-            get_data_callback=get_data_callback
-        )
-        self.add(group=self.plot_ellipse_group)
-
-        self.plot_bloch_group = BlochSphere3D(
-            get_data_callback=get_data_callback
-        )
-        self.add(group=self.plot_bloch_group)
-
 class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(
             self,
@@ -651,6 +634,23 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
         fw_ver_label = Gtk.Label(label=device_info.firmware_version)
         fw_ver_row.add_suffix(widget=fw_ver_label)
 
+class ColumnOne(Adw.PreferencesPage):
+    def __init__(
+            self,
+            get_data_callback: typing.Callable        
+    ) -> None:
+        super().__init__()
+
+        self.plot_ellipse_group = PolEllipseGroup(
+            get_data_callback=get_data_callback
+        )
+        self.add(group=self.plot_ellipse_group)
+
+        self.plot_bloch_group = BlochSphere3D(
+            get_data_callback=get_data_callback
+        )
+        self.add(group=self.plot_bloch_group)
+
 class ColumnTwo(Adw.PreferencesPage):
     def __init__(
             self,
@@ -693,13 +693,11 @@ class PolarimeterBox(Gtk.Box):
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
 
-        # self.polarimeter = thorlabs_polarimeter.Polarimeter(
-        #     id='1313:8031',
-        #     serial_number='M00910360'
-        # )
         self.polarimeter = polarimeter
         try:
-            self.data = self.polarimeter.measure().to_data()
+            self.data = thorlabs_polarimeter.Data().from_raw_data(
+                raw_data=self.polarimeter.measure()
+            )
         except:
             self.data = thorlabs_polarimeter.Data()
         self.enable_polarimeter = True
@@ -735,10 +733,12 @@ class PolarimeterBox(Gtk.Box):
         return self.enable_polarimeter
     
     def set_wavelength(self, value: float) -> None:
-        self.polarimeter.set_wavelength(wavelength=value)
+        self.polarimeter.set_wavelength(
+            wavelength=thorlabs_polarimeter.Metres(value)
+        )
 
     def get_wavelength(self) -> float:
-        return self.polarimeter.measure().to_data().wavelength
+        return float(self.polarimeter.measure().wavelength)
 
     def set_poling_interval(self, value: int) -> None:
         self.poling_interval = value
@@ -755,7 +755,9 @@ class PolarimeterBox(Gtk.Box):
 
     def update_from_polarimeter(self) -> bool:
         if self.enable_polarimeter == True:
-            self.data = self.polarimeter.measure().to_data()
+            self.data = thorlabs_polarimeter.Data().from_raw_data(
+                raw_data=self.polarimeter.measure()
+            )
             self.set_polarimeter_data()
         return True
 

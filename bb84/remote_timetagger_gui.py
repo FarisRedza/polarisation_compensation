@@ -12,13 +12,13 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import polarimeter.polarimeter_box as polarimeter_box
-import polarimeter.remote_polarimeter as remote_polarimeter
+import bb84.timetagger_box as timetagger_box
+import bb84.remote_timetagger as remote_timetagger
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.set_title(title='Polarisation Viewer')
+        self.set_title(title='Timetagger Viewer')
         self.set_default_size(width=600, height=500)
         self.set_size_request(width=450, height=150)
         self.connect('close-request', self.on_close_request)
@@ -31,35 +31,35 @@ class MainWindow(Adw.ApplicationWindow):
         header_bar = Adw.HeaderBar()
         main_box.append(child=header_bar)
 
-        ### polarimeter box
+        ### timetagger box
         try:
-            self.polarimeter_box = polarimeter_box.PolarimeterBox(
-                polarimeter=remote_polarimeter.Polarimeter(
-                    host=remote_polarimeter.server_host,
-                    port=remote_polarimeter.server_port,
-                    serial_number='M00910360'
+            self.timetagger_box = timetagger_box.TimeTaggerBox(
+                    tt=remote_timetagger.Timetagger(
+                        host=remote_timetagger.server_host,
+                        port=remote_timetagger.server_port
+                    )
                 )
-            )
         except:
             main_box.append(
                 child=Gtk.Label(
-                    label='No polarimeter found',
+                    label='No timetagger found',
                     valign=Gtk.Align.CENTER,
                     vexpand=True
                 )
             )
         else:
-            main_box.append(child=self.polarimeter_box)
+            main_box.append(child=self.timetagger_box)
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        try:
-            self.polarimeter_box.polarimeter.disconnect()
-        except Exception as e:
-            print('Error: Polarimeter already disconnected')
+        # try:
+        #     if type(self.timetagger_box.timetagger) == qutag.Qutag:
+        #         self.timetagger_box.timetagger._qutag.deInitialize()
+        # except Exception as e:
+        #     print('Error: QuTAG already disconnected')
         return False
 
 class App(Adw.Application):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 
@@ -68,9 +68,10 @@ class App(Adw.Application):
         self.win.present()
 
 if __name__ == '__main__':
-    app = App(application_id='com.github.FarisRedza.PolarisationViewer')
+    app = App(application_id='com.github.FarisRedza.TimeTaggerViewer')
     try:
         app.run(sys.argv)
     except Exception as e:
-        app.win.polarimeter_box.polarimeter.disconnect()
+        # if type(app.win.timetagger_box.timetagger) == qutag.Qutag:
+        #     app.win.timetagger_box.timetagger._qutag.deInitialize()
         print('App crashed with an exception:', e)

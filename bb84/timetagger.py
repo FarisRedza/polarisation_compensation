@@ -1,6 +1,10 @@
 import dataclasses
 import typing
 import math
+import struct
+import random
+
+import numpy
 
 Percent = typing.NewType('Percent', float)
 Degrees = typing.NewType('Degrees', float)
@@ -11,17 +15,17 @@ DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
 C_1550_H = 0
 C_1550_V = 1
-# C_1550_D = 2
-# C_1550_A = 3
-C_1550_R = 2
-C_1550_L = 3
+C_1550_D = 2
+C_1550_A = 3
+C_1550_R = None
+C_1550_L = None
 
 C_780_H = 4
 C_780_V = 5
-# C_780_D = 6
-# C_780_A = 7
-C_780_R = 6
-C_780_L = 7
+C_780_D = 6
+C_780_A = 7
+C_780_R = None
+C_780_L = None
 
 @dataclasses.dataclass
 class DeviceInfo:
@@ -30,58 +34,97 @@ class DeviceInfo:
     serial_number: str = 'N/A'
     firmware_version: str = 'N/A'
 
-@dataclasses.dataclass
-class Data:
-    # timestamp = float(0.0)
-    # wavelength = Metres(0.0)
-    azimuth: float = 0.0
-    ellipticity: float = 0.0
-    # degree_of_polarisation = Percent(0.0)
-    # degree_of_linear_polarisation = Percent(0.0)
-    # degree_of_circular_polarisation = Percent(0.0)
-    # power = DecibelMilliwatts(0.0)
-    # power_polarised = DecibelMilliwatts(0.0)
-    # power_unpolarised = DecibelMilliwatts(0.0)
-    normalised_s1: float = 0.0
-    normalised_s2: float = 0.0
-    normalised_s3: float = 0.0
-    # S0 = Watts(0.0)
-    # S1 = Watts(0.0)
-    # S2 = Watts(0.0)
-    # S3 = Watts(0.0)
-    # power_split_ratio: float = 0.0
-    # phase_difference = Degrees(0.0)
-    # circularity = Percent(0.0)
+    def serialise(self) -> bytes:
+        def encode_string(s: str):
+            b = s.encode()
+            return struct.pack(f'I{len(b)}s', len(b), b)
+
+        return (
+            encode_string(self.manufacturer) +
+            encode_string(self.model) +
+            encode_string(self.serial_number) +
+            encode_string(self.firmware_version)
+        )
+    
+    @classmethod
+    def deserialise(cls, payload: bytes) -> 'DeviceInfo':
+        offset = 0
+        fields = []
+        for _ in range(4):
+            length = struct.unpack_from('I', payload, offset)[0]
+            offset += 4
+            value = struct.unpack_from(
+                f'{length}s',
+                payload,
+                offset
+            )[0].decode()
+            offset += length
+            fields.append(value)
+        return DeviceInfo(*fields)
 
 @dataclasses.dataclass
 class RawData:
-    singles_780_h: int = 0
-    singles_780_v: int = 0
-    singles_780_d: int = 0
-    singles_780_a: int = 0
-    singles_780_r: int = 0
-    singles_780_l: int = 0
+    timetags: numpy.ndarray
+    channels: numpy.ndarray
 
-    singles_1550_h: int = 0
-    singles_1550_v: int = 0
-    singles_1550_d: int = 0
-    singles_1550_a: int = 0
-    singles_1550_r: int = 0
-    singles_1550_l: int = 0
+    def serialise(self) -> bytes:
+        n_data_points = len(self.timetags)
 
-    def to_data(self) -> Data:
-        try:
-            s1 = (self.singles_780_h - self.singles_780_v)/(self.singles_780_h + self.singles_780_v)
-        except:
-            s1 = None
-        try:
-            s2 = (self.singles_780_d - self.singles_780_a)/(self.singles_780_d + self.singles_780_a)
-        except:
-            s2 = None
-        try:
-            s3 = (self.singles_780_r - self.singles_780_l)/(self.singles_780_r + self.singles_780_l)
-        except:
-            s3 = None
+        header = struct.pack('!II', n_data_points, n_data_points)
+        timetags_bytes = self.timetags.astype(dtype='>i8').tobytes()
+        channels_bytes = self.channels.astype(dtype='>u1').tobytes()
+
+        return header + timetags_bytes + channels_bytes
+
+    @classmethod
+    def deserialise(cls, payload: bytes) -> 'RawData':
+        header_size = struct.calcsize('!II')
+        n_data_points, _ = struct.unpack('!II', payload[:header_size])
+
+        timetags_size = n_data_points * 4
+        channels_size = timetags_size
+
+        timetags_start = header_size
+        timetags_end = timetags_start + timetags_size
+        channels_start = timetags_end
+        channels_end = channels_start + channels_size
+
+        timetags_bytes = n_data_points * 8
+        channels_bytes = n_data_points
+
+        offset_timetags = header_size
+        offset_channels = offset_timetags + timetags_bytes
+
+        timetags = numpy.frombuffer(payload[offset_timetags:offset_channels], dtype='>i8').astype(numpy.int64)
+        channels = numpy.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype='>u1').astype(numpy.uint8)
+
+        return RawData(timetags=timetags, channels=channels)
+
+@dataclasses.dataclass
+class Data:
+    azimuth: float = 0.0
+    ellipticity: float = 0.0
+    normalised_s1: float = 0.0
+    normalised_s2: float = 0.0
+    normalised_s3: float = 0.0
+
+    @classmethod
+    def from_raw_data(cls, raw_data: RawData) -> 'Data':
+        singles = numpy.bincount(raw_data.channels, minlength=8)
+
+        with numpy.errstate(invalid='ignore'):
+            try:
+                s1 = float((singles[C_780_H] - singles[C_780_V])/(singles[C_780_H] + singles[C_780_V]))
+            except:
+                s1 = None
+            try:
+                s2 = float((singles[C_780_D] - singles[C_780_A])/(singles[C_780_D] + singles[C_780_A]))
+            except:
+                s2 = None
+            try:
+                s3 = float((singles[C_780_R] - singles[C_780_L])/(singles[C_780_R] + singles[C_780_L]))
+            except:
+                s3 = None
 
         match (s1, s2, s3):
             case (float(), None, float()):
@@ -94,7 +137,7 @@ class RawData:
                 s3 = math.sqrt(1 - s1**2 - s2**2)
 
             case _:
-                raise RuntimeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
+                raise TypeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
 
         try:
             eta = math.asin(s3)/2
@@ -105,7 +148,7 @@ class RawData:
         except:
             theta = 0
 
-        return Data(
+        return cls(
             azimuth=math.degrees(theta),
             ellipticity=math.degrees(eta),
             normalised_s1=s1,
@@ -114,9 +157,46 @@ class RawData:
         )
 
 class TimeTagger:
-    def __init__(self):
+    def __init__(self) -> None:
         self.device_info = DeviceInfo()
 
     def measure(self) -> RawData:
-        data = RawData()
-        return data
+        data_points = 10000
+        timetags = numpy.array(
+            object=range(data_points),
+            dtype=numpy.int64
+        )
+        channels = numpy.random.randint(
+            low=1,
+            high=8,
+            size=data_points
+        ).astype(dtype=numpy.uint8)
+        raw_data = RawData(
+            timetags=timetags,
+            channels=channels
+        )
+        return raw_data
+    
+    def disconnect(self) -> None:
+        pass
+
+if __name__ == '__main__':
+    with open(file='30.12_dB_0_km_1_mW_72.32588510097698_s.txt') as file:
+        timetags = []
+        channels = []
+        for line in file:
+            parts = line.strip().split()
+
+            if len(parts) < 2:
+                continue
+            
+            timetag, channel = int(parts[0]), int(parts[1])
+            timetags.append(timetag)
+            channels.append(channel)
+
+    raw_data = RawData(
+        timetags=numpy.array(object=timetags, dtype=numpy.int64),
+        channels=numpy.array(object=channels, dtype=numpy.uint8),
+    )
+    print(raw_data.timetags[-1])
+

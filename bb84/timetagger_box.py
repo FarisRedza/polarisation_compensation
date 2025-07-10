@@ -18,8 +18,7 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import bb84.timetagger as tt
-import bb84.qutag as qutag
+import bb84.timetagger as timetagger
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(
@@ -171,7 +170,6 @@ class BlochSphere3D(Adw.PreferencesGroup):
         # if z < 0, it's behind the viewer
         return transformed[2] < 0
 
-
     def update_point(self) -> None:
         data: timetagger.Data = self.get_data_callback()
 
@@ -193,7 +191,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
         self.canvas.draw_idle()
 
-class CountsGroup(Adw.PreferencesGroup):
+class Counts(Adw.PreferencesGroup):
     def __init__(
             self,
             get_raw_data_callback: typing.Callable
@@ -300,14 +298,16 @@ class CountsGroup(Adw.PreferencesGroup):
         data_value_box.append(child=self.l_value_label)
 
     def update_timetagger_info(self):
-        raw_data: tt.RawData = self.get_raw_data_callback()
+        raw_data: timetagger.RawData = self.get_raw_data_callback()
+        singles = numpy.bincount(raw_data.channels, minlength=8)
+        # singles = [int(val) for channel, val in raw_data.__dict__.items()]
 
-        self.h_value_label.set_text(f'{raw_data.singles_780_h}')
-        self.v_value_label.set_text(f'{raw_data.singles_780_v}')
-        self.d_value_label.set_text(f'{raw_data.singles_780_d}')
-        self.a_value_label.set_text(f'{raw_data.singles_780_a}')
-        self.r_value_label.set_text(f'{raw_data.singles_780_r}')
-        self.l_value_label.set_text(f'{raw_data.singles_780_l}')
+        self.h_value_label.set_text(f'{singles[timetagger.C_780_H]}' if timetagger.C_780_H is not None else '0')
+        self.v_value_label.set_text(f'{singles[timetagger.C_780_V]}' if timetagger.C_780_V is not None else '0')
+        self.d_value_label.set_text(f'{singles[timetagger.C_780_D]}' if timetagger.C_780_D is not None else '0')
+        self.a_value_label.set_text(f'{singles[timetagger.C_780_A]}' if timetagger.C_780_A is not None else '0')
+        self.r_value_label.set_text(f'{singles[timetagger.C_780_R]}' if timetagger.C_780_R is not None else '0')
+        self.l_value_label.set_text(f'{singles[timetagger.C_780_L]}' if timetagger.C_780_L is not None else '0')
 
 class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(
@@ -403,20 +403,20 @@ class MeasurementGroup(Adw.PreferencesGroup):
         )
         data_value_box.append(child=self.normalised_s3_value_label)
 
-        # # qber
-        # qber_label = Gtk.Label(
-        #     label='QBER',
-        #     halign=Gtk.Align.START
-        # )
-        # data_header_box.append(child=qber_label)
-        # self.qber_value_label = Gtk.Label(
-        #     halign=Gtk.Align.START,
-        #     width_chars=width_chars
-        # )
-        # data_value_box.append(child=self.qber_value_label)
+        # qber
+        qber_label = Gtk.Label(
+            label='QBER',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=qber_label)
+        self.qber_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.qber_value_label)
 
-    def update_qutag_info(self):
-        data: tt.Data = self.get_data_callback()
+    def update_qutag_info(self) -> None:
+        data: timetagger.Data = self.get_data_callback()
 
         # self.wavelength_value_label.set_text(f'{data.wavelength} m')
         self.azimuth_value_label.set_text(f'{data.azimuth:.2f} °')
@@ -430,7 +430,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         self.normalised_s1_value_label.set_text(f'{data.normalised_s1:.2f}')
         self.normalised_s2_value_label.set_text(f'{data.normalised_s2:.2f}')
         self.normalised_s3_value_label.set_text(f'{data.normalised_s3:.2f}')
-        # self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
+        self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
         # self.S0_value_label.set_text(f'{data.S0:.2} W')
         # self.S1_value_label.set_text(f'{data.S1:.2} W')
         # self.S2_value_label.set_text(f'{data.S2:.2} W')
@@ -444,8 +444,8 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
             self,
             get_device_info_callback: typing.Callable
     ) -> None:
-        super().__init__(title='Polarimeter Info')
-        device_info: tt.DeviceInfo = get_device_info_callback()
+        super().__init__(title='Device Info')
+        device_info: timetagger.DeviceInfo = get_device_info_callback()
 
         # serial number
         serial_no_row = Adw.ActionRow(title='Serial number')
@@ -490,7 +490,7 @@ class ColumnTwo(Adw.PreferencesPage):
             get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__()
-        self.counts_group = CountsGroup(
+        self.counts_group = Counts(
             get_raw_data_callback=get_raw_data_callback
         )
         self.add(group=self.counts_group)
@@ -508,16 +508,19 @@ class ColumnTwo(Adw.PreferencesPage):
 class TimeTaggerBox(Gtk.Box):
     def __init__(
             self,
-            timetagger: tt.TimeTagger
+            tt: timetagger.TimeTagger
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
+        self.timetagger = tt
+        self.raw_data = self.timetagger.measure()
+        self.data = timetagger.Data()
 
-        self.timetagger = timetagger
-        self.raw_data = tt.RawData()
-        self.data = tt.Data()
-
-        self.columnone = ColumnOne(get_data_callback=self.get_data)
+        self.columnone = ColumnOne(
+            get_data_callback=self.get_data
+        )
         self.append(child=self.columnone)
+
+        self.poling_interval = 100
 
         self.columntwo = ColumnTwo(
             get_raw_data_callback=self.get_raw_data,
@@ -527,22 +530,27 @@ class TimeTaggerBox(Gtk.Box):
         self.append(child=self.columntwo)
 
         GLib.timeout_add(
-            interval=125,
+            interval=self.poling_interval,
             function=self.update_from_timetagger
         )
 
-    def get_raw_data(self) -> tt.RawData:
+    def get_raw_data(self) -> timetagger.RawData:
         return self.raw_data
 
-    def get_data(self) -> tt.Data:
+    def get_data(self) -> timetagger.Data:
         return self.data
-    
-    def get_device_info(self) -> tt.DeviceInfo:
+
+    def get_device_info(self) -> timetagger.DeviceInfo:
         return self.timetagger.device_info
         
     def update_from_timetagger(self) -> bool:
         self.raw_data = self.timetagger.measure()
-        self.data = self.raw_data.to_data()
+        try:
+            self.data = timetagger.Data().from_raw_data(
+                raw_data=self.raw_data
+            )
+        except:
+            self.data = timetagger.Data()
         self.set_qutag_data()
         return True
     
