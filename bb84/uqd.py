@@ -2,16 +2,6 @@ import sys
 import os
 import pathlib
 
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
-import bb84.timetagger as timetagger
-import ttag.python.ttag as ttag
-import timetag.python.timetag as timetag
-
 os.environ['TTAG'] = str(pathlib.Path(
     os.environ['HOME'],
     'Projects',
@@ -26,6 +16,16 @@ os.environ['TIMETAG'] = str(pathlib.Path(
     'timetag',
     'python'
 ))
+
+sys.path.append(
+    os.path.abspath(os.path.join(
+        os.path.dirname(__file__),
+        os.path.pardir
+    ))
+)
+import bb84.timetagger as timetagger
+import ttag.python.ttag as ttag
+import timetag.python.timetag as timetag
 
 class UQD(timetagger.TimeTagger):
     def __init__(self) -> None:
