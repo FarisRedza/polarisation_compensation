@@ -3,7 +3,6 @@ import os
 import socket
 import threading
 import struct
-import enum
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -11,23 +10,13 @@ sys.path.append(
         os.path.pardir
     ))
 )
+import server_struct.remote_measurement_protocol as remote_measurement_protocol
+
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 
 import bb84.timetagger as timetagger
 import bb84.uqd as uqd
 # import bb84.qutag as qutag
-
-class Command(enum.IntEnum):
-    LIST_DEVICES = 1
-    MEASURE_ONCE = 2
-    START_MEASURING = 3
-    STOP_MEASURING = 4
-
-class Response(enum.IntEnum):
-    ERROR = 0
-    DEVICE_INFO = 1
-    RAWDATA = 2
-    STATUS = 3
 
 def pack_status(message: str):
     b = message.encode()
@@ -50,22 +39,22 @@ def handle_client(
                     break
 
                 command = struct.unpack('I', cmd_data)[0]
-                match Command(command):
-                    case Command.LIST_DEVICES:
+                match remote_measurement_protocol.Command(command):
+                    case remote_measurement_protocol.Command.LIST_DEVICES:
                         payload = measurement_device.device_info.serialise()
                         header = struct.pack(
                             'IB',
                             len(payload) + 1,
-                            Response.DEVICE_INFO
+                            remote_measurement_protocol.Response.DEVICE_INFO
                         )
                         connection.sendall(header + payload)
 
-                    case Command.MEASURE_ONCE:
+                    case remote_measurement_protocol.Command.MEASURE_ONCE:
                         payload = measurement_device.measure().serialise()
                         header = struct.pack(
                             'IB',
                             len(payload) + 1,
-                            Response.RAWDATA
+                            remote_measurement_protocol.Response.RAWDATA
                         )
                         connection.sendall(header + payload)
 
@@ -79,7 +68,7 @@ def handle_client(
                         header = struct.pack(
                             'IB',
                             len(payload) + 1,
-                            Response.ERROR
+                            remote_measurement_protocol.Response.ERROR
                         )
                         connection.sendall(header + payload)
 

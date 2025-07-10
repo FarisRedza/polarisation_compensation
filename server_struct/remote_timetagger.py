@@ -15,7 +15,7 @@ sys.path.append(
     ))
 )
 import bb84.timetagger as timetagger
-import server_struct.remote_measurement_server as remote_measurement_server
+import server_struct.remote_measurement_protocol as remote_measurement_protocol
 
 server_host = '127.0.0.1'
 server_host = '137.195.63.6'
@@ -47,10 +47,10 @@ class Timetagger(timetagger.TimeTagger):
 
     def measure(self) -> timetagger.RawData:
         self._send_command(
-            command=remote_measurement_server.Command.MEASURE_ONCE
+            command=remote_measurement_protocol.Command.MEASURE_ONCE
         )
         resp_type, payload = self._receive_response()
-        if resp_type == remote_measurement_server.Response.RAWDATA:
+        if resp_type == remote_measurement_protocol.Response.RAWDATA:
             return timetagger.RawData.deserialise(
                 payload=payload
             )
@@ -66,10 +66,10 @@ class Timetagger(timetagger.TimeTagger):
 
     def _get_device_info(self) -> None:
         self._send_command(
-            command=remote_measurement_server.Command.LIST_DEVICES
+            command=remote_measurement_protocol.Command.LIST_DEVICES
         )
         resp_type, payload = self._receive_response()
-        if resp_type == remote_measurement_server.Response.DEVICE_INFO:
+        if resp_type == remote_measurement_protocol.Response.DEVICE_INFO:
             self.device_info=timetagger.DeviceInfo.deserialise(
                 payload=payload
             )
@@ -78,7 +78,7 @@ class Timetagger(timetagger.TimeTagger):
 
     def _send_command(
             self,
-            command: remote_measurement_server.Command
+            command: remote_measurement_protocol.Command
         ) -> None:
         self._sock.sendall(struct.pack('I', command))
 
