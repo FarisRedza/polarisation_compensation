@@ -1,17 +1,7 @@
-import sys
-import os
 import time
 
-import numpy
-
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
-import bb84.timetagger as timetagger
-import quTAG.QuTAG_HR as QuTAG_HR
+from . import timetagger
+from ..quTAG import QuTAG_HR
 
 class Qutag(timetagger.TimeTagger):
     def __init__(self):
@@ -36,9 +26,7 @@ class Qutag(timetagger.TimeTagger):
     def __del__(self) -> None:
         self._qutag.deInitialize()
 
-    def measure(self) -> timetagger.RawData:
-        # raw_data = timetagger.RawData()
-        
+    def measure(self) -> timetagger.RawData:        
         self._qutag.getLastTimestamps(reset=True)
         time.sleep(0.1)
         timetags, channels, valid = self._qutag.getLastTimestamps(
@@ -48,16 +36,6 @@ class Qutag(timetagger.TimeTagger):
             timetags=timetags,
             channels=channels
         )
-
-        # singles = numpy.bincount(channels, minlength=8)[4:]
-
-        # data.singles_780_h=int(singles[timetagger.C_780_H])
-        # data.singles_780_v=int(singles[timetagger.C_780_V])
-        # # data.singles_d=int(singles[timetagger.C_D])
-        # # data.singles_a=int(singles[timetagger.C_A])
-        # data.singles_780_r=int(singles[timetagger.C_780_R])
-        # data.singles_780_l=int(singles[timetagger.C_780_L])
-
         return raw_data
 
 if __name__ == '__main__':

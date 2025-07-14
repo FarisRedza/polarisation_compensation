@@ -15,22 +15,24 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
+from . import pol_compensation
+
+import polarimeter.gui_widget as polarimeter_gui_widget
+import polarimeter.remote_polarimeter as remote_polarimeter
+
 sys.path.append(
     os.path.abspath(os.path.join(
         os.path.dirname(__file__),
         os.path.pardir
     ))
 )
-import polarisation_compensation.pol_compensation as pol_compensation
-import polarimeter.polarimeter_box as polarimeter_box
-import polarimeter.remote_polarimeter as remote_polarimeter
-import bb84.timetagger as timetagger
-import bb84.remote_timetagger as remote_timetagger
-import bb84.timetagger_box as timetagger_box
-import motor.motor_box as motor_box
-import motor.base_motor as base_motor
-import motor.thorlabs_motor as thorlabs_motor
-import motor.remote_motor as remote_motor
+from bb84 import timetagger
+from bb84 import remote_timetagger
+from bb84 import gui_widget as timetagger_gui_widget
+from motor import gui_widget as motor_gui_widget
+from motor import base_motor
+from motor import thorlabs_motor
+from motor import remote_motor
 
 class CurveBox(Gtk.Box):
     def __init__(
@@ -135,8 +137,8 @@ class ControlGroup(Adw.PreferencesGroup):
 
     def __init__(
             self,
-            polarisation_box: polarimeter_box.PolarimeterBox | timetagger_box.TimeTaggerBox,
-            motor_controllers: list[motor_box.MotorControlPage],
+            polarisation_gui_widget: polarimeter_gui_widget.PolarimeterBox | timetagger_gui_widget.TimeTaggerBox,
+            motor_controllers: list[motor_gui_widget.MotorControlPage],
             set_enable_compensation_callback: typing.Callable,
             get_enable_compensation_callback: typing.Callable,
             set_target_azimuth_callback: typing.Callable,
@@ -155,7 +157,7 @@ class ControlGroup(Adw.PreferencesGroup):
             get_ellipticity_velocity_callback: typing.Callable,
     ) -> None:
         super().__init__(title='Polarisation Compensation')
-        self.polarimeter_box = polarisation_box
+        self.polarimeter_gui_widget = polarisation_gui_widget
         self.motor_controllers = [m.motor_controls_group for m in motor_controllers]
 
         self.set_enable_compensation = set_enable_compensation_callback
@@ -179,9 +181,9 @@ class ControlGroup(Adw.PreferencesGroup):
 
         self.set_qwp_motor(value=self.MotorWP.QWP.value)
         self.set_hwp_motor(value=self.MotorWP.HWP.value)
-        if type(self.polarimeter_box) == polarimeter_box.PolarimeterBox:
+        if type(self.polarimeter_gui_widget) == polarimeter_gui_widget.PolarimeterBox:
             self.set_polarimeter(
-                value=self.polarimeter_box.polarimeter.device_info.serial_number
+                value=self.polarimeter_gui_widget.polarimeter.device_info.serial_number
             )
         else:
             self.set_polarimeter(
@@ -279,8 +281,8 @@ class ControlGroup(Adw.PreferencesGroup):
                     target_ellipticity=self.get_target_ellipticity(),
                     azimuth_velocities=self.get_azimuth_velocity(),
                     ellipticity_velocities=self.get_ellipticity_velocity(),
-                    current_azimuth=self.polarimeter_box.data.azimuth,
-                    current_ellipticity=self.polarimeter_box.data.ellipticity
+                    current_azimuth=self.polarimeter_gui_widget.data.azimuth,
+                    current_ellipticity=self.polarimeter_gui_widget.data.ellipticity
                 )
             time.sleep(self.pol_comp_time)
 
@@ -330,8 +332,8 @@ class ControlGroup(Adw.PreferencesGroup):
             target_ellipticity=self.target_ellipticity,
             azimuth_velocities=self.get_azimuth_velocity(),
             ellipticity_velocities=self.get_ellipticity_velocity(),
-            current_azimuth=self.polarimeter_box.data.azimuth,
-            current_ellipticity=self.polarimeter_box.data.ellipticity
+            current_azimuth=self.polarimeter_gui_widget.data.azimuth,
+            current_ellipticity=self.polarimeter_gui_widget.data.ellipticity
         )
         return True
 
@@ -457,8 +459,8 @@ class DevicesGroup(Adw.PreferencesGroup):
 class PolCompPage(Adw.PreferencesPage):
     def __init__(
             self,
-            polarimeter_box: polarimeter_box.PolarimeterBox | timetagger_box.TimeTaggerBox,
-            motor_controllers: list[motor_box.MotorControlPage]
+            polarimeter_gui_widget: polarimeter_gui_widget.PolarimeterBox | timetagger_gui_widget.TimeTaggerBox,
+            motor_controllers: list[motor_gui_widget.MotorControlPage]
     ) -> None:
         super().__init__()
         self.enable_compensation = False
@@ -505,7 +507,7 @@ class PolCompPage(Adw.PreferencesPage):
         ]
 
         self.control_group = ControlGroup(
-            polarisation_box=polarimeter_box,
+            polarisation_gui_widget=polarimeter_gui_widget,
             motor_controllers=motor_controllers,
             set_enable_compensation_callback=self.set_enable_compensation,
             get_enable_compensation_callback=self.get_enable_compensation,
@@ -612,21 +614,21 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=self.content_box)
 
         ### polarimeter box
-        # self.polarisation_box = polarimeter_box.PolarimeterBox()
-        # self.polarisation_box = polarimeter_box.PolarimeterBox(
+        # self.polarisation_box = polarimeter_gui_widget.PolarimeterBox()
+        # self.polarisation_box = polarimeter_gui_widget.PolarimeterBox(
         #     polarimeter=remote_polarimeter.Polarimeter(
         #         host=remote_polarimeter.server_host,
         #         port=remote_polarimeter.server_port,
         #         serial_number='M00910360'
         #     )
         # )
-        self.polarisation_box = timetagger_box.TimeTaggerBox(
+        self.polarisation_box = timetagger_gui_widget.TimeTaggerBox(
             tt=remote_timetagger.Timetagger(
                 host=remote_timetagger.server_host,
                 port=remote_timetagger.server_port
             )
         )
-        # self.polarisation_box = timetagger_box.TimeTaggerBox()
+        # self.polarisation_box = timetagger_gui_widget.TimeTaggerBox()
         self.content_box.append(child=self.polarisation_box)
 
         ### init motor control boxes
@@ -635,7 +637,7 @@ class MainWindow(Adw.ApplicationWindow):
             host=remote_motor.server_host,
             port=remote_motor.server_port
         )
-        self.motor_controllers: list[motor_box.MotorControlPage] = []
+        self.motor_controllers: list[motor_gui_widget.MotorControlPage] = []
         for i, m in enumerate(self.motors):
             self.motor_controllers.append(
                 # motor_box.MotorControlPage(
@@ -643,7 +645,7 @@ class MainWindow(Adw.ApplicationWindow):
                 #         serial_number=m.device_info.serial_number
                 #     )
                 # )
-                motor_box.MotorControlPage(
+                motor_gui_widget.MotorControlPage(
                     motor=remote_motor.Motor(
                         serial_number=m.device_info.serial_number,
                         host=remote_motor.server_host,
@@ -654,7 +656,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### pol comp
         self.pol_comp_page = PolCompPage(
-            polarimeter_box=self.polarisation_box,
+            polarimeter_gui_widget=self.polarisation_box,
             motor_controllers=self.motor_controllers
         )
         self.content_box.append(child=self.pol_comp_page)
@@ -666,7 +668,7 @@ class MainWindow(Adw.ApplicationWindow):
             )
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        if type(self.polarisation_box) == polarimeter_box.PolarimeterBox:
+        if type(self.polarisation_box) == polarimeter_gui_widget.PolarimeterBox:
             self.polarisation_box.polarimeter.disconnect()
         for i in self.motor_controllers:
             i.motor_controls_group.motor.stop()
@@ -686,6 +688,6 @@ if __name__ == '__main__':
     try:
         app.run(sys.argv)
     except Exception as e:
-        if type(app.win.polarisation_box) == polarimeter_box.PolarimeterBox:
+        if type(app.win.polarisation_box) == polarimeter_gui_widget.PolarimeterBox:
             app.win.polarisation_box.polarimeter.disconnect()
         print('App crashed with an exception:', e)
