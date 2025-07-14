@@ -2,11 +2,6 @@ import sys
 import os
 import socket
 import struct
-import time
-import typing
-import pprint
-
-import numpy
 
 sys.path.append(
     os.path.abspath(os.path.join(
@@ -14,11 +9,11 @@ sys.path.append(
         os.path.pardir
     ))
 )
-import bb84.timetagger as timetagger
-import bb84.remote_timetagger_protocol as remote_timetagger_protocol
+import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
+import polarimeter.remote_polarimeter_protocol as remote_polarimeter_protocol
 
 server_host = '127.0.0.1'
-server_host = '137.195.63.6'
+server_host = '137.195.89.222'
 server_port = 5003
 
 def parse_status(payload: bytes) -> str:
@@ -26,11 +21,12 @@ def parse_status(payload: bytes) -> str:
     message = struct.unpack(f'{message_len}s', payload[4:])[0]
     return bytes(message).decode()
 
-class Timetagger(timetagger.TimeTagger):
+class Polarimeter(thorlabs_polarimeter.Polarimeter):
     def __init__(
             self,
             host: str,
-            port: int
+            port: int,
+            serial_number: str
     ) -> None:
         self.host = host
         self.port = port
@@ -40,37 +36,36 @@ class Timetagger(timetagger.TimeTagger):
             socket.SOCK_STREAM
         )
         self._sock.connect((self.host, self.port))
-        self._get_device_info()
+        self._get_device_info(serial_number=serial_number)
 
     def __del__(self) -> None:
         self.disconnect()
 
-    def measure(self) -> timetagger.RawData:
+    def measure(self) -> thorlabs_polarimeter.RawData:
         self._send_command(
-            command=remote_timetagger_protocol.Command.MEASURE_ONCE
+            command=remote_polarimeter_protocol.Command.MEASURE_ONCE
         )
         resp_type, payload = self._receive_response()
-        if resp_type == remote_timetagger_protocol.Response.RAWDATA:
-            return timetagger.RawData.deserialise(
+        if resp_type == remote_polarimeter_protocol.Response.RAWDATA:
+            return thorlabs_polarimeter.RawData.deserialise(
                 payload=payload
             )
         else:
             print('Unexpected response:', resp_type)
-            return timetagger.RawData(
-                timetags=numpy.empty(0),
-                channels=numpy.empty(0)
-            )
 
     def disconnect(self) -> None:
         self._sock.close()
 
-    def _get_device_info(self) -> None:
+    def _get_device_info(
+            self,
+            serial_number: str
+    ) -> None:
         self._send_command(
-            command=remote_timetagger_protocol.Command.LIST_DEVICES
+            command=remote_polarimeter_protocol.Command.LIST_DEVICES
         )
         resp_type, payload = self._receive_response()
-        if resp_type == remote_timetagger_protocol.Response.DEVICE_INFO:
-            self.device_info=timetagger.DeviceInfo.deserialise(
+        if resp_type == remote_polarimeter_protocol.Response.DEVICE_INFO:
+            self.device_info=thorlabs_polarimeter.DeviceInfo.deserialise(
                 payload=payload
             )
         else:
@@ -78,7 +73,7 @@ class Timetagger(timetagger.TimeTagger):
 
     def _send_command(
             self,
-            command: remote_timetagger_protocol.Command
+            command: remote_polarimeter_protocol.Command
         ) -> None:
         self._sock.sendall(struct.pack('I', command))
 
@@ -91,22 +86,16 @@ class Timetagger(timetagger.TimeTagger):
             data.extend(part)
         return data
 
-    def _receive_response(self) -> tuple[typing.Any, bytes]:
+    def _receive_response(self) -> tuple[int, bytes]:
         header = self._recvall(size=5)
         total_len, resp_type = struct.unpack('IB', header)
         payload = self._recvall(total_len - 1)
         return resp_type, payload
 
 if __name__ == '__main__':
-    tt = Timetagger(
+    pax = Polarimeter(
         host=server_host,
-        port=server_port
+        port=server_port,
+        serial_number='M00910360'
     )
-    print(tt.device_info)
-    # for _ in range(10):
-    #     raw_data = tt.measure()
-    #     # print(timetagger.Data.from_raw_data(raw_data=raw_data))
-    #     # singles = numpy.bincount(raw_data.channels, minlength=8)
-    #     # print(singles)
-    #     pprint.pprint(raw_data)
-    #     time.sleep(1)
+    print(pax.device_info)

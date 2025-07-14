@@ -1,3 +1,5 @@
+import sys
+import os
 import typing
 
 import gi
@@ -10,7 +12,13 @@ import matplotlib.figure
 import matplotlib.pyplot
 import numpy
 
-from . import timetagger
+sys.path.append(
+    os.path.abspath(os.path.join(
+        os.path.dirname(__file__),
+        os.path.pardir
+    ))
+)
+import bb84.timetagger as timetagger
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(

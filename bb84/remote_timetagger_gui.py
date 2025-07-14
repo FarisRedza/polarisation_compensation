@@ -1,12 +1,19 @@
 import sys
+import os
 
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-from . import gui_widget
-from . import remote_timetagger
+sys.path.append(
+    os.path.abspath(os.path.join(
+        os.path.dirname(__file__),
+        os.path.pardir
+    ))
+)
+import bb84.timetagger_box as timetagger_box
+import bb84.remote_timetagger as remote_timetagger
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:
@@ -26,7 +33,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### timetagger box
         try:
-            self.timetagger_box = gui_widget.TimeTaggerBox(
+            self.timetagger_box = timetagger_box.TimeTaggerBox(
                     tt=remote_timetagger.Timetagger(
                         host=remote_timetagger.server_host,
                         port=remote_timetagger.server_port
