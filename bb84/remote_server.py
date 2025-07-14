@@ -1,19 +1,11 @@
-import sys
-import os
 import socket
 import threading
 import struct
 
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
-import bb84.remote_timetagger_protocol as remote_timetagger_protocol
-import bb84.timetagger as timetagger
-import bb84.uqd as uqd
-# import bb84.qutag as qutag
+from . import remote_protocol
+from . import timetagger
+from . import uqd
+# from . import qutag
 
 def pack_status(message: str):
     b = message.encode()
@@ -36,22 +28,22 @@ def handle_client(
                     break
 
                 command = struct.unpack('I', cmd_data)[0]
-                match remote_timetagger_protocol.Command(command):
-                    case remote_timetagger_protocol.Command.LIST_DEVICES:
+                match remote_protocol.Command(command):
+                    case remote_protocol.Command.LIST_DEVICES:
                         payload = measurement_device.device_info.serialise()
                         header = struct.pack(
                             'IB',
                             len(payload) + 1,
-                            remote_timetagger_protocol.Response.DEVICE_INFO
+                            remote_protocol.Response.DEVICE_INFO
                         )
                         connection.sendall(header + payload)
 
-                    case remote_timetagger_protocol.Command.MEASURE_ONCE:
+                    case remote_protocol.Command.MEASURE_ONCE:
                         payload = measurement_device.measure().serialise()
                         header = struct.pack(
                             'IB',
                             len(payload) + 1,
-                            remote_timetagger_protocol.Response.RAWDATA
+                            remote_protocol.Response.RAWDATA
                         )
                         connection.sendall(header + payload)
 
@@ -65,7 +57,7 @@ def handle_client(
                         header = struct.pack(
                             'IB',
                             len(payload) + 1,
-                            remote_timetagger_protocol.Response.ERROR
+                            remote_protocol.Response.ERROR
                         )
                         connection.sendall(header + payload)
 
