@@ -1,6 +1,8 @@
 import sys
 import os
 import pathlib
+import datetime
+import logging
 
 os.environ['TTAG'] = str(pathlib.Path(
     os.environ['HOME'],
@@ -32,7 +34,6 @@ class UQD(timetagger.TimeTagger):
         self._uqd = ttag.TTBuffer(buffernumber=ttag.getfreebuffer()-1)
         # self._uqd = timetag.CTimeTag()
 
-
         self.device_info = timetagger.DeviceInfo(
             manufacturer = 'UQDevices',
             model = 'Logic-16',
@@ -50,7 +51,6 @@ class UQD(timetagger.TimeTagger):
         # self._uqd.StartTimetags()
         # channels, timetags = self._uqd.ReadTags()
         channels, timetags = self._uqd(seconds)
-        channels, timetags = self._uqd()
         raw_data = timetagger.RawData(
             timetags=timetags,
             channels=channels

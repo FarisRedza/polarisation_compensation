@@ -3,6 +3,8 @@ import typing
 import math
 import struct
 import time
+import datetime
+import logging
 
 import numpy
 
@@ -159,6 +161,15 @@ class Data:
 class TimeTagger:
     def __init__(self) -> None:
         self.device_info = DeviceInfo()
+
+        logging.basicConfig(
+            level=logging.INFO,
+            filename=f'~/Projects/logs/log_{datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.log',
+            encoding='utf-8',
+            filemode='a',
+            format='{asctime} - {levelname} - {message}',
+            style='{',
+        )
 
     def measure(self, seconds: int = 1) -> RawData:
         data_points = 10000

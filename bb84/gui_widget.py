@@ -1,4 +1,6 @@
 import typing
+import datetime
+import logging
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -11,6 +13,39 @@ import matplotlib.pyplot
 import numpy
 
 from . import timetagger
+
+import tomtag as tomt
+
+def get_qber(channels, timetags, delay=0, tcc=15):
+    """
+    Assume that channels are HVDAHVDA
+    """
+    tags_H_1550 = timetags[channels == 0]
+    tags_V_1550 = timetags[channels == 1]
+    tags_D_1550 = timetags[channels == 2]
+    tags_A_1550 = timetags[channels == 3]
+    tags_H_780 = timetags[channels == 4] + delay
+    tags_V_780 = timetags[channels == 5] + delay
+    tags_D_780 = timetags[channels == 6] + delay
+    tags_A_780 = timetags[channels == 7] + delay
+
+    # self.find_delay(tags_H_1550, tags_H_780, tcc)
+
+    HH = tomt.count_twofolds(tags_H_1550, tags_H_780, len(tags_H_1550), len(tags_H_780),tcc)
+    HV = tomt.count_twofolds(tags_H_1550, tags_V_780, len(tags_H_1550), len(tags_V_780),tcc)
+    VH = tomt.count_twofolds(tags_V_1550, tags_H_780, len(tags_V_1550), len(tags_H_780),tcc)
+    VV = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
+
+    qber =  (VH + VH) / (HH + HV + VH + VV)
+
+    DD = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
+    DA = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
+    AD = tomt.count_twofolds(tags_A_1550, tags_D_780, len(tags_A_1550), len(tags_D_780),tcc)
+    AA = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
+
+    qx =  (DA + AD) / (DD + AD + DA + AA)
+
+    return qber, qx, HH+HV+VH+VV
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(
@@ -543,7 +578,13 @@ class TimeTaggerBox(Gtk.Box):
             )
         except:
             self.data = timetagger.Data()
+
         self.set_qutag_data()
+        qber = get_qber(
+            channels=self.raw_data.channels,
+            timetags=self.raw_data.timetags
+        )
+        logging.info(f'Timetagger - Azimuth: {self.data.azimuth}, Ellipticity: {self.data.ellipticity}, QBER: {qber}')
         return True
     
     def set_qutag_data(self) -> None:
