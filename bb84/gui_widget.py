@@ -217,7 +217,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.point.set_alpha(0.3 if is_behind else 1.0)
 
         self.canvas.draw_idle()
-azimuth
+
 class Counts(Adw.PreferencesGroup):
     def __init__(
             self,

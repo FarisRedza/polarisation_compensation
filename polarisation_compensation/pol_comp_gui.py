@@ -615,19 +615,19 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### polarimeter box
         # self.polarisation_box = polarimeter_gui_widget.PolarimeterBox()
-        self.polarisation_box = polarimeter_gui_widget.PolarimeterBox(
-            polarimeter=remote_polarimeter.Polarimeter(
-                host=remote_polarimeter.server_host,
-                port=remote_polarimeter.server_port,
-                serial_number='M00910360'
-            )
-        )
-        # self.polarisation_box = timetagger_gui_widget.TimeTaggerBox(
-        #     tt=remote_timetagger.Timetagger(
-        #         host=remote_timetagger.server_host,
-        #         port=remote_timetagger.server_port
+        # self.polarisation_box = polarimeter_gui_widget.PolarimeterBox(
+        #     polarimeter=remote_polarimeter.Polarimeter(
+        #         host=remote_polarimeter.server_host,
+        #         port=remote_polarimeter.server_port,
+        #         serial_number='M00910360'
         #     )
         # )
+        self.polarisation_box = timetagger_gui_widget.TimeTaggerBox(
+            tt=remote_timetagger.Timetagger(
+                host=remote_timetagger.server_host,
+                port=remote_timetagger.server_port
+            )
+        )
         # self.polarisation_box = timetagger_gui_widget.TimeTaggerBox()
         self.content_box.append(child=self.polarisation_box)
 
