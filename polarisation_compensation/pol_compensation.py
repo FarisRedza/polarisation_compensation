@@ -1,13 +1,14 @@
 import sys
 import os
-
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
 import motor.base_motor as base_motor
+
+# sys.path.append(
+#     os.path.abspath(os.path.join(
+#         os.path.dirname(__file__),
+#         os.path.pardir
+#     ))
+# )
+# import motor.base_motor as base_motor
 
 def pol_comp(
         motor_list: list[base_motor.Motor],
