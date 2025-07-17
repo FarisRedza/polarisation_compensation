@@ -1,6 +1,7 @@
 import enum
 
 class Command(enum.IntEnum):
+    NETWORK_DELAY = 0
     LIST_DEVICES = 1
     MEASURE_ONCE = 2
     START_MEASURING = 3
@@ -11,3 +12,4 @@ class Response(enum.IntEnum):
     DEVICE_INFO = 1
     RAWDATA = 2
     STATUS = 3
+    TIME = 4

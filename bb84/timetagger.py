@@ -2,6 +2,7 @@ import dataclasses
 import typing
 import math
 import struct
+import time
 
 import numpy
 
@@ -159,7 +160,7 @@ class TimeTagger:
     def __init__(self) -> None:
         self.device_info = DeviceInfo()
 
-    def measure(self) -> RawData:
+    def measure(self, seconds: int = 1) -> RawData:
         data_points = 10000
         timetags = numpy.array(
             object=range(data_points),

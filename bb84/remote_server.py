@@ -1,11 +1,12 @@
 import socket
 import threading
 import struct
+import time
 
 from . import remote_protocol
 from . import timetagger
 from . import uqd
-# from . import qutag
+from . import qutag
 
 def pack_status(message: str):
     b = message.encode()
@@ -29,6 +30,20 @@ def handle_client(
 
                 command = struct.unpack('I', cmd_data)[0]
                 match remote_protocol.Command(command):
+                    case remote_protocol.Command.NETWORK_DELAY:
+                        connection_time = str(time.time())
+                        payload = struct.pack(
+                            f'I{len(connection_time)}s',
+                            len(connection_time),
+                            connection_time.encode()
+                        )
+                        header = struct.pack(
+                            'IB',
+                            len(payload) + 1,
+                            remote_protocol.Response.DEVICE_INFO
+                        )
+                        connection.sendall(header + payload) 
+
                     case remote_protocol.Command.LIST_DEVICES:
                         payload = measurement_device.device_info.serialise()
                         header = struct.pack(
@@ -106,5 +121,6 @@ def start_server(
 
 if __name__ == '__main__':
     # measurement_device = timetagger.TimeTagger()
-    measurement_device = uqd.UQD()
+    # measurement_device = uqd.UQD()
+    measurement_device = qutag.Qutag()
     start_server()

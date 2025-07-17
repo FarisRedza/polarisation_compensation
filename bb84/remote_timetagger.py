@@ -1,6 +1,7 @@
 import socket
 import struct
 import typing
+import time
 
 import numpy
 
@@ -35,7 +36,7 @@ class Timetagger(timetagger.TimeTagger):
     def __del__(self) -> None:
         self.disconnect()
 
-    def measure(self) -> timetagger.RawData:
+    def measure(self, seconds: int = 1) -> timetagger.RawData:
         self._send_command(
             command=remote_protocol.Command.MEASURE_ONCE
         )
@@ -53,6 +54,16 @@ class Timetagger(timetagger.TimeTagger):
 
     def disconnect(self) -> None:
         self._sock.close()
+
+    def get_network_delay(self) -> float:
+        connect_request_time = time.time()
+        self._send_command(
+            command=remote_protocol.Command.NETWORK_DELAY
+        )
+        resp_type, payload = self._receive_response()
+        if resp_type == remote_protocol.Response.TIME:
+            remote_time = struct.unpack(payload)
+
 
     def _get_device_info(self) -> None:
         self._send_command(

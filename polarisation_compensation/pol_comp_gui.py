@@ -15,7 +15,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
-from . import pol_compensation
+import pol_compensation
 
 import polarimeter.gui_widget as polarimeter_gui_widget
 import polarimeter.remote_polarimeter as remote_polarimeter
@@ -615,19 +615,19 @@ class MainWindow(Adw.ApplicationWindow):
 
         ### polarimeter box
         # self.polarisation_box = polarimeter_gui_widget.PolarimeterBox()
-        # self.polarisation_box = polarimeter_gui_widget.PolarimeterBox(
-        #     polarimeter=remote_polarimeter.Polarimeter(
-        #         host=remote_polarimeter.server_host,
-        #         port=remote_polarimeter.server_port,
-        #         serial_number='M00910360'
-        #     )
-        # )
-        self.polarisation_box = timetagger_gui_widget.TimeTaggerBox(
-            tt=remote_timetagger.Timetagger(
-                host=remote_timetagger.server_host,
-                port=remote_timetagger.server_port
+        self.polarisation_box = polarimeter_gui_widget.PolarimeterBox(
+            polarimeter=remote_polarimeter.Polarimeter(
+                host=remote_polarimeter.server_host,
+                port=remote_polarimeter.server_port,
+                serial_number='M00910360'
             )
         )
+        # self.polarisation_box = timetagger_gui_widget.TimeTaggerBox(
+        #     tt=remote_timetagger.Timetagger(
+        #         host=remote_timetagger.server_host,
+        #         port=remote_timetagger.server_port
+        #     )
+        # )
         # self.polarisation_box = timetagger_gui_widget.TimeTaggerBox()
         self.content_box.append(child=self.polarisation_box)
 

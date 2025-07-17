@@ -32,6 +32,7 @@ class UQD(timetagger.TimeTagger):
         self._uqd = ttag.TTBuffer(buffernumber=ttag.getfreebuffer()-1)
         # self._uqd = timetag.CTimeTag()
 
+
         self.device_info = timetagger.DeviceInfo(
             manufacturer = 'UQDevices',
             model = 'Logic-16',
@@ -45,10 +46,11 @@ class UQD(timetagger.TimeTagger):
         # if self._uqd.IsOpen():
         #     self._uqd.Close()
 
-    def measure(self) -> timetagger.RawData:
+    def measure(self, seconds: int = 1) -> timetagger.RawData:
         # self._uqd.StartTimetags()
         # channels, timetags = self._uqd.ReadTags()
-        channels, timetags = self._uqd(1)
+        channels, timetags = self._uqd(seconds)
+        channels, timetags = self._uqd()
         raw_data = timetagger.RawData(
             timetags=timetags,
             channels=channels
