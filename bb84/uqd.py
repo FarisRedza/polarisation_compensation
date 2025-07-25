@@ -32,7 +32,6 @@ class UQD(timetagger.TimeTagger):
         self._uqd = ttag.TTBuffer(buffernumber=ttag.getfreebuffer()-1)
         # self._uqd = timetag.CTimeTag()
 
-
         self.device_info = timetagger.DeviceInfo(
             manufacturer = 'UQDevices',
             model = 'Logic-16',

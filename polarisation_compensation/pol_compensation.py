@@ -1,14 +1,4 @@
-import sys
-import os
 import motor.base_motor as base_motor
-
-# sys.path.append(
-#     os.path.abspath(os.path.join(
-#         os.path.dirname(__file__),
-#         os.path.pardir
-#     ))
-# )
-# import motor.base_motor as base_motor
 
 def pol_comp(
         motor_list: list[base_motor.Motor],
@@ -62,7 +52,7 @@ def pol_comp(
                         acceleration=20.0,
                         max_velocity=velocity
                     )
-                # print(f'{motor.device_info.serial_number} moving: {motor.is_moving}')
+                print(f'Rotating motor {motor.device_info.serial_number} {motor.direction.name}')
                 break
             elif motor.is_moving == True:
                 motor.stop()
