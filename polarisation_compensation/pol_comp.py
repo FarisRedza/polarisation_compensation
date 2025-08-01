@@ -1,16 +1,45 @@
 import time
-import datetime
-import logging
 import threading
+import logging
+import json
+import datetime
 
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
-import motor.remote_motor as remote_motor
+import motor.thorlabs_motor as thorlabs_motor
 import motor.base_motor as base_motor
 
 MOTOR_SERVER_HOST = '137.195.89.222'
 MOTOR_SERVER_PORT = 5002
-POLARIMETER_SERVER_HOST = '137.195.89.222'
-POLARIMETER_SERVER_PORT = 5003
+MEASUREMENT_SERVER_HOST = '137.195.89.222'
+MEASUREMENT_SERVER_PORT = 5001
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record) -> str:
+        log_record = {
+            'time': self.formatTime(record=record),
+            'level': record.levelname,
+            'name': record.name,
+            'message': record.getMessage(),
+        }
+        if record.exc_info:
+            log_record['exception'] = self.formatException(ei=record.exc_info)
+
+        standard_attrs = vars(
+            logging.LogRecord(
+                name='',
+                level=0,
+                pathname='',
+                lineno=0,
+                msg='',
+                args=(),
+                exc_info=None
+            )
+        ).keys()
+        for attr, value in record.__dict__.items():
+            if attr not in standard_attrs:
+                log_record[attr] = value
+
+        return json.dumps(log_record)
 
 def get_data(
         polarisation_device: thorlabs_polarimeter.Polarimeter,
@@ -70,7 +99,13 @@ def compensate(
                         acceleration=20.0,
                         max_velocity=velocity
                     )
-                print(f'Rotating motor {motor.device_info.serial_number} {motor.direction.name}')
+                motor_logger.info(
+                    msg='Direction change',
+                    extra={
+                        'serial number': motor.device_info.serial_number,
+                        'direction': motor.direction.name
+                    }
+                )
                 break
             elif motor.is_moving == True:
                 motor.stop()
@@ -97,27 +132,37 @@ def compensate(
     return True
 
 if __name__ == '__main__':
-    # logging.basicConfig(
-    #     level=logging.DEBUG,
-    #     filename=f'polarimeter_{datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.log',
-    #     encoding='utf-8',
-    #     filemode='a',
-    #     format='{asctime} - {levelname} - {message}',
-    #     style='{',
-    # )
+    handler = logging.StreamHandler()
+    handler.setFormatter(fmt=JsonFormatter())
+
+    file_handler = logging.FileHandler(
+        filename=f'pol_comp_{datetime.datetime.now().strftime(
+            format='%Y_%m_%d_%H_%M_%S'
+        )}.log'
+    )
+    file_handler.setFormatter(fmt=JsonFormatter())
+
+    motor_logger = logging.getLogger(name='Motor')
+    motor_logger.setLevel(level=logging.INFO)
+    motor_logger.addHandler(hdlr=file_handler)
+
+    data_logger = logging.getLogger(name='Data')
+    data_logger.setLevel(level=logging.INFO)
+    data_logger.addHandler(hdlr=file_handler)
 
     event = threading.Event()
     raw_data_container = [thorlabs_polarimeter.RawData()]
     meaurement_rate = 0.1
-    compensation_rate = 1
+    compensation_rate = 0.1
 
-    polarisation_device = thorlabs_polarimeter.Polarimeter(
+    measurement_device = thorlabs_polarimeter.Polarimeter(
         serial_number='M00910360'
     )
-    motors = remote_motor.list_motors(
-        host=MOTOR_SERVER_HOST,
-        port=MOTOR_SERVER_PORT
-    )
+    motors = [
+        thorlabs_motor.Motor(serial_number=m[0])
+        for m in thorlabs_motor.list_thorlabs_motors()
+    ]
+
     QWP = '55353314'  # azimuth
     HWP = '55356974'  # ellipticity
     target_qber = 0
@@ -135,7 +180,7 @@ if __name__ == '__main__':
     measurement_thread = threading.Thread(
         target=get_data,
         args=(
-            polarisation_device,
+            measurement_device,
             raw_data_container,
             meaurement_rate
         )
@@ -157,10 +202,16 @@ if __name__ == '__main__':
                     parameter_2_target=target_qx,
                     parameter_1_velocities=qber_velocity,
                     parameter_2_velocities=qx_velocity,
-                    parameter_1_current_value=qber,
-                    parameter_2_current_value=qx
+                    parameter_1_current_value=data.azimuth,
+                    parameter_2_current_value=data.ellipticity
                 )
-                print(f'{qber=}, {qx=}')
+                data_logger.info(
+                    msg='Measurement taken',
+                    extra={
+                        'QBER': qber,
+                        'Qx': qx
+                    }
+                )
 
             time.sleep(compensation_rate)
         except KeyboardInterrupt:
@@ -172,4 +223,4 @@ if __name__ == '__main__':
     for m in motors:
         m.stop()
         m.disconnect()
-    polarisation_device.disconnect()
+    measurement_device.disconnect()
