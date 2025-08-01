@@ -159,7 +159,7 @@ if __name__ == '__main__':
         serial_number='M00910360'
     )
     motors = [
-        thorlabs_motor.Motor(serial_number=m[0])
+        thorlabs_motor.ThorlabsMotor(serial_number=m[0])
         for m in thorlabs_motor.list_thorlabs_motors()
     ]
 

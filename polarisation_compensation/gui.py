@@ -6,11 +6,12 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, GObject
 
 import motor.remote_motor as remote_motor
+import motor.thorlabs_motor as thorlabs_motor
 import motor.gui_widget as motor_gui_widget
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 import polarimeter.gui_widget as polarimeter_gui_widget
 
-import pol_comp
+from . import pol_comp
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:
@@ -36,16 +37,16 @@ class MainWindow(Adw.ApplicationWindow):
         main_box.append(child=self.content_box)
 
         ### polarimeter box
-        self.polarisation_box = polarimeter_gui_widget.PolarimeterBox(
+        self.measurement_box = polarimeter_gui_widget.PolarimeterBox(
             polarimeter=thorlabs_polarimeter.Polarimeter(
                 serial_number='M00910360'
             )
         )
-        main_box.append(child=self.polarisation_box)
+        main_box.append(child=self.measurement_box)
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        if type(self.polarisation_box) == polarimeter_gui_widget.PolarimeterBox:
-            self.polarisation_box.polarimeter.disconnect()
+        if type(self.measurement_box) == polarimeter_gui_widget.PolarimeterBox:
+            self.measurement_box.polarimeter.disconnect()
         # for i in self.motor_controllers:
         #     i.motor_controls_group.motor.stop()
         return False

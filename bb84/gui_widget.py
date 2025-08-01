@@ -539,19 +539,6 @@ class DeviceSettingsGroup(Adw.PreferencesGroup):
             widget=enable_polarimeter_switch
         )
 
-        wavelength_row = Adw.ActionRow(title='Wavelength')
-        self.add(child=wavelength_row)
-        wavelength_entry = Gtk.Entry(
-            text=self.get_wavelength() * 1e9,
-            placeholder_text='nm',
-            valign=Gtk.Align.CENTER
-        )
-        wavelength_entry.connect(
-            'activate',
-            self.on_set_wavelength
-        )
-        wavelength_row.add_suffix(widget=wavelength_entry)
-
         poling_interval_row = Adw.ActionRow(title='Poling interval')
         self.add(child=poling_interval_row)
         poling_interval_label = Gtk.Entry(
@@ -566,14 +553,6 @@ class DeviceSettingsGroup(Adw.PreferencesGroup):
         poling_interval_row.add_suffix(
             widget=poling_interval_label
         )
-
-    def on_set_wavelength(self, entry: Gtk.Entry) -> None:
-        try:
-            value = abs(float(entry.get_text()) * 1e-9)
-        except:
-            print(f'Invalid entry: {entry.get_text()}')
-        else:
-            self.set_wavelength(value=value)
 
     def on_set_poling_interval(self, entry: Gtk.Entry) -> None:
         try:
