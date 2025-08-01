@@ -1,4 +1,6 @@
 import typing
+import time
+import threading
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -124,15 +126,43 @@ class BlochSphere3D(Adw.PreferencesGroup):
         x = numpy.outer(a=numpy.cos(u), b=numpy.sin(v))
         y = numpy.outer(a=numpy.sin(u), b=numpy.sin(v))
         z = numpy.outer(a=numpy.ones_like(u), b=numpy.cos(v))
-        self.ax.plot_wireframe(x, y, z, color='lightgray', linewidth=0.5, alpha=0.3)
+        self.ax.plot_wireframe(
+            x,
+            y,
+            z,
+            color='lightgray',
+            linewidth=0.5,
+            alpha=0.3
+        )
 
-        self.ax.plot3D([-1, 1], [0, 0], [0, 0], color='gray', linestyle='--', linewidth=1)
+        self.ax.plot3D(
+            [-1, 1],
+            [0, 0],
+            [0, 0],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
 
         # D–A axis s2
-        self.ax.plot3D([0, 0], [-1, 1], [0, 0], color='gray', linestyle='--', linewidth=1)
+        self.ax.plot3D(
+            [0, 0],
+            [-1, 1],
+            [0, 0],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
 
         # R–L axis s3
-        self.ax.plot3D([0, 0], [0, 0], [-1, 1], color='gray', linestyle='--', linewidth=1)
+        self.ax.plot3D(
+            [0, 0],
+            [0, 0],
+            [-1, 1],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
 
         # polarisation basis labels
         self.ax.text(1.05, 0, 0, 'H', ha='center', va='center', fontsize=10)
@@ -145,9 +175,18 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.ax.text(0, 0, -1.05, 'L', ha='center', va='center', fontsize=10)
 
         # dot
-        self.point = self.ax.plot([0], [0], [0], 'o', color='blue', markersize=6)[0]
+        self.point = self.ax.plot(
+            [0],
+            [0],
+            [0],
+            'o',
+            color='blue',
+            markersize=6
+        )[0]
 
-        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(self.fig)
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
+            figure=self.fig
+        )
         self.canvas.set_size_request(width=200, height=200)
         self.add(child=Gtk.Frame(child=self.canvas))
 
@@ -161,6 +200,7 @@ class BlochSphere3D(Adw.PreferencesGroup):
 
         # if z < 0, it's behind the viewer
         return transformed[2] < 0
+
 
     def update_point(self) -> None:
         data: timetagger.Data = self.get_data_callback()
@@ -182,124 +222,6 @@ class BlochSphere3D(Adw.PreferencesGroup):
         self.point.set_alpha(0.3 if is_behind else 1.0)
 
         self.canvas.draw_idle()
-azimuth
-class Counts(Adw.PreferencesGroup):
-    def __init__(
-            self,
-            get_raw_data_callback: typing.Callable
-    ) -> None:
-        super().__init__(title='Counts')
-        self.get_raw_data_callback = get_raw_data_callback
-
-        data_row = Adw.ActionRow()
-        self.add(child=data_row)
-
-        margin = 6
-        box_spacing = 6
-        width_chars = 9
-
-        data_header_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            margin_top=margin,
-            margin_bottom=margin,
-            valign=Gtk.Align.CENTER,
-            spacing=box_spacing
-        )
-        data_row.add_prefix(widget=data_header_box)
-
-        data_value_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            margin_top=margin,
-            margin_bottom=margin,
-            valign=Gtk.Align.CENTER,
-            halign=Gtk.Align.END,
-            spacing=box_spacing,
-        )
-        data_row.add_suffix(widget=data_value_box)
-
-        # h
-        h_label = Gtk.Label(
-            label='H',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=h_label)
-        self.h_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.h_value_label)
-
-        # v
-        v_label = Gtk.Label(
-            label='V',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=v_label)
-        self.v_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.v_value_label)
-
-        # d
-        d_label = Gtk.Label(
-            label='D',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=d_label)
-        self.d_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.d_value_label)
-
-        # a
-        a_label = Gtk.Label(
-            label='A',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=a_label)
-        self.a_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.a_value_label)
-
-        # r
-        r_label = Gtk.Label(
-            label='R',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=r_label)
-        self.r_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.r_value_label)
-
-        # l
-        h_label = Gtk.Label(
-            label='L',
-            halign=Gtk.Align.START
-        )
-        data_header_box.append(child=h_label)
-        self.l_value_label = Gtk.Label(
-            halign=Gtk.Align.START,
-            width_chars=width_chars
-        )
-        data_value_box.append(child=self.l_value_label)
-
-    def update_timetagger_info(self):
-        raw_data: timetagger.RawData = self.get_raw_data_callback()
-        singles = numpy.bincount(raw_data.channels, minlength=8)
-        # singles = [int(val) for channel, val in raw_data.__dict__.items()]
-
-        self.h_value_label.set_text(f'{singles[timetagger.C_780_H]}' if timetagger.C_780_H is not None else '0')
-        self.v_value_label.set_text(f'{singles[timetagger.C_780_V]}' if timetagger.C_780_V is not None else '0')
-        self.d_value_label.set_text(f'{singles[timetagger.C_780_D]}' if timetagger.C_780_D is not None else '0')
-        self.a_value_label.set_text(f'{singles[timetagger.C_780_A]}' if timetagger.C_780_A is not None else '0')
-        self.r_value_label.set_text(f'{singles[timetagger.C_780_R]}' if timetagger.C_780_R is not None else '0')
-        self.l_value_label.set_text(f'{singles[timetagger.C_780_L]}' if timetagger.C_780_L is not None else '0')
 
 class MeasurementGroup(Adw.PreferencesGroup):
     def __init__(
@@ -310,7 +232,7 @@ class MeasurementGroup(Adw.PreferencesGroup):
         self.get_data_callback = get_data_callback
 
         data_row = Adw.ActionRow()
-        self.add(child=data_row)
+        self.add(data_row)
 
         margin = 6
         box_spacing = 6
@@ -334,6 +256,18 @@ class MeasurementGroup(Adw.PreferencesGroup):
             spacing=box_spacing,
         )
         data_row.add_suffix(widget=data_value_box)
+
+        # wavelength
+        wavelength_label = Gtk.Label(
+            label='Wavelength',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=wavelength_label)
+        self.wavelength_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.wavelength_value_label)
 
         # azimuth
         azimuth_label = Gtk.Label(
@@ -358,6 +292,78 @@ class MeasurementGroup(Adw.PreferencesGroup):
             width_chars=width_chars
         )
         data_value_box.append(child=self.ellipticity_value_label)
+
+        # dop
+        dop_label = Gtk.Label(
+            label='DOP',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=dop_label)
+        self.dop_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.dop_value_label)
+
+        # dolp
+        dolp_label = Gtk.Label(
+            label='DOLP',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=dolp_label)
+        self.dolp_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.dolp_value_label)
+
+        # docp
+        docp_label = Gtk.Label(
+            label='DOCP',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=docp_label)
+        self.docp_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.docp_value_label)
+
+        # power
+        power_label = Gtk.Label(
+            label='Power',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=power_label)
+        self.power_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.power_value_label)
+
+        # power polarised
+        poewr_polarised_label = Gtk.Label(
+            label='PPol',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=poewr_polarised_label)
+        self.power_polarised_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.power_polarised_value_label)
+
+        # power unpolarised
+        power_unpolarised_label = Gtk.Label(
+            label='PUnpol',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=power_unpolarised_label)
+        self.power_unpolarised_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.power_unpolarised_value_label)
 
         # normalised s1
         normalised_s1_label = Gtk.Label(
@@ -407,36 +413,182 @@ class MeasurementGroup(Adw.PreferencesGroup):
         )
         data_value_box.append(child=self.qber_value_label)
 
-    def update_qutag_info(self) -> None:
+        # S0
+        S0_label = Gtk.Label(
+            label='S0',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=S0_label)
+        self.S0_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.S0_value_label)
+
+        # S1
+        S1_label = Gtk.Label(
+            label='S1',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=S1_label)
+        self.S1_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.S1_value_label)
+
+        # S2
+        S2_label = Gtk.Label(
+            label='S2',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=S2_label)
+        self.S2_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.S2_value_label)
+
+        # S3
+        S3_label = Gtk.Label(
+            label='S3',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=S3_label)
+        self.S3_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.S3_value_label)
+
+        # power split ratio
+        power_split_ratio_label = Gtk.Label(
+            label='Power-split-ratio',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=power_split_ratio_label)
+        self.power_split_ratio_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.power_split_ratio_value_label)
+
+        # phase difference
+        phase_difference_label = Gtk.Label(
+            label='Phase-difference',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=phase_difference_label)
+        self.phase_difference_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.phase_difference_value_label)
+
+        # circularity
+        circularity_label = Gtk.Label(
+            label='Circularity',
+            halign=Gtk.Align.START
+        )
+        data_header_box.append(child=circularity_label)
+        self.circularity_value_label = Gtk.Label(
+            halign=Gtk.Align.START,
+            width_chars=width_chars
+        )
+        data_value_box.append(child=self.circularity_value_label)
+
+    def update_timetagger_info(self):
         data: timetagger.Data = self.get_data_callback()
 
-        # self.wavelength_value_label.set_text(f'{data.wavelength} m')
         self.azimuth_value_label.set_text(f'{data.azimuth:.2f} °')
         self.ellipticity_value_label.set_text(f'{data.ellipticity:.2f} °')
-        # self.dop_value_label.set_text(f'{data.degree_of_polarisation:.2f} %')
-        # self.dolp_value_label.set_text(f'{data.degree_of_linear_polarisation:.2f} %')
-        # self.docp_value_label.set_text(f'{data.degree_of_circular_polarisation:.2f} %')
-        # self.power_value_label.set_text(f'{data.power:.2f} dBm')
-        # self.power_polarised_value_label.set_text(f'{data.power_polarised:.2f} dBm')
-        # self.power_unpolarised_value_label.set_text(f'{data.power_unpolarised:.2f} dBm')
         self.normalised_s1_value_label.set_text(f'{data.normalised_s1:.2f}')
         self.normalised_s2_value_label.set_text(f'{data.normalised_s2:.2f}')
         self.normalised_s3_value_label.set_text(f'{data.normalised_s3:.2f}')
         self.qber_value_label.set_text(f'{1 - data.normalised_s1**2:.2f}')
-        # self.S0_value_label.set_text(f'{data.S0:.2} W')
-        # self.S1_value_label.set_text(f'{data.S1:.2} W')
-        # self.S2_value_label.set_text(f'{data.S2:.2} W')
-        # self.S3_value_label.set_text(f'{data.S3:.2} W')
-        # self.power_split_ratio_value_label.set_text(f'{data.power_split_ratio:.2f}')
-        # self.phase_difference_value_label.set_text(f'{data.phase_difference:3.2f}')
-        # self.circularity_value_label.set_text(f'{data.circularity:.2f} %')
+
+class DeviceSettingsGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            set_enable_polarimeter_callback: typing.Callable,
+            get_enable_polarimeter_callback: typing.Callable,
+            set_poling_interval_callback: typing.Callable,
+            get_poling_interval_callback: typing.Callable,
+    ) -> None:
+        super().__init__(title='Settings')
+        self.set_enable_polarimeter = set_enable_polarimeter_callback
+        self.get_enable_polarimeter = get_enable_polarimeter_callback
+        self.set_poling_interval = set_poling_interval_callback
+        self.get_poling_interval = get_poling_interval_callback
+
+        enable_polarimeter_row = Adw.ActionRow(title='Enable polarimeter')
+        self.add(child=enable_polarimeter_row)
+
+        enable_polarimeter_switch = Gtk.Switch(
+            valign=Gtk.Align.CENTER,
+            active=self.get_enable_polarimeter()
+        )
+        enable_polarimeter_switch.connect(
+            'notify::active',
+            lambda sw, _: self.set_enable_polarimeter(sw.get_active())
+        )
+        enable_polarimeter_row.add_suffix(
+            widget=enable_polarimeter_switch
+        )
+        enable_polarimeter_row.set_activatable_widget(
+            widget=enable_polarimeter_switch
+        )
+
+        wavelength_row = Adw.ActionRow(title='Wavelength')
+        self.add(child=wavelength_row)
+        wavelength_entry = Gtk.Entry(
+            text=self.get_wavelength() * 1e9,
+            placeholder_text='nm',
+            valign=Gtk.Align.CENTER
+        )
+        wavelength_entry.connect(
+            'activate',
+            self.on_set_wavelength
+        )
+        wavelength_row.add_suffix(widget=wavelength_entry)
+
+        poling_interval_row = Adw.ActionRow(title='Poling interval')
+        self.add(child=poling_interval_row)
+        poling_interval_label = Gtk.Entry(
+            text=self.get_poling_interval(),
+            placeholder_text='ms',
+            valign=Gtk.Align.CENTER
+        )
+        poling_interval_label.connect(
+            'activate',
+            self.on_set_poling_interval
+        )
+        poling_interval_row.add_suffix(
+            widget=poling_interval_label
+        )
+
+    def on_set_wavelength(self, entry: Gtk.Entry) -> None:
+        try:
+            value = abs(float(entry.get_text()) * 1e-9)
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.set_wavelength(value=value)
+
+    def on_set_poling_interval(self, entry: Gtk.Entry) -> None:
+        try:
+            value = abs(float(entry.get_text()))
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.set_poling_interval(value=value)
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
     def __init__(
             self,
             get_device_info_callback: typing.Callable
     ) -> None:
-        super().__init__(title='Device Info')
+        super().__init__(title='Polarimeter Info')
         device_info: timetagger.DeviceInfo = get_device_info_callback()
 
         # serial number
@@ -460,7 +612,7 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
 class ColumnOne(Adw.PreferencesPage):
     def __init__(
             self,
-            get_data_callback: typing.Callable
+            get_data_callback: typing.Callable        
     ) -> None:
         super().__init__()
 
@@ -477,45 +629,64 @@ class ColumnOne(Adw.PreferencesPage):
 class ColumnTwo(Adw.PreferencesPage):
     def __init__(
             self,
-            get_raw_data_callback: typing.Callable,
+            set_enable_polarimeter_callback: typing.Callable,
+            get_enable_polarimeter_callback: typing.Callable,
+            set_poling_interval_callback: typing.Callable,
+            get_poling_interval_callback: typing.Callable,
             get_data_callback: typing.Callable,
             get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__()
-        self.counts_group = Counts(
-            get_raw_data_callback=get_raw_data_callback
-        )
-        self.add(group=self.counts_group)
 
         self.measurement_group = MeasurementGroup(
             get_data_callback=get_data_callback
         )
         self.add(group=self.measurement_group)
 
-        self.timetagger_group = DeviceInfoGroup(
+        self.device_settings_group = DeviceSettingsGroup(
+            set_enable_polarimeter_callback=set_enable_polarimeter_callback,
+            get_enable_polarimeter_callback=get_enable_polarimeter_callback,
+            set_poling_interval_callback=set_poling_interval_callback,
+            get_poling_interval_callback=get_poling_interval_callback,
+        )
+        self.add(group=self.device_settings_group)
+
+        self.polarimeter_group = DeviceInfoGroup(
             get_device_info_callback=get_device_info_callback
         )
-        self.add(group=self.timetagger_group)
+        self.add(group=self.polarimeter_group)
 
-class TimeTaggerBox(Gtk.Box):
+class TimetaggerBox(Gtk.Box):
     def __init__(
             self,
             tt: timetagger.TimeTagger
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
-        self.timetagger = tt
-        self.raw_data = self.timetagger.measure()
-        self.data = timetagger.Data()
+        self.polarimeter = tt
+        self._measurement_rate = 0.1
+        self._event = threading.Event()
+        self._raw_data_container = [timetagger.RawData()]
+        self._measurement_thread = threading.Thread(
+            target=self._measure,
+            args=(self,)
+        )
+        self._measurement_thread.start()
 
-        self.columnone = ColumnOne(
+        self.data = timetagger.Data()
+        self.enable_polarimeter = True
+
+        self.plot_box = ColumnOne(
             get_data_callback=self.get_data
         )
-        self.append(child=self.columnone)
+        self.append(child=self.plot_box)
 
         self.poling_interval = 100
 
         self.columntwo = ColumnTwo(
-            get_raw_data_callback=self.get_raw_data,
+            set_enable_polarimeter_callback=self.set_enable_polarimeter,
+            get_enable_polarimeter_callback=self.get_enable_polarimeter,
+            set_poling_interval_callback=self.set_poling_interval,
+            get_poling_interval_callback=self.get_poling_interval,
             get_data_callback=self.get_data,
             get_device_info_callback=self.get_device_info
         )
@@ -526,28 +697,42 @@ class TimeTaggerBox(Gtk.Box):
             function=self.update_from_timetagger
         )
 
-    def get_raw_data(self) -> timetagger.RawData:
-        return self.raw_data
+    def _measure(self, _) -> None:
+        while True:
+            for i in range(len(self._raw_data_container)):
+                self._raw_data_container[i] = self.polarimeter.measure()
+            if self._event.is_set():
+                break
+            time.sleep(self._measurement_rate)
+
+    def set_enable_polarimeter(self, value: bool) -> None:
+        self.enable_polarimeter = value
+
+    def get_enable_polarimeter(self) -> bool:
+        return self.enable_polarimeter
+
+    def set_poling_interval(self, value: int) -> None:
+        self.poling_interval = value
+        print(self.poling_interval)
+
+    def get_poling_interval(self) -> int:
+        return self.poling_interval
 
     def get_data(self) -> timetagger.Data:
         return self.data
-
-    def get_device_info(self) -> timetagger.DeviceInfo:
-        return self.timetagger.device_info
-        
-    def update_from_timetagger(self) -> bool:
-        self.raw_data = self.timetagger.measure()
-        try:
-            self.data = timetagger.Data().from_raw_data(
-                raw_data=self.raw_data
-            )
-        except:
-            self.data = timetagger.Data()
-        self.set_qutag_data()
-        return True
     
-    def set_qutag_data(self) -> None:
-        self.columnone.plot_ellipse_group.update_plot()
-        self.columnone.plot_bloch_group.update_point()
-        self.columntwo.counts_group.update_timetagger_info()
-        self.columntwo.measurement_group.update_qutag_info()
+    def get_device_info(self) -> timetagger.DeviceInfo:
+        return self.polarimeter.device_info
+
+    def update_from_timetagger(self) -> bool:
+        if self.enable_polarimeter == True:
+            self.data = timetagger.Data().from_raw_data(
+                raw_data=self._raw_data_container[0]
+            )
+            self.set_timetagger_data()
+        return True
+
+    def set_timetagger_data(self):
+        self.plot_box.plot_ellipse_group.update_plot()
+        self.plot_box.plot_bloch_group.update_point()
+        self.columntwo.measurement_group.update_timetagger_info()

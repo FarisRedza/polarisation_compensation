@@ -2,7 +2,6 @@ import dataclasses
 import typing
 import math
 import struct
-import time
 
 import numpy
 
@@ -64,8 +63,12 @@ class DeviceInfo:
 
 @dataclasses.dataclass
 class RawData:
-    timetags: numpy.ndarray
-    channels: numpy.ndarray
+    timetags: numpy.ndarray = dataclasses.field(
+        default_factory=lambda: numpy.array([])
+    )
+    channels: numpy.ndarray = dataclasses.field(
+        default_factory=lambda: numpy.array([])
+    )
 
     def serialise(self) -> bytes:
         n_data_points = len(self.timetags)
@@ -160,7 +163,7 @@ class TimeTagger:
     def __init__(self) -> None:
         self.device_info = DeviceInfo()
 
-    def measure(self, seconds: int = 1) -> RawData:
+    def measure(self) -> RawData:
         data_points = 10000
         timetags = numpy.array(
             object=range(data_points),
@@ -179,24 +182,4 @@ class TimeTagger:
     
     def disconnect(self) -> None:
         pass
-
-if __name__ == '__main__':
-    with open(file='30.12_dB_0_km_1_mW_72.32588510097698_s.txt') as file:
-        timetags = []
-        channels = []
-        for line in file:
-            parts = line.strip().split()
-
-            if len(parts) < 2:
-                continue
-            
-            timetag, channel = int(parts[0]), int(parts[1])
-            timetags.append(timetag)
-            channels.append(channel)
-
-    raw_data = RawData(
-        timetags=numpy.array(object=timetags, dtype=numpy.int64),
-        channels=numpy.array(object=channels, dtype=numpy.uint8),
-    )
-    print(raw_data.timetags[-1])
 

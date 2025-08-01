@@ -16,7 +16,12 @@ from quTAG import QuTAG_HR
 
 class Qutag(timetagger.TimeTagger):
     def __init__(self) -> None:
-        self._qutag = QuTAG_HR.QuTAG()
+        qutag = QuTAG_HR.QuTAG()
+        if qutag.dev_nr == -1:
+            raise RuntimeError('Qutag not found')
+        else:
+            self._qutag = qutag
+
         for channel in range(0, 8):
             self._qutag.setSignalConditioning(
                 channel=channel,
@@ -55,14 +60,25 @@ class Qutag(timetagger.TimeTagger):
             channels=channels
         )
         return raw_data
+    
+def list_devices() -> list[Qutag]:
+    # will expand on this later, but needed now for compat
+    try:
+        qt = Qutag()
+    except:
+        return []
+    else:
+        return [qt]
 
 if __name__ == '__main__':
-    qutag = Qutag()
+    # qutag = Qutag()
 
-    for _ in range(10):
-        time.sleep(0.1)
-        print(timetagger.Data().from_raw_data(
-            raw_data=qutag.measure()
-        ))
+    # for _ in range(10):
+    #     time.sleep(0.1)
+    #     print(timetagger.Data().from_raw_data(
+    #         raw_data=qutag.measure()
+    #     ))
 
-    qutag._qutag.deInitialize()
+    # qutag._qutag.deInitialize()
+    dev = list_devices()
+    print(dev)
