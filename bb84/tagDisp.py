@@ -9,11 +9,10 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw
 
-from . import gui_widget
 from . import timetagger
 from . import uqd
-from . import qutag
 from . import remote_timetagger
+from . import tagDisp_device
 
 class DeviceListGroup(Adw.PreferencesGroup):
     def __init__(
@@ -24,7 +23,6 @@ class DeviceListGroup(Adw.PreferencesGroup):
             remote: bool = False
     ) -> None:
         super().__init__(title=title)
-        self.set_device_callback = set_device_callback
         self.remote = remote
         
         if len(devices_infos) == 0:
@@ -53,13 +51,18 @@ class DeviceListGroup(Adw.PreferencesGroup):
                     lambda button,
                     model=d.model: self.on_connect_device(
                         button=button,
+                        set_device=set_device_callback,
                         model=model
                     )
                 )
                 device_row.add_suffix(widget=connect_device_button)
 
-    def on_connect_device(self, button: Gtk.Button, model: str) -> None:
-        self.set_device_callback(
+    def on_connect_device(
+            self, button: Gtk.Button,
+            set_device: typing.Callable,
+            model: str
+    ) -> None:
+        set_device(
             model=model,
             remote=self.remote
         )
@@ -139,9 +142,9 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.set_title(title='Polarisation Viewer')
-        self.set_default_size(width=600, height=500)
-        self.set_size_request(width=450, height=150)
+        self.set_title(title='tagDisp')
+        self.set_default_size(width=650, height=575)
+        self.set_size_request(width=350, height=125)
         self.connect('close-request', self.on_close_request)
 
         self.host = '127.0.0.1'
@@ -149,22 +152,19 @@ class MainWindow(Adw.ApplicationWindow):
         self._sock: socket.socket | None = None
 
         # main box
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.set_content(content=main_box)
+        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_content(content=self.main_box)
 
         ## header_bar
-        try:
-            header_bar = Gtk.HeaderBar(
-                use_native_controls=True
-            )
-        except:
-            header_bar = Gtk.HeaderBar()
-        main_box.append(child=header_bar)
+        self.header_bar = Gtk.HeaderBar()
+        if Gtk.HeaderBar().find_property(property_name='use_native_controls'):
+            self.header_bar.set_use_native_controls(True)
+        self.main_box.append(child=self.header_bar)
 
         self.main_stack = Gtk.Stack(
             transition_type=Gtk.StackTransitionType.CROSSFADE
         )
-        main_box.append(child=self.main_stack)
+        self.main_box.append(child=self.main_stack)
 
         self.device_select_page = Adw.PreferencesPage()
         self.main_stack.add_child(child=self.device_select_page)
@@ -216,18 +216,18 @@ class MainWindow(Adw.ApplicationWindow):
 
     def set_device(self, model: str, remote: bool = False) -> None:
         if not remote:
-            self.timetagger_box = gui_widget.TimetaggerBox(
-                tt=timetagger.TimeTagger(
-                    # serial_number=serial_number
-                )
+            self.main_box.remove(child=self.header_bar)
+            self.timetagger_box = tagDisp_device.DeviceBox(
+                tt=timetagger.TimeTagger()
             )
         else:
-            self.timetagger_box = gui_widget.TimetaggerBox(
-                tt=remote_timetagger.RemoteTimetagger(
-                    model=model,
-                    sock=self._sock
-                )
-            )
+            # self.timetagger_box = gui_widget.TimetaggerBox(
+            #     tt=remote_timetagger.RemoteTimetagger(
+            #         model=model,
+            #         sock=self._sock
+            #     )
+            # )
+            pass
         self.main_stack.add_child(child=self.timetagger_box)
         self.main_stack.set_visible_child(child=self.timetagger_box)
 
@@ -260,7 +260,7 @@ class App(Adw.Application):
         self.win.present()
 
 if __name__ == '__main__':
-    app = App(application_id='com.github.FarisRedza.PolarisationViewer')
+    app = App(application_id='com.github.FarisRedza.tagDisp')
     try:
         app.run(sys.argv)
     except Exception as e:
@@ -269,4 +269,4 @@ if __name__ == '__main__':
         if hasattr(app.win, 'timetagger_box'):
             app.win.timetagger_box._event.set()
             app.win.timetagger_box._measurement_thread.join()
-            app.win.timetagger_box.polarimeter.disconnect()
+            app.win.timetagger_box.timetagger.disconnect()

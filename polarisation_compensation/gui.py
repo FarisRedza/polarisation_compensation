@@ -1,4 +1,6 @@
 import sys
+import os
+import signal
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -42,13 +44,17 @@ class MainWindow(Adw.ApplicationWindow):
                 serial_number='M00910360'
             )
         )
-        main_box.append(child=self.measurement_box)
+        self.content_box.append(child=self.measurement_box)
+
+        for m in thorlabs_motor.get_all_motors():
+            self.content_box.append(
+                child=motor_gui_widget.MotorControlPage(
+                    motor=m
+                )
+            )
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        if type(self.measurement_box) == polarimeter_gui_widget.PolarimeterBox:
-            self.measurement_box.polarimeter.disconnect()
-        # for i in self.motor_controllers:
-        #     i.motor_controls_group.motor.stop()
+        os.kill(os.getpid(), signal.SIGINT)
         return False
 
 class App(Adw.Application):
@@ -68,3 +74,8 @@ if __name__ == '__main__':
         # if type(app.win.polarisation_box) == polarimeter_gui_widget.PolarimeterBox:
             # app.win.polarisation_box.polarimeter.disconnect()
         print('App crashed with an exception:', e)
+    except KeyboardInterrupt:
+        if hasattr(app.win, 'measurement_box'):
+            app.win.measurement_box._event.set()
+            app.win.measurement_box._measurement_thread.join()
+            app.win.measurement_box.polarimeter.disconnect()
