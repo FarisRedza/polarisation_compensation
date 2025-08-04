@@ -216,8 +216,8 @@ class MainWindow(Adw.ApplicationWindow):
         )
 
     def set_device(self, model: str, remote: bool = False) -> None:
+        self.main_box.remove(child=self.header_bar)
         if not remote:
-            self.main_box.remove(child=self.header_bar)
             match model:
                 case 'Logic-16':
                     self.timetagger_box = tagDisp_device.DeviceBox(
@@ -228,12 +228,12 @@ class MainWindow(Adw.ApplicationWindow):
                         tt=timetagger.TimeTagger()
                     )
         else:
-            # self.timetagger_box = gui_widget.TimetaggerBox(
-            #     tt=remote_timetagger.RemoteTimetagger(
-            #         model=model,
-            #         sock=self._sock
-            #     )
-            # )
+            self.timetagger_box = tagDisp_device.DeviceBox(
+                tt=remote_timetagger.RemoteTimetagger(
+                    model=model,
+                    sock=self._sock
+                )
+            )
             pass
         self.main_stack.add_child(child=self.timetagger_box)
         self.main_stack.set_visible_child(child=self.timetagger_box)

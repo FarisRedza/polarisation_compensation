@@ -115,7 +115,7 @@ class RemoteTimetagger(timetagger.TimeTagger):
         send_command(
             sock=self._sock,
             command=remote_server.Command.MEASURE,
-            args=(self.device_info.serial_number,)
+            args=(self.device_info.model,)
         )
         payload = self._handle_response(
             expected_response_id=remote_server.Response.RAWDATA,
