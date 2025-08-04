@@ -63,7 +63,7 @@ class DeviceBox(Gtk.Box):
         self._data = timetagger.Data()
         self.enable_polarimeter = True
 
-        self.poling_interval = 100
+        self.refresh_rate = 250
 
         self.dc_calibration_file = pathlib.Path()
 
@@ -112,18 +112,22 @@ class DeviceBox(Gtk.Box):
             title='Settings'
         )
 
-        simple_display = page_simple_display.SimpleDisplay()
+        self.simple_display = page_simple_display.SimpleDisplay(
+            set_refresh_rate_callback=self.set_refresh_rate,
+            get_refresh_rate_callback=self.get_refresh_rate
+        )
         stack.add_titled(
-            child=simple_display,
+            child=self.simple_display,
             name='Simple Display',
             title='Simple Display'
         )
 
-        GLib.timeout_add(
-            self.poling_interval,
+        self._timeout_id = GLib.timeout_add(
+            self.refresh_rate,
             self.update_from_timetagger,
-            simple_display,
+            self.simple_display,
         )
+
 
     def _measure(self, _) -> None:
         while True:
@@ -180,3 +184,16 @@ class DeviceBox(Gtk.Box):
 
     def get_dc_calibration_file(self) -> pathlib.Path:
         return self.dc_calibration_file
+
+    def set_refresh_rate(self, value: int) -> None:
+        self.refresh_rate = value
+        if hasattr(self, '_timeout_id'):
+            GLib.source_remove(self._timeout_id)
+        self._timeout_id = GLib.timeout_add(
+            self.refresh_rate,
+            self.update_from_timetagger,
+            self.simple_display,
+        )
+
+    def get_refresh_rate(self) -> int:
+        return self.refresh_rate

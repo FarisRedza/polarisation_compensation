@@ -1,5 +1,6 @@
 import os
 import sys
+import typing
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -67,9 +68,11 @@ class SettingsScale(Gtk.Box):
     def __init__(
             self,
             label_string: str,
-            min: int,
-            max: int,
-            default_value: int = 0
+            min: float,
+            max: float,
+            default_value: float = 0,
+            digits: int = 0,
+            set_value_callback: typing.Callable = None
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
         label = Gtk.Label(
@@ -90,7 +93,7 @@ class SettingsScale(Gtk.Box):
         self.append(child=self.min_entry)
 
         self.scale = Gtk.Scale(
-            digits=0,
+            digits=digits,
             draw_value=True,
             hexpand=True,
         )
@@ -99,6 +102,11 @@ class SettingsScale(Gtk.Box):
             max=max
         )
         self.scale.set_value(value=default_value)
+        self.scale.connect(
+            'value-changed',
+            self.on_set_value,
+            set_value_callback
+        )
         self.append(child=self.scale)
 
         self.max_entry = Gtk.Entry(
@@ -110,8 +118,15 @@ class SettingsScale(Gtk.Box):
         # self.max_entry.connect('activate', self.on_update_window_range)
         self.append(child=self.max_entry)
 
+    def on_set_value(self, scale: Gtk.Scale, set_value_callback: typing.Callable) -> None:
+        set_value_callback(value=int(scale.get_value()))
+
 class Settings(Gtk.Box):
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            set_refresh_rate_callback: typing.Callable,
+            get_refresh_rate_callback: typing.Callable
+    ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
 
         window_scale = SettingsScale(
@@ -129,16 +144,22 @@ class Settings(Gtk.Box):
         self.append(child=delay_scale)
 
         refresh_rate_scale = SettingsScale(
-            label_string='Refresh Rate (s)',
-            min=0,
-            max=1000,
-            default_value=500
+            label_string='Refresh Rate (ms)',
+            min=1,
+            max=500,
+            default_value=get_refresh_rate_callback(),
+            # digits=3,
+            set_value_callback=set_refresh_rate_callback
         )
-        self.append(child=refresh_rate_scale)   
+        self.append(child=refresh_rate_scale)
 
 
 class SimpleDisplay(Gtk.ScrolledWindow):
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            set_refresh_rate_callback: typing.Callable,
+            get_refresh_rate_callback: typing.Callable
+    ) -> None:
         super().__init__(vexpand=True)
         self.set_policy(
             hscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
@@ -176,7 +197,12 @@ class SimpleDisplay(Gtk.ScrolledWindow):
         )
         simpleDisplayBox.append(child=self.channel_b_scale)
 
-        simpleDisplayBox.append(child=Settings())
+        simpleDisplayBox.append(
+            child=Settings(
+                set_refresh_rate_callback=set_refresh_rate_callback,
+                get_refresh_rate_callback=get_refresh_rate_callback
+            )
+        )
 
     def update_counts(self, raw_data: timetagger.RawData) -> None:
         singles = numpy.bincount(raw_data.channels, minlength=8)

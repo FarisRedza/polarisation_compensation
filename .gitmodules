@@ -7,3 +7,6 @@
 [submodule "quTAG"]
 	path = quTAG
 	url = https://github.com/FarisRedza/quTAG.git
+[submodule "UQDinterface"]
+	path = UQDinterface
+	url = https://github.com/edinburgh-mostly-quantum-lab/UQDinterface.git

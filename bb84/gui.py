@@ -170,12 +170,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_child(child=self.device_select_page)
         self.main_stack.set_visible_child(child=self.device_select_page)
 
-        # local_device_infos = [
-        #     d.device_info for d in uqd.list_devices()
-        # ] + [
-        #     d.device_info for d in qutag.list_devices()
-        # ]
-        local_device_infos = [timetagger.TimeTagger().device_info]
+        local_device_infos = [
+            d.device_info for d in uqd.list_devices()
+        ] + [
+            d.device_info for d in qutag.list_devices()
+        ]
+        # local_device_infos = [timetagger.TimeTagger().device_info]
         local_device_group = DeviceListGroup(
             title='Local Devices',
             devices_infos=local_device_infos,
@@ -217,9 +217,8 @@ class MainWindow(Adw.ApplicationWindow):
     def set_device(self, model: str, remote: bool = False) -> None:
         if not remote:
             self.timetagger_box = gui_widget.TimetaggerBox(
-                tt=timetagger.TimeTagger(
-                    # serial_number=serial_number
-                )
+                # tt=timetagger.TimeTagger()
+                tt=uqd.UQD()
             )
         else:
             self.timetagger_box = gui_widget.TimetaggerBox(

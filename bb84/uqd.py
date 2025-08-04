@@ -55,3 +55,4 @@ def list_devices() -> list[UQD]:
 
 if __name__ == '__main__':
     devs = list_devices()
+    print(devs[0].measure())

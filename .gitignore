@@ -220,7 +220,5 @@ dkms.conf
 PKG_SOURCE/
 
 # Binaries
-UQDinterface
 
 # Exceptions
-!src/ttag/UQD/CTimeTag/*.so

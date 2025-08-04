@@ -1,5 +1,6 @@
 import pathlib
 import typing
+import subprocess
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -185,7 +186,7 @@ class UQDInterface(Adw.PreferencesGroup):
         uqd_start_button.connect('clicked', self.on_uqd_start)
         uqdinterface_control_box.append(uqd_start_button)
 
-    def on_uqd_start(self, button) -> None:
+    def on_uqd_start(self, button: Gtk.Button) -> None:
         # if self.uqdinterface:
         #     return
 
@@ -210,6 +211,10 @@ class UQDInterface(Adw.PreferencesGroup):
         # GLib.io_add_watch(self.uqdinterface.stderr, GLib.IO_IN, self.read_uqd_output)
         # self.parent.on_toggle_timetagger()
         pass
+        uqd_interface_path = pathlib.Path().cwd().joinpath('UQDinterface/UQDinterface')
+        subprocess.Popen(['gnome-terminal', '--', uqd_interface_path])
+        
+        
 
     def on_uqd_stop(self, button) -> None:
         # if self.uqdinterface is not None:
