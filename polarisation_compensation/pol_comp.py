@@ -3,6 +3,7 @@ import threading
 import logging
 import json
 import datetime
+import typing
 
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 import motor.thorlabs_motor as thorlabs_motor
@@ -76,18 +77,68 @@ def compensate(
     def adjust_motor(
         motor_list: list[base_motor.Motor],
         motor_index: int,
-        current_value: float,
+        current_value: float | None,
         target_value: float,
-        thresholds_velocities: list[tuple[float, float]]
+        thresholds_velocities: list[tuple[float, float]],
+        probe_function: typing.Callable | None = None,
+        probe_step: float = 0.1,
+        probe_delay: float = 0.3
     ) -> None:
         if motor_index == -1:
             return
 
         motor = motor_list[motor_index]
-        delta = target_value - current_value
 
-        target_direction = base_motor.MotorDirection.FORWARD if delta > 0 else base_motor.MotorDirection.BACKWARD
-        abs_delta = abs(delta)
+        if current_value is not None:
+            delta = target_value - current_value
+            target_direction = base_motor.MotorDirection.FORWARD if delta > 0 else base_motor.MotorDirection.BACKWARD
+            abs_delta = abs(delta)
+        
+        elif probe_function is not None:
+            try:
+                original_value = probe_function()
+                motor.jog(
+                    direction=base_motor.MotorDirection.FORWARD,
+                    acceleration=20.0,
+                    max_velocity=5.0
+                )
+                time.sleep(probe_step)
+                motor.stop()
+                time.sleep(probe_delay)
+                forward_value = probe_function()
+
+                motor.jog(
+                    direction=base_motor.MotorDirection.BACKWARD,
+                    acceleration=20.0,
+                    max_velocity=5.0
+                )
+                time.sleep(0.1)
+                motor.stop()
+                time.sleep(0.3)
+                backward_value = probe_function()
+
+                if forward_value < original_value and forward_value < backward_value:
+                    target_direction = base_motor.MotorDirection.FORWARD
+                    abs_delta = abs(forward_value - original_value)
+                elif backward_value < original_value:
+                    target_direction = base_motor.MotorDirection.BACKWARD
+                    abs_delta = abs(backward_value - original_value)
+                else:
+                    target_direction = base_motor.MotorDirection.IDLE
+                    abs_delta = 0
+    
+            except Exception as e:
+                motor_logger.error("Probe failed", exc_info=True)
+                return
+            
+        else:
+            motor_logger.warning("No valid feedback for motor control")
+            return
+            
+        if target_direction == base_motor.MotorDirection.IDLE:
+            if motor.is_moving:
+                motor.stop()
+            return
 
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
             if abs_delta > threshold:
@@ -100,17 +151,17 @@ def compensate(
                         max_velocity=velocity
                     )
                 motor_logger.info(
-                    msg='Direction change',
+                    msg='Motor adjustment',
                     extra={
                         'serial number': motor.device_info.serial_number,
-                        'direction': motor.direction.name
+                        'direction': motor.direction.name,
+                        'method': 'probe' if current_value is None else 'direct',
+                        'delta': abs_delta
                     }
                 )
                 break
-            elif motor.is_moving == True:
+            elif motor.is_moving:
                 motor.stop()
-            else:
-                pass
 
 
     adjust_motor(
@@ -128,6 +179,24 @@ def compensate(
         target_value=parameter_2_target,
         thresholds_velocities=parameter_2_velocities
     )
+
+    # adjust_motor(
+    #     motor_list=motor_list,
+    #     motor_index=motor_1_index,
+    #     current_value=None,
+    #     target_value=parameter_1_target,
+    #     thresholds_velocities=parameter_1_velocities,
+    #     probe_function=lambda: 1 - data.normalised_s1**2
+    # )
+
+    # adjust_motor(
+    #     motor_list=motor_list,
+    #     motor_index=motor_2_index,
+    #     current_value=None,
+    #     target_value=parameter_2_target,
+    #     thresholds_velocities=parameter_2_velocities,
+    #     probe_function=lambda: 1 - data.normalised_s2**2
+    # )
 
     return True
 
@@ -190,8 +259,6 @@ if __name__ == '__main__':
                 data = thorlabs_polarimeter.Data().from_raw_data(
                     raw_data=raw_data_container[0]
                 )
-                qber = 1 - data.normalised_s1**2
-                qx = 1 - data.normalised_s2**2
                 compensate(
                     motor_list=motors,
                     motor_1_serial_no=QWP,
@@ -203,6 +270,8 @@ if __name__ == '__main__':
                     parameter_1_current_value=data.azimuth,
                     parameter_2_current_value=data.ellipticity
                 )
+                qber = max(0, min(1, 1 - data.normalised_s1**2))
+                qx = max(0, min(1, 1 - data.normalised_s2**2))
                 data_logger.info(
                     msg='Measurement taken',
                     extra={
