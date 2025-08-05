@@ -136,9 +136,7 @@ if __name__ == '__main__':
     handler.setFormatter(fmt=JsonFormatter())
 
     file_handler = logging.FileHandler(
-        filename=f'pol_comp_{datetime.datetime.now().strftime(
-            format='%Y_%m_%d_%H_%M_%S'
-        )}.log'
+        filename=f'pol_comp_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.log'
     )
     file_handler.setFormatter(fmt=JsonFormatter())
 
