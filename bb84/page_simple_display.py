@@ -13,8 +13,9 @@ import ttag
 from . import timetagger
 
 class ChannelCounter(Gtk.Box):
-    def __init__(self, label: str) -> None:
+    def __init__(self, label: str, counter_size: int = 40) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
+        self.counter_size = counter_size
         channel_label = Gtk.Label(label=label)
         self.append(child=channel_label)
 
@@ -22,13 +23,13 @@ class ChannelCounter(Gtk.Box):
         self.channel_counts_label.set_halign(align=Gtk.Align.END)
         self.channel_counts_label.set_hexpand(expand=True)
         self.channel_counts_label.set_markup(
-            f'<span font_desc="Monospace 40">{0}</span>'
+            f'<span font_desc="Monospace {counter_size}">{0}</span>'
         )
         self.append(child=self.channel_counts_label)
 
     def update_counts(self, value: int) -> None:
         self.channel_counts_label.set_markup(
-            f'<span font_desc="Monospace 40">{value}</span>'
+            f'<span font_desc="Monospace {self.counter_size}">{value}</span>'
         )
 
 class ChannelScale(Gtk.Box):
@@ -118,28 +119,40 @@ class SettingsScale(Gtk.Box):
         # self.max_entry.connect('activate', self.on_update_window_range)
         self.append(child=self.max_entry)
 
-    def on_set_value(self, scale: Gtk.Scale, set_value_callback: typing.Callable) -> None:
+    def on_set_value(
+            self,
+            scale: Gtk.Scale,
+            set_value_callback: typing.Callable
+    ) -> None:
         set_value_callback(value=int(scale.get_value()))
 
 class Settings(Gtk.Box):
     def __init__(
             self,
+            set_window_callback: typing.Callable,
+            get_window_callback: typing.Callable,
             set_refresh_rate_callback: typing.Callable,
-            get_refresh_rate_callback: typing.Callable
+            get_refresh_rate_callback: typing.Callable,
+            set_delay_callback: typing.Callable,
+            get_delay_callback: typing.Callable
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
 
         window_scale = SettingsScale(
             label_string='Window (ns)',
-            min=0,
-            max=2000
+            min=1,
+            max=2000,
+            default_value=get_window_callback(),
+            set_value_callback=set_window_callback
         )
         self.append(child=window_scale)
 
         delay_scale = SettingsScale(
             label_string='Delay (ns)',
             min=-1000,
-            max=1000
+            max=1000,
+            default_value=get_delay_callback(),
+            set_value_callback=set_delay_callback
         )
         self.append(child=delay_scale)
 
@@ -153,10 +166,13 @@ class Settings(Gtk.Box):
         )
         self.append(child=refresh_rate_scale)
 
-
 class SimpleDisplay(Gtk.ScrolledWindow):
     def __init__(
             self,
+            set_window_callback: typing.Callable,
+            get_window_callback: typing.Callable,
+            set_delay_callback: typing.Callable,
+            get_delay_callback: typing.Callable,
             set_refresh_rate_callback: typing.Callable,
             get_refresh_rate_callback: typing.Callable
     ) -> None:
@@ -165,6 +181,8 @@ class SimpleDisplay(Gtk.ScrolledWindow):
             hscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
             vscrollbar_policy=Gtk.PolicyType.AUTOMATIC
         )
+        self.counter_size = 40
+
         simpleDisplayBox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         simpleDisplayBox.set_margin_top(margin=20)
         simpleDisplayBox.set_margin_bottom(margin=20)
@@ -172,16 +190,28 @@ class SimpleDisplay(Gtk.ScrolledWindow):
         simpleDisplayBox.set_margin_end(margin=20)
         self.set_child(simpleDisplayBox)
 
-        self.channel_a_counter = ChannelCounter(label='Channel A')
+        self.channel_a_counter = ChannelCounter(
+            label='Channel A',
+            counter_size=self.counter_size
+        )
         simpleDisplayBox.append(child=self.channel_a_counter)
 
-        self.channel_b_counter = ChannelCounter(label='Channel B')
+        self.channel_b_counter = ChannelCounter(
+            label='Channel B',
+            counter_size=self.counter_size
+        )
         simpleDisplayBox.append(child=self.channel_b_counter)
 
-        self.coincidence_counter = ChannelCounter(label='Coincidences')
+        self.coincidence_counter = ChannelCounter(
+            label='Coincidences',
+            counter_size=self.counter_size
+        )
         simpleDisplayBox.append(child=self.coincidence_counter)
 
-        self.efficiency = ChannelCounter(label='Efficiency')
+        self.efficiency = ChannelCounter(
+            label='Efficiency',
+            counter_size=self.counter_size
+        )
         simpleDisplayBox.append(child=self.efficiency)
 
         self.channel_a_scale = ChannelScale(
@@ -199,6 +229,10 @@ class SimpleDisplay(Gtk.ScrolledWindow):
 
         simpleDisplayBox.append(
             child=Settings(
+                set_window_callback=set_window_callback,
+                get_window_callback=get_window_callback,
+                set_delay_callback=set_delay_callback,
+                get_delay_callback=get_delay_callback,
                 set_refresh_rate_callback=set_refresh_rate_callback,
                 get_refresh_rate_callback=get_refresh_rate_callback
             )
@@ -206,9 +240,12 @@ class SimpleDisplay(Gtk.ScrolledWindow):
 
     def update_counts(self, raw_data: timetagger.RawData) -> None:
         singles = numpy.bincount(raw_data.channels, minlength=8)
+        channel_a_counts = int(self.channel_a_scale.scale.get_value() - 1)
+        channel_b_counts = int(self.channel_b_scale.scale.get_value() - 1)
+
         self.channel_a_counter.update_counts(
-            value=singles[int(self.channel_a_scale.scale.get_value() - 1)]
+            value=singles[channel_a_counts]
         )
         self.channel_b_counter.update_counts(
-            value=singles[int(self.channel_b_scale.scale.get_value() - 1)]
+            value=singles[channel_b_counts]
         )

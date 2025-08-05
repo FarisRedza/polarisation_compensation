@@ -169,20 +169,18 @@ class UQDInterface(Adw.PreferencesGroup):
         ### uqd stop button
         uqd_stop_button = Gtk.Button(
             label='Stop',
-            valign=Gtk.Align.CENTER
+            valign=Gtk.Align.CENTER,
+            css_classes=['destructive-action', 'pill']
         )
-        uqd_stop_button.add_css_class('destructive-action')
-        uqd_stop_button.add_css_class('pill')
         uqd_stop_button.connect('clicked', self.on_uqd_stop)
         uqdinterface_control_box.append(uqd_stop_button)
 
         ### uqd start button
         uqd_start_button = Gtk.Button(
             label='Start',
-            valign=Gtk.Align.CENTER
+            valign=Gtk.Align.CENTER,
+            css_classes=['suggested-action', 'pill']
         )
-        uqd_start_button.add_css_class('suggested-action')
-        uqd_start_button.add_css_class('pill')
         uqd_start_button.connect('clicked', self.on_uqd_start)
         uqdinterface_control_box.append(uqd_start_button)
 

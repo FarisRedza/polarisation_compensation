@@ -7,7 +7,7 @@ import socket
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw
+from gi.repository import Gtk, Adw, Gio
 
 from . import timetagger
 from . import uqd
@@ -176,7 +176,7 @@ class MainWindow(Adw.ApplicationWindow):
         # local_device_infos += [
         #     d.device_info for d in qutag.list_devices()
         # ]
-        # local_device_infos = [timetagger.TimeTagger().device_info]
+        local_device_infos = [timetagger.TimeTagger().device_info]
         local_device_group = DeviceListGroup(
             title='Local Devices',
             devices_infos=local_device_infos,
@@ -262,9 +262,66 @@ class App(Adw.Application):
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 
-    def on_activate(self, app: Adw.Application):
+        help_action = Gio.SimpleAction(name='help')
+        help_action.connect('activate', self.on_help)
+        self.add_action(action=help_action)
+
+        about_action = Gio.SimpleAction(name='about')
+        about_action.connect('activate', self.on_about)
+        self.add_action(action=about_action)
+
+        quit_action = Gio.SimpleAction(name='quit')
+        quit_action.connect('activate', self.on_quit)
+        self.add_action(action=quit_action)
+
+    def on_activate(self, app: Adw.Application) -> None:
         self.win = MainWindow(application=app)
         self.win.present()
+
+    def on_help(
+            self,
+            simple_action,
+            parameter_type = None
+    ) -> None:
+        help_dialog = Gtk.MessageDialog(
+            transient_for=self.get_active_window(),
+            modal=True,
+            buttons=Gtk.ButtonsType.OK,
+            text='Help',
+            secondary_text='Select a UQD time tagger device, click start, and then click the Simple Display button'
+        )
+        help_dialog.connect(
+            'response',
+            lambda dialog, response: dialog.destroy()
+        )
+        help_dialog.present()
+
+    def on_about(
+            self,
+            simple_action: Gio.SimpleAction,
+            parameter_type = None
+        ) -> None:
+        about_dialog = Gtk.AboutDialog(
+            transient_for=self.win,
+            modal=True,
+            logo_icon_name='tag-symbolic',
+            name='tagDisp',
+            version='0.1',
+            authors=[
+                'Faris Redza',
+                'Peter Barrow'
+            ],
+            website='https://github.com/edinburgh-mostly-quantum-lab/tagDisp'
+        )
+        about_dialog.present()
+
+    def on_quit(
+            self,
+            simple_action: Gio.SimpleAction,
+            parameter_type = None
+    ) -> None:
+        # self.quit()
+        os.kill(os.getpid(), signal.SIGINT)
 
 if __name__ == '__main__':
     app = App(application_id='com.github.FarisRedza.tagDisp')
