@@ -5,13 +5,16 @@ import json
 import datetime
 import typing
 
-import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
+# import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
+import bb84.timetagger as thorlabs_polarimeter
+import bb84.remote_timetagger as remote_timetagger
 import motor.thorlabs_motor as thorlabs_motor
 import motor.base_motor as base_motor
 
 MOTOR_SERVER_HOST = '137.195.89.222'
 MOTOR_SERVER_PORT = 5002
 MEASUREMENT_SERVER_HOST = '137.195.89.222'
+MEASUREMENT_SERVER_HOST = '137.195.63.6'
 MEASUREMENT_SERVER_PORT = 5001
 
 class JsonFormatter(logging.Formatter):
@@ -43,7 +46,7 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_record)
 
 def get_data(
-        polarisation_device: thorlabs_polarimeter.Polarimeter,
+        polarisation_device: remote_timetagger.RemoteTimetagger,
         raw_data_container: list,
         polling_rate: float = 1
     ) -> None:
@@ -222,8 +225,11 @@ if __name__ == '__main__':
     meaurement_rate = 0.1
     compensation_rate = 0.1
 
-    measurement_device = thorlabs_polarimeter.Polarimeter(
-        serial_number='M00910360'
+    measurement_device = remote_timetagger.RemoteTimetagger(
+        host=MEASUREMENT_SERVER_HOST,
+        port=MEASUREMENT_SERVER_PORT,
+        model='Logic-16'
+        # serial_number='M00910360'
     )
     motors = [
         thorlabs_motor.ThorlabsMotor(serial_number=m[0])

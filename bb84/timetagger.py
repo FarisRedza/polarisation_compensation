@@ -4,6 +4,7 @@ import math
 import struct
 
 import numpy
+import tomtag as tomt
 
 Percent = typing.NewType('Percent', float)
 Degrees = typing.NewType('Degrees', float)
@@ -25,6 +26,57 @@ C_780_D = 6
 C_780_A = 7
 C_780_R = None
 C_780_L = None
+
+def find_delay(
+        tags_1550: numpy.ndarray,
+        tags_780: numpy.ndarray,
+        tcc: int = 15
+    ) -> int:
+    """
+    Find the delay between the two channels.
+    """
+    # find delay between 1550 and 780 nm
+    cc = []
+    for delay in numpy.arange(-3000, 3000,10):
+        cc.append(
+            tomt.count_twofolds(
+                tags_1550, tags_780 + delay,
+                len(tags_1550), len(tags_780), 15
+            )
+        )
+    return numpy.arange(-3000, 3000,10)[numpy.argmax(cc)]
+    
+def get_qber(channels, timetags, delay=0, tcc=15):
+    """
+    Assume that channels are HVDAHVDA
+    """
+    tags_H_1550 = timetags[channels == 0]
+    tags_V_1550 = timetags[channels == 1]
+    tags_D_1550 = timetags[channels == 2]
+    tags_A_1550 = timetags[channels == 3]
+    tags_H_780 = timetags[channels == 4] + delay
+    tags_V_780 = timetags[channels == 5] + delay
+    tags_D_780 = timetags[channels == 6] + delay
+    tags_A_780 = timetags[channels == 7] + delay
+
+    # self.find_delay(tags_H_1550, tags_H_780, tcc)
+
+    HH = tomt.count_twofolds(tags_H_1550, tags_H_780, len(tags_H_1550), len(tags_H_780),tcc)
+    HV = tomt.count_twofolds(tags_H_1550, tags_V_780, len(tags_H_1550), len(tags_V_780),tcc)
+    VH = tomt.count_twofolds(tags_V_1550, tags_H_780, len(tags_V_1550), len(tags_H_780),tcc)
+    VV = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
+
+    qber =  (VH + VH) / (HH + HV + VH + VV)
+    print( HH, HV, VH, VV)
+
+    DD = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
+    DA = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
+    AD = tomt.count_twofolds(tags_A_1550, tags_D_780, len(tags_A_1550), len(tags_D_780),tcc)
+    AA = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
+
+    qx =  (DA + AD) / (DD + AD + DA + AA)
+
+    return qber, qx, HH+HV+VH+VV
 
 @dataclasses.dataclass
 class DeviceInfo:
@@ -110,10 +162,14 @@ class Data:
     normalised_s1: float = 0.0
     normalised_s2: float = 0.0
     normalised_s3: float = 0.0
+    qber: float = 0.0
+    qx: float = 0.0
 
     @classmethod
     def from_raw_data(cls, raw_data: RawData) -> 'Data':
-        singles = numpy.bincount(raw_data.channels, minlength=8)
+        singles = numpy.bincount(raw_data.channels.astype(numpy.int64) , minlength=8)
+        print(raw_data.timetags[0:10])
+        print(singles)
 
         with numpy.errstate(invalid='ignore'):
             try:
@@ -142,6 +198,14 @@ class Data:
             case _:
                 raise TypeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
 
+        try:    
+            qber, qx, rate = get_qber(channels=raw_data.channels, timetags=raw_data.timetags)
+        except:
+            qber = 0
+            qx = 0
+        else:
+            print(qber, qx)
+
         try:
             eta = math.asin(s3)/2
         except:
@@ -156,7 +220,9 @@ class Data:
             ellipticity=math.degrees(eta),
             normalised_s1=s1,
             normalised_s2=s2,
-            normalised_s3=s3
+            normalised_s3=s3,
+            qber=qber,
+            qx=qx
         )
 
 class TimeTagger:
