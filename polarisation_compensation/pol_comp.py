@@ -4,9 +4,11 @@ import logging
 import json
 import datetime
 import typing
+import pathlib
+import collections
 
 # import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
-import bb84.timetagger as thorlabs_polarimeter
+import bb84.timetagger as timetagger
 import bb84.remote_timetagger as remote_timetagger
 import motor.thorlabs_motor as thorlabs_motor
 import motor.base_motor as base_motor
@@ -18,9 +20,15 @@ MEASUREMENT_SERVER_HOST = '137.195.63.6'
 MEASUREMENT_SERVER_PORT = 5001
 
 class JsonFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.datetime.fromtimestamp(record.created)
+        if datefmt:
+            return dt.strftime(datefmt).replace('%f', f"{dt.microsecond // 1000:03d}")
+        return dt.isoformat()
+
     def format(self, record) -> str:
         log_record = {
-            'time': self.formatTime(record=record),
+            'time': self.formatTime(record=record, datefmt=f'{datetime_format}.%f'),
             'level': record.levelname,
             'name': record.name,
             'message': record.getMessage(),
@@ -46,16 +54,16 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_record)
 
 def get_data(
-        polarisation_device: remote_timetagger.RemoteTimetagger,
+        measurement_device: timetagger.TimeTagger,
         raw_data_container: list,
-        polling_rate: float = 1
+        measurement_rate: float = 1
     ) -> None:
-    while True:
+    # while True:
         for i in range(len(raw_data_container)):
-            raw_data_container[i] = polarisation_device.measure()
-        if event.is_set():
-            break
-        time.sleep(polling_rate)
+            raw_data_container[i] = measurement_device.measure()
+        # if event.is_set():
+        #     break
+        time.sleep(measurement_rate)
 
 def compensate(
         motor_list: list[base_motor.Motor],
@@ -204,37 +212,11 @@ def compensate(
     return True
 
 if __name__ == '__main__':
-    handler = logging.StreamHandler()
-    handler.setFormatter(fmt=JsonFormatter())
-
-    file_handler = logging.FileHandler(
-        filename=f'pol_comp_{datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}.log'
-    )
-    file_handler.setFormatter(fmt=JsonFormatter())
-
-    motor_logger = logging.getLogger(name='Motor')
-    motor_logger.setLevel(level=logging.INFO)
-    motor_logger.addHandler(hdlr=file_handler)
-
-    data_logger = logging.getLogger(name='Data')
-    data_logger.setLevel(level=logging.INFO)
-    data_logger.addHandler(hdlr=file_handler)
-
-    event = threading.Event()
-    raw_data_container = [thorlabs_polarimeter.RawData()]
+    # settings
     meaurement_rate = 0.1
     compensation_rate = 0.1
-
-    measurement_device = remote_timetagger.RemoteTimetagger(
-        host=MEASUREMENT_SERVER_HOST,
-        port=MEASUREMENT_SERVER_PORT,
-        model='Logic-16'
-        # serial_number='M00910360'
-    )
-    motors = [
-        thorlabs_motor.ThorlabsMotor(serial_number=m[0])
-        for m in thorlabs_motor.list_thorlabs_motors()
-    ]
+    cycles = 5
+    smoothing_factor = 0.1
 
     QWP = '55353314'  # azimuth
     HWP = '55356974'  # ellipticity
@@ -250,50 +232,129 @@ if __name__ == '__main__':
         (2.5, 15.0),
     ]
 
-    measurement_thread = threading.Thread(
-        target=get_data,
-        args=(
-            measurement_device,
-            raw_data_container,
-            meaurement_rate
-        )
+    # setup logging
+    datetime_format = '%Y_%m_%d_%H_%M_%S'
+    handler = logging.StreamHandler()
+    handler.setFormatter(fmt=JsonFormatter())
+
+    pathlib.Path('logs').mkdir(exist_ok=True)
+    file_handler = logging.FileHandler(
+        filename=f'logs/pol_comp_{datetime.datetime.now().strftime(datetime_format)}.log'
     )
-    measurement_thread.start()
+    file_handler.setFormatter(fmt=JsonFormatter())
+
+    motor_logger = logging.getLogger(name='Motor')
+    motor_logger.setLevel(level=logging.INFO)
+    motor_logger.addHandler(hdlr=file_handler)
+
+    data_logger = logging.getLogger(name='Data')
+    data_logger.setLevel(level=logging.INFO)
+    data_logger.addHandler(hdlr=file_handler)
+
+    # devices
+    measurement_device = remote_timetagger.RemoteTimetagger(
+        host=MEASUREMENT_SERVER_HOST,
+        port=MEASUREMENT_SERVER_PORT,
+        model='Logic-16'
+    )
+    # measurement_device = timetagger.TimeTagger()
+
+    motors = [
+        thorlabs_motor.ThorlabsMotor(serial_number=m[0])
+        for m in thorlabs_motor.list_thorlabs_motors()
+    ]
+
+    raw_data_container = [timetagger.RawData()]
+    qber_avg = None
+    qx_avg = None
     while True:
         try:
-            if isinstance(raw_data_container[0], thorlabs_polarimeter.RawData):
-                data = thorlabs_polarimeter.Data().from_raw_data(
-                    raw_data=raw_data_container[0]
-                )
-                compensate(
-                    motor_list=motors,
-                    motor_1_serial_no=QWP,
-                    motor_2_serial_no=HWP,
-                    parameter_1_target=target_qber,
-                    parameter_2_target=target_qx,
-                    parameter_1_velocities=qber_velocity,
-                    parameter_2_velocities=qx_velocity,
-                    parameter_1_current_value=data.azimuth,
-                    parameter_2_current_value=data.ellipticity
-                )
-                # qber = max(0, min(1, 1 - data.normalised_s1**2))
-                # qx = max(0, min(1, 1 - data.normalised_s2**2))
-                data_logger.info(
-                    msg='Measurement taken',
-                    extra={
-                        'QBER': data.qber,
-                        'Qx': data.qx
-                    }
-                )
+            get_data(
+                measurement_device=measurement_device,
+                raw_data_container=raw_data_container,
+                measurement_rate=meaurement_rate
+            )
+            data = timetagger.Data().from_raw_data(raw_data=raw_data_container[0])
+            qber_values = collections.deque(maxlen=cycles)
+            qx_values = collections.deque(maxlen=cycles)
 
-            time.sleep(compensation_rate)
+            qber_values.append(data.qber)
+            qx_values.append(data.qx)
+
+            qber_avg = sum(qber_values) / len(qber_values)
+            qx_avg = sum(qx_values) / len(qx_values)
+
+            # # EMA
+            # if qber_avg is None or qx_avg is None:
+            #     qber_avg = data.qber
+            #     qx_avg = data.qx
+            # else:
+            #     qber_avg = (1 - smoothing_factor) * qber_avg + smoothing_factor * data.qber
+            #     qx_avg = (1 - smoothing_factor) * qx_avg + smoothing_factor * data.qx
+
+            print(qber_avg)
+            print(qx_avg)
+
+            data_logger.info(
+                msg='Measurement taken',
+                extra={
+                    'singles': data.singles.tolist(),
+                    'QBER': data.qber,
+                    'Qx': data.qx
+                }
+            )
+
         except KeyboardInterrupt:
-            event.set()
             break
 
-    measurement_thread.join()
+    # # threading
+    # raw_data_container = [timetagger.RawData()]
+    # event = threading.Event()
+    # measurement_thread = threading.Thread(
+    #     target=get_data,
+    #     args=(
+    #         measurement_device,
+    #         raw_data_container,
+    #         meaurement_rate
+    #     )
+    # )
+    # measurement_thread.start()
+    # while True:
+    #     try:
+    #         if isinstance(raw_data_container[0], timetagger.RawData):
+    #             data = timetagger.Data().from_raw_data(
+    #                 raw_data=raw_data_container[0]
+    #             )
+    #             # compensate(
+    #             #     motor_list=motors,
+    #             #     motor_1_serial_no=QWP,
+    #             #     motor_2_serial_no=HWP,
+    #             #     parameter_1_target=target_qber,
+    #             #     parameter_2_target=target_qx,
+    #             #     parameter_1_velocities=qber_velocity,
+    #             #     parameter_2_velocities=qx_velocity,
+    #             #     parameter_1_current_value=data.azimuth,
+    #             #     parameter_2_current_value=data.ellipticity
+    #             # )
+    #             # qber = max(0, min(1, 1 - data.normalised_s1**2))
+    #             # qx = max(0, min(1, 1 - data.normalised_s2**2))
+    #             data_logger.info(
+    #                 msg='Measurement taken',
+    #                 extra={
+    #                     'Singles': data.singles,
+    #                     'QBER': data.qber,
+    #                     'Qx': data.qx
+    #                 }
+    #             )
 
-    for m in motors:
-        m.stop()
-        m.disconnect()
-    measurement_device.disconnect()
+    #         time.sleep(compensation_rate)
+    #     except KeyboardInterrupt:
+    #         event.set()
+    #         break
+
+    # measurement_thread.join()
+
+    # for m in motors:
+    #     m.stop()
+    #     m.disconnect()
+    # measurement_device.disconnect()

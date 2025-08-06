@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-file_name = 'pol_comp_2025_08_05_16_39_10.log'
+file_name = 'logs/pol_comp_2025_08_06_11_36_45.847868.log'
 with open(file_name, 'r') as f:
     qbers  = []
     qxs = []
@@ -12,7 +12,7 @@ with open(file_name, 'r') as f:
         data = json.loads(line)
         qbers += [data['QBER']]
         qxs += [data['Qx']]
-        # singles += [data['singles']]
+        singles += [data['singles']]
         time = data['time'].split(' ')[1].split(',')[0].split(':')
         times += [int(time[0])*3600 + int(time[1])*60 + float(time[2])]
 

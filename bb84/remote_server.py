@@ -98,7 +98,7 @@ def handle_client(
                         payload=payload,
                         response_id=Response.LIST_DEVICES
                     )
-                
+
                 elif args:
                     model = str(args[0])
                     device = next(
@@ -134,7 +134,7 @@ def handle_client(
                                 message=f'Unsupported command: {command}',
                                 response_id=Response.ERROR
                             )
-                    
+
                 else:
                     send_message(
                         sock=sock,

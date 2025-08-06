@@ -45,8 +45,14 @@ def find_delay(
             )
         )
     return numpy.arange(-3000, 3000,10)[numpy.argmax(cc)]
-    
-def get_qber(channels, timetags, delay=0, tcc=50):
+
+def get_qber(
+        channels,
+        timetags,
+        delay=0,
+        tcc=50,
+        verbose: bool = False
+) -> tuple[float,float,float]:
     """
     Assume that channels are HVDAHVDA
     """
@@ -67,8 +73,9 @@ def get_qber(channels, timetags, delay=0, tcc=50):
     VV = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
 
     qber =  (VH + VH) / (HH + HV + VH + VV)
-    print('qber =',qber)
-    print( HH, HV, VH, VV)
+    if verbose == True:
+        print('qber =',qber)
+        print( HH, HV, VH, VV)
 
     DD = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
     DA = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
@@ -76,8 +83,9 @@ def get_qber(channels, timetags, delay=0, tcc=50):
     AA = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
 
     qx =  (DA + AD) / (DD + AD + DA + AA)
-    print('qx =', qx)
-    print(DD, AD, DA, AA)
+    if verbose == True:
+        print('qx =', qx)
+        print(DD, AD, DA, AA)
 
     return qber, qx, HH+HV+VH+VV
 
@@ -165,6 +173,9 @@ class Data:
     normalised_s1: float = 0.0
     normalised_s2: float = 0.0
     normalised_s3: float = 0.0
+    singles: numpy.ndarray = dataclasses.field(
+        default_factory=lambda: numpy.array([])
+    )
     qber: float = 0.0
     qx: float = 0.0
 
@@ -219,6 +230,7 @@ class Data:
             normalised_s1=s1,
             normalised_s2=s2,
             normalised_s3=s3,
+            singles=singles,
             qber=qber,
             qx=qx
         )
