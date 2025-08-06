@@ -167,21 +167,21 @@ def compensate(
                 motor.stop()
 
 
-    adjust_motor(
-        motor_list=motor_list,
-        motor_index=motor_1_index,
-        current_value=parameter_1_current_value,
-        target_value=parameter_1_target,
-        thresholds_velocities=parameter_1_velocities
-    )
+    # adjust_motor(
+    #     motor_list=motor_list,
+    #     motor_index=motor_1_index,
+    #     current_value=parameter_1_current_value,
+    #     target_value=parameter_1_target,
+    #     thresholds_velocities=parameter_1_velocities
+    # )
 
-    adjust_motor(
-        motor_list=motor_list,
-        motor_index=motor_2_index,
-        current_value=parameter_2_current_value,
-        target_value=parameter_2_target,
-        thresholds_velocities=parameter_2_velocities
-    )
+    # adjust_motor(
+    #     motor_list=motor_list,
+    #     motor_index=motor_2_index,
+    #     current_value=parameter_2_current_value,
+    #     target_value=parameter_2_target,
+    #     thresholds_velocities=parameter_2_velocities
+    # )
 
     # adjust_motor(
     #     motor_list=motor_list,
@@ -276,13 +276,13 @@ if __name__ == '__main__':
                     parameter_1_current_value=data.azimuth,
                     parameter_2_current_value=data.ellipticity
                 )
-                qber = max(0, min(1, 1 - data.normalised_s1**2))
-                qx = max(0, min(1, 1 - data.normalised_s2**2))
+                # qber = max(0, min(1, 1 - data.normalised_s1**2))
+                # qx = max(0, min(1, 1 - data.normalised_s2**2))
                 data_logger.info(
                     msg='Measurement taken',
                     extra={
-                        'QBER': qber,
-                        'Qx': qx
+                        'QBER': data.qber,
+                        'Qx': data.qx
                     }
                 )
 

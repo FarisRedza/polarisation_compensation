@@ -46,7 +46,7 @@ def find_delay(
         )
     return numpy.arange(-3000, 3000,10)[numpy.argmax(cc)]
     
-def get_qber(channels, timetags, delay=0, tcc=15):
+def get_qber(channels, timetags, delay=0, tcc=50):
     """
     Assume that channels are HVDAHVDA
     """
@@ -67,6 +67,7 @@ def get_qber(channels, timetags, delay=0, tcc=15):
     VV = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
 
     qber =  (VH + VH) / (HH + HV + VH + VV)
+    print('qber =',qber)
     print( HH, HV, VH, VV)
 
     DD = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
@@ -75,6 +76,8 @@ def get_qber(channels, timetags, delay=0, tcc=15):
     AA = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
 
     qx =  (DA + AD) / (DD + AD + DA + AA)
+    print('qx =', qx)
+    print(DD, AD, DA, AA)
 
     return qber, qx, HH+HV+VH+VV
 
@@ -168,8 +171,6 @@ class Data:
     @classmethod
     def from_raw_data(cls, raw_data: RawData) -> 'Data':
         singles = numpy.bincount(raw_data.channels.astype(numpy.int64) , minlength=8)
-        print(raw_data.timetags[0:10])
-        print(singles)
 
         with numpy.errstate(invalid='ignore'):
             try:
@@ -203,9 +204,6 @@ class Data:
         except:
             qber = 0
             qx = 0
-        else:
-            print(qber, qx)
-
         try:
             eta = math.asin(s3)/2
         except:

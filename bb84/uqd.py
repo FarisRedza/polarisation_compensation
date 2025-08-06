@@ -27,8 +27,9 @@ import bb84.timetagger as timetagger
 import ttag.python.ttag as ttag
 
 class UQD(timetagger.TimeTagger):
-    def __init__(self) -> None:
+    def __init__(self, tagsAsTime: bool = False) -> None:
         self._uqd = ttag.TTBuffer(buffernumber=ttag.getfreebuffer()-1)
+        self._uqd.tagsAsTime = tagsAsTime
         self.device_info = timetagger.DeviceInfo(
             manufacturer = 'UQDevices',
             model = 'Logic-16',
