@@ -66,16 +66,23 @@ def get_data(
         time.sleep(measurement_rate)
 
 def compensate(
-        motor_list: list[base_motor.Motor],
-        motor_1_serial_no: str,
-        motor_2_serial_no: str,
-        parameter_1_target: float,
-        parameter_2_target: float,
-        parameter_1_velocities: list[tuple[float, float]],
-        parameter_2_velocities: list[tuple[float, float]],
-        parameter_1_current_value: float,
-        parameter_2_current_value: float
-) -> bool:
+    motor_list: list[base_motor.Motor],
+    motor_1_serial_no: str,
+    motor_2_serial_no: str,
+    parameter_1_target: float,
+    parameter_2_target: float,
+    parameter_1_velocities: list[tuple[float, float]],
+    parameter_2_velocities: list[tuple[float, float]],
+    parameter_1_current_value: float,
+    parameter_2_current_value: float,
+    mode: typing.Literal['direct', 'probe'] = 'probe',
+    prev_value_1: typing.Optional[float] = None,
+    prev_value_2: typing.Optional[float] = None,
+    probe_direction_1: typing.Optional[base_motor.MotorDirection] = None,
+    probe_direction_2: typing.Optional[base_motor.MotorDirection] = None,
+):
+# ) -> tuple[bool, float, float, base_motor.MotorDirection, base_motor.MotorDirection]:
+
     motor_1_index = next(
         (i for i, m in enumerate(motor_list) if m.device_info.serial_number == motor_1_serial_no),
         -1
@@ -86,73 +93,51 @@ def compensate(
     )
 
     def adjust_motor(
-        motor_list: list[base_motor.Motor],
         motor_index: int,
-        current_value: float | None,
+        current_value: float,
         target_value: float,
         thresholds_velocities: list[tuple[float, float]],
-        probe_function: typing.Callable | None = None,
-        probe_step: float = 0.1,
-        probe_delay: float = 0.3
-    ) -> None:
+        prev_value: typing.Optional[float],
+        probe_direction: typing.Optional[base_motor.MotorDirection],
+    ) -> tuple[typing.Optional[float], typing.Optional[base_motor.MotorDirection]]:
         if motor_index == -1:
-            return
+            return prev_value, probe_direction
 
         motor = motor_list[motor_index]
+        delta = target_value - current_value
+        abs_delta = abs(delta)
 
-        if current_value is not None:
-            delta = target_value - current_value
-            target_direction = base_motor.MotorDirection.FORWARD if delta > 0 else base_motor.MotorDirection.BACKWARD
-            abs_delta = abs(delta)
-        
-        elif probe_function is not None:
-            try:
-                original_value = probe_function()
-                motor.jog(
-                    direction=base_motor.MotorDirection.FORWARD,
-                    acceleration=20.0,
-                    max_velocity=5.0
-                )
-                time.sleep(probe_step)
-                motor.stop()
-                time.sleep(probe_delay)
-                forward_value = probe_function()
+        if mode == "direct":
+            target_direction = (
+                base_motor.MotorDirection.FORWARD if delta > 0 else
+                base_motor.MotorDirection.BACKWARD if delta < 0 else
+                base_motor.MotorDirection.IDLE
+            )
 
-                motor.jog(
-                    direction=base_motor.MotorDirection.BACKWARD,
-                    acceleration=20.0,
-                    max_velocity=5.0
-                )
-                time.sleep(0.1)
-                motor.stop()
-                time.sleep(0.3)
-                backward_value = probe_function()
+        elif mode == "probe":
+            if probe_direction is None:
+                probe_direction = base_motor.MotorDirection.FORWARD
 
-                if forward_value < original_value and forward_value < backward_value:
-                    target_direction = base_motor.MotorDirection.FORWARD
-                    abs_delta = abs(forward_value - original_value)
-                elif backward_value < original_value:
-                    target_direction = base_motor.MotorDirection.BACKWARD
-                    abs_delta = abs(backward_value - original_value)
-                else:
-                    target_direction = base_motor.MotorDirection.IDLE
-                    abs_delta = 0
-    
-            except Exception as e:
-                motor_logger.error("Probe failed", exc_info=True)
-                return
-            
+            if prev_value is not None:
+                improving = current_value <= prev_value
+                if not improving:
+                    probe_direction = (
+                        base_motor.MotorDirection.BACKWARD
+                        if probe_direction == base_motor.MotorDirection.FORWARD
+                        else base_motor.MotorDirection.FORWARD
+                    )
+
+            target_direction = probe_direction
         else:
-            motor_logger.warning("No valid feedback for motor control")
-            return
-            
+            raise ValueError(f"Unknown mode: {mode}")
+
         if target_direction == base_motor.MotorDirection.IDLE:
             if motor.is_moving:
                 motor.stop()
-            return
+            return current_value, probe_direction
 
         for threshold, velocity in sorted(thresholds_velocities, reverse=True):
-            if abs_delta > threshold:
+            if abs_delta > threshold or mode == "probe":
                 if (motor.direction != target_direction or
                         motor.max_velocity != velocity):
                     motor.direction = target_direction
@@ -166,70 +151,71 @@ def compensate(
                     extra={
                         'serial number': motor.device_info.serial_number,
                         'direction': motor.direction.name,
-                        'method': 'probe' if current_value is None else 'direct',
-                        'delta': abs_delta
+                        'method': mode,
+                        'velocity': motor.max_velocity
                     }
                 )
                 break
             elif motor.is_moving:
                 motor.stop()
 
+        return current_value, probe_direction
 
-    # adjust_motor(
-    #     motor_list=motor_list,
-    #     motor_index=motor_1_index,
-    #     current_value=parameter_1_current_value,
-    #     target_value=parameter_1_target,
-    #     thresholds_velocities=parameter_1_velocities
-    # )
+    new_prev_1, new_probe_direction_1 = adjust_motor(
+        motor_index=motor_1_index,
+        current_value=parameter_1_current_value,
+        target_value=parameter_1_target,
+        thresholds_velocities=parameter_1_velocities,
+        prev_value=prev_value_1,
+        probe_direction=probe_direction_1,
+    )
 
-    # adjust_motor(
-    #     motor_list=motor_list,
+    new_prev_2 = None
+    new_probe_direction_2 = None
+    # new_prev_2, new_probe_direction_2 = adjust_motor(
     #     motor_index=motor_2_index,
     #     current_value=parameter_2_current_value,
     #     target_value=parameter_2_target,
-    #     thresholds_velocities=parameter_2_velocities
-    # )
-
-    # adjust_motor(
-    #     motor_list=motor_list,
-    #     motor_index=motor_1_index,
-    #     current_value=None,
-    #     target_value=parameter_1_target,
-    #     thresholds_velocities=parameter_1_velocities,
-    #     probe_function=lambda: 1 - data.normalised_s1**2
-    # )
-
-    # adjust_motor(
-    #     motor_list=motor_list,
-    #     motor_index=motor_2_index,
-    #     current_value=None,
-    #     target_value=parameter_2_target,
     #     thresholds_velocities=parameter_2_velocities,
-    #     probe_function=lambda: 1 - data.normalised_s2**2
+    #     prev_value=prev_value_2,
+    #     probe_direction=probe_direction_2,
     # )
 
-    return True
+    return True, new_prev_1, new_prev_2, new_probe_direction_1, new_probe_direction_2
+
 
 if __name__ == '__main__':
     # settings
     meaurement_rate = 0.1
     compensation_rate = 0.1
     cycles = 5
-    smoothing_factor = 0.1
 
     QWP = '55353314'  # azimuth
     HWP = '55356974'  # ellipticity
+    
+    M1 = QWP
+    M2 = HWP
+    
     target_qber = 0
     target_qx = 0
 
+    # 5 mins maintained with cycles = 3
+    # qber_velocity = [
+    #     (0.5, 25.0),
+    #     (0.25, 15.0),
+    #     (0.1, 1.0),
+    # ]
+    # qx_velocity = [
+    #     (0.5, 25.0),
+    #     (0.25, 15.0),
+    #     (0.1, 0.1)
+    # ]
+
     qber_velocity = [
-        (5.0, 25.0),
-        (2.5, 15.0),
+        (0.0, 5.0),
     ]
     qx_velocity = [
-        (5.0, 25.0),
-        (2.5, 15.0),
+        (0.0, 5.0)
     ]
 
     # setup logging
@@ -267,6 +253,11 @@ if __name__ == '__main__':
     raw_data_container = [timetagger.RawData()]
     qber_avg = None
     qx_avg = None
+
+    prev_qber = None
+    prev_qx = None
+    qber_direction = None
+    qx_direction = None
     while True:
         try:
             get_data(
@@ -284,16 +275,8 @@ if __name__ == '__main__':
             qber_avg = sum(qber_values) / len(qber_values)
             qx_avg = sum(qx_values) / len(qx_values)
 
-            # # EMA
-            # if qber_avg is None or qx_avg is None:
-            #     qber_avg = data.qber
-            #     qx_avg = data.qx
-            # else:
-            #     qber_avg = (1 - smoothing_factor) * qber_avg + smoothing_factor * data.qber
-            #     qx_avg = (1 - smoothing_factor) * qx_avg + smoothing_factor * data.qx
-
-            print(qber_avg)
-            print(qx_avg)
+            # print(qber_avg)
+            # print(qx_avg)
 
             data_logger.info(
                 msg='Measurement taken',
@@ -304,57 +287,26 @@ if __name__ == '__main__':
                 }
             )
 
+            _, prev_qber, prev_qx, qber_direction, qx_direction = compensate(
+                motor_list=motors,
+                motor_1_serial_no=M1,
+                motor_2_serial_no=M2,
+                parameter_1_target=target_qber,
+                parameter_2_target=target_qx,
+                parameter_1_velocities=qber_velocity,
+                parameter_2_velocities=qx_velocity,
+                parameter_1_current_value=qber_avg,
+                parameter_2_current_value=qx_avg,
+                mode='probe',
+                prev_value_1=prev_qber,
+                prev_value_2=prev_qx,
+                probe_direction_1=qber_direction,
+                probe_direction_2=qx_direction
+            )
+            time.sleep(compensation_rate)
+
         except KeyboardInterrupt:
+            for m in motors:
+                m.stop()
+                m.disconnect()
             break
-
-    # # threading
-    # raw_data_container = [timetagger.RawData()]
-    # event = threading.Event()
-    # measurement_thread = threading.Thread(
-    #     target=get_data,
-    #     args=(
-    #         measurement_device,
-    #         raw_data_container,
-    #         meaurement_rate
-    #     )
-    # )
-    # measurement_thread.start()
-    # while True:
-    #     try:
-    #         if isinstance(raw_data_container[0], timetagger.RawData):
-    #             data = timetagger.Data().from_raw_data(
-    #                 raw_data=raw_data_container[0]
-    #             )
-    #             # compensate(
-    #             #     motor_list=motors,
-    #             #     motor_1_serial_no=QWP,
-    #             #     motor_2_serial_no=HWP,
-    #             #     parameter_1_target=target_qber,
-    #             #     parameter_2_target=target_qx,
-    #             #     parameter_1_velocities=qber_velocity,
-    #             #     parameter_2_velocities=qx_velocity,
-    #             #     parameter_1_current_value=data.azimuth,
-    #             #     parameter_2_current_value=data.ellipticity
-    #             # )
-    #             # qber = max(0, min(1, 1 - data.normalised_s1**2))
-    #             # qx = max(0, min(1, 1 - data.normalised_s2**2))
-    #             data_logger.info(
-    #                 msg='Measurement taken',
-    #                 extra={
-    #                     'Singles': data.singles,
-    #                     'QBER': data.qber,
-    #                     'Qx': data.qx
-    #                 }
-    #             )
-
-    #         time.sleep(compensation_rate)
-    #     except KeyboardInterrupt:
-    #         event.set()
-    #         break
-
-    # measurement_thread.join()
-
-    # for m in motors:
-    #     m.stop()
-    #     m.disconnect()
-    # measurement_device.disconnect()
