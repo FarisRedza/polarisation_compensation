@@ -170,16 +170,16 @@ def compensate(
         probe_direction=probe_direction_1,
     )
 
-    new_prev_2 = None
-    new_probe_direction_2 = None
-    # new_prev_2, new_probe_direction_2 = adjust_motor(
-    #     motor_index=motor_2_index,
-    #     current_value=parameter_2_current_value,
-    #     target_value=parameter_2_target,
-    #     thresholds_velocities=parameter_2_velocities,
-    #     prev_value=prev_value_2,
-    #     probe_direction=probe_direction_2,
-    # )
+    # new_prev_2 = None
+    # new_probe_direction_2 = None
+    new_prev_2, new_probe_direction_2 = adjust_motor(
+        motor_index=motor_2_index,
+        current_value=parameter_2_current_value,
+        target_value=parameter_2_target,
+        thresholds_velocities=parameter_2_velocities,
+        prev_value=prev_value_2,
+        probe_direction=probe_direction_2,
+    )
 
     return True, new_prev_1, new_prev_2, new_probe_direction_1, new_probe_direction_2
 

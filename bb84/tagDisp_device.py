@@ -9,7 +9,8 @@ from gi.repository import Gtk, Gio, Adw, GObject, GLib
 
 from . import timetagger
 from . import page_simple_display
-from . import page_settings as page_settings
+from . import page_settings
+from . import page_plot
 
 class Sidebar(Gtk.Revealer):
     def __init__(self) -> None:
@@ -34,7 +35,6 @@ class Sidebar(Gtk.Revealer):
 
         popover = Gtk.Popover(
             position=Gtk.PositionType.BOTTOM,
-            # css_classes=['menu']
         )
         menu_button.set_popover(popover=popover)
 
@@ -45,8 +45,7 @@ class Sidebar(Gtk.Revealer):
 
         counter_size_box = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL,
-            margin_start=10,
-            # spacing=6
+            margin_start=10
         )
         popover_box.append(child=counter_size_box)
 
@@ -119,6 +118,7 @@ class DeviceBox(Gtk.Box):
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
         self.timetagger = tt
+        self._data = timetagger.Data()
         self._measurement_rate = 0.1
         self._event = threading.Event()
         self._raw_data_container = [timetagger.RawData()]
@@ -127,9 +127,6 @@ class DeviceBox(Gtk.Box):
             args=(self,)
         )
         self._measurement_thread.start()
-
-        self._data = timetagger.Data()
-        self.enable_polarimeter = True
 
         self.window = 1
         self.delay = 0
@@ -183,12 +180,7 @@ class DeviceBox(Gtk.Box):
         )
 
         self.simple_display = page_simple_display.SimpleDisplay(
-            set_window_callback=self.set_window,
-            get_window_callback=self.get_window,
-            set_delay_callback=self.set_delay,
-            get_delay_callback=self.get_delay,
-            set_refresh_rate_callback=self.set_refresh_rate,
-            get_refresh_rate_callback=self.get_refresh_rate
+            get_data_callback=self.get_data
         )
         stack.add_titled(
             child=self.simple_display,
@@ -196,10 +188,18 @@ class DeviceBox(Gtk.Box):
             title='Simple Display'
         )
 
+        plot_page = page_plot.PlotPage(
+            get_data_callback=self.get_data
+        )
+        stack.add_titled(
+            child=plot_page,
+            name='Plot',
+            title='Plot'
+        )
+
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_from_timetagger,
-            self.simple_display,
+            self.set_data
         )
 
 
@@ -228,30 +228,17 @@ class DeviceBox(Gtk.Box):
     ) -> None:
         window_title.set_title(title=stack.get_visible_child_name() or '')
 
+    def set_data(self) -> bool:
+        self._data = timetagger.Data().from_raw_data(
+            raw_data=self._raw_data_container[0]
+        )
+        return True
+
     def get_data(self) -> timetagger.Data:
         return self._data
     
     def get_device_info(self) -> timetagger.DeviceInfo:
         return self.timetagger.device_info
-
-    def update_from_timetagger(
-            self,
-            simple_display: page_simple_display.SimpleDisplay
-    ) -> bool:
-        self._data = timetagger.Data().from_raw_data(
-            raw_data=self._raw_data_container[0]
-        )
-        self.set_timetagger_data(simple_display=simple_display)
-        return True
-
-    def set_timetagger_data(
-            self,
-            simple_display: page_simple_display.SimpleDisplay
-    ) -> None:
-        simple_display.update_counts(raw_data=self._raw_data_container[0])
-        # self.plot_box.plot_ellipse_group.update_plot()
-        # self.plot_box.plot_bloch_group.update_point()
-        # self.columntwo.measurement_group.update_timetagger_info()
 
     def set_dc_calibration_file(self, path: pathlib.Path) -> None:
         self.dc_calibration_file = path
@@ -277,7 +264,7 @@ class DeviceBox(Gtk.Box):
             GLib.source_remove(self._timeout_id)
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_from_timetagger,
+            self.set_data,
             self.simple_display,
         )
 

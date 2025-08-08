@@ -4,7 +4,7 @@ import typing
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib
 import numpy
 
 sys.path.append(os.environ['TTAG'])
@@ -169,19 +169,19 @@ class Settings(Gtk.Box):
 class SimpleDisplay(Gtk.ScrolledWindow):
     def __init__(
             self,
-            set_window_callback: typing.Callable,
-            get_window_callback: typing.Callable,
-            set_delay_callback: typing.Callable,
-            get_delay_callback: typing.Callable,
-            set_refresh_rate_callback: typing.Callable,
-            get_refresh_rate_callback: typing.Callable
+            get_data_callback: typing.Callable
     ) -> None:
         super().__init__(vexpand=True)
+        self.get_data_callback = get_data_callback
+
         self.set_policy(
             hscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
             vscrollbar_policy=Gtk.PolicyType.AUTOMATIC
         )
         self.counter_size = 40
+        self.window = 1
+        self.delay = 0
+        self.refresh_rate = 250
 
         simpleDisplayBox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         simpleDisplayBox.set_margin_top(margin=20)
@@ -229,23 +229,59 @@ class SimpleDisplay(Gtk.ScrolledWindow):
 
         simpleDisplayBox.append(
             child=Settings(
-                set_window_callback=set_window_callback,
-                get_window_callback=get_window_callback,
-                set_delay_callback=set_delay_callback,
-                get_delay_callback=get_delay_callback,
-                set_refresh_rate_callback=set_refresh_rate_callback,
-                get_refresh_rate_callback=get_refresh_rate_callback
+                set_window_callback=self.set_window,
+                get_window_callback=self.get_window,
+                set_delay_callback=self.set_delay,
+                get_delay_callback=self.get_delay,
+                set_refresh_rate_callback=self.set_refresh_rate,
+                get_refresh_rate_callback=self.get_refresh_rate
             )
         )
 
-    def update_counts(self, raw_data: timetagger.RawData) -> None:
-        singles = numpy.bincount(raw_data.channels, minlength=8)
+        self._timeout_id = GLib.timeout_add(
+            self.refresh_rate,
+            self.update_counts,
+            self.get_data_callback
+        )
+
+    def update_counts(
+            self,
+            get_data_callback: typing.Callable
+    ) -> bool:
+        data: timetagger.Data = get_data_callback()
         channel_a_counts = int(self.channel_a_scale.scale.get_value() - 1)
         channel_b_counts = int(self.channel_b_scale.scale.get_value() - 1)
 
-        self.channel_a_counter.update_counts(
-            value=singles[channel_a_counts]
+        if len(data.singles) > 0:
+            self.channel_a_counter.update_counts(
+                value=data.singles[channel_a_counts]
+            )
+            self.channel_b_counter.update_counts(
+                value=data.singles[channel_b_counts]
+            )
+        return True
+
+    def set_window(self, value: int) -> None:
+        self.window = value
+
+    def get_window(self) -> int:
+        return self.window
+    
+    def set_delay(self, value: int) -> None:
+        self.delay = value
+
+    def get_delay(self) -> int:
+        return self.delay
+    
+    def set_refresh_rate(self, value: int) -> None:
+        self.refresh_rate = value
+        if hasattr(self, '_timeout_id'):
+            GLib.source_remove(self._timeout_id)
+        self._timeout_id = GLib.timeout_add(
+            self.refresh_rate,
+            self.update_counts,
+            self.get_data_callback
         )
-        self.channel_b_counter.update_counts(
-            value=singles[channel_b_counts]
-        )
+
+    def get_refresh_rate(self) -> int:
+        return self.refresh_rate

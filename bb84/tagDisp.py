@@ -157,7 +157,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         ## header_bar
         self.header_bar = Gtk.HeaderBar()
-        if Gtk.HeaderBar().find_property(property_name='use_native_controls'):
+        if Gtk.HeaderBar().find_property(property_name='use_native_controls') is not None:
             self.header_bar.set_use_native_controls(True)
         self.main_box.append(child=self.header_bar)
 
