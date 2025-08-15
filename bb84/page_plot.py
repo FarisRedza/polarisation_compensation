@@ -318,6 +318,9 @@ class QBERPlot(Gtk.Box):
         self.axes.set_xlim(0, self.plot_length)
         self.axes.grid(visible=self.grid)
 
+        self.axes.get_legend().get_texts()[0].set_text(f'QBER - {qber_avg:.3f}')
+        self.axes.get_legend().get_texts()[1].set_text(f'Qx - {qx_avg:.3f}')
+
         self.canvas.draw()
         return True
     
@@ -376,6 +379,6 @@ class PlotPage(Gtk.ScrolledWindow):
 
         qber_plot = QBERPlot(get_data_callback=get_data_callback)
         main_box.append(child=qber_plot)
-        
-        pol_plot = PolEllipsePlot(get_data_callback=get_data_callback)
-        main_box.append(child=pol_plot)
+
+        # pol_plot = PolEllipsePlot(get_data_callback=get_data_callback)
+        # main_box.append(child=pol_plot)

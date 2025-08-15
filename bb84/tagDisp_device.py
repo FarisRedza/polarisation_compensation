@@ -8,8 +8,9 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Gio, Adw, GObject, GLib
 
 from . import timetagger
-from . import page_simple_display
 from . import page_settings
+from . import page_simple_display
+from . import page_channels
 from . import page_plot
 
 class Sidebar(Gtk.Revealer):
@@ -188,6 +189,13 @@ class DeviceBox(Gtk.Box):
             title='Simple Display'
         )
 
+        self.channels_page = page_channels.ChannelsPage()
+        stack.add_titled(
+            child=self.channels_page,
+            name='Channels',
+            title='Channels'
+        )
+
         plot_page = page_plot.PlotPage(
             get_data_callback=self.get_data
         )
@@ -230,12 +238,19 @@ class DeviceBox(Gtk.Box):
 
     def set_data(self) -> bool:
         self._data = timetagger.Data().from_raw_data(
-            raw_data=self._raw_data_container[0]
+            raw_data=self._raw_data_container[0],
+            pattern=self.get_pattern()
         )
         return True
 
     def get_data(self) -> timetagger.Data:
         return self._data
+    
+    def set_pattern(self, pattern: dict) -> None:
+        self.timetagger.pattern = pattern
+
+    def get_pattern(self) -> dict:
+        return self.timetagger.pattern
     
     def get_device_info(self) -> timetagger.DeviceInfo:
         return self.timetagger.device_info

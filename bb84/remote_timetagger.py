@@ -107,6 +107,8 @@ class RemoteTimetagger(timetagger.TimeTagger):
         else:
             raise NameError('Must provide either a socket or host and port')
         self._get_device_info(model=model)
+        self.pattern = timetagger.default_pattern
+
     
     def disconnect(self) -> None:
         pass
