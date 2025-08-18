@@ -265,11 +265,13 @@ class SimpleDisplay(Gtk.ScrolledWindow):
         self.delay = 0
         self.refresh_rate = 250
 
+        margin = 20
         main_box = Gtk.Box(
-            margin_top=20,
-            margin_bottom=20,
-            margin_start=20,
-            margin_end=20,
+            margin_top=margin,
+            margin_bottom=margin,
+            margin_start=margin,
+            margin_end=margin,
+            spacing=margin,
             orientation=Gtk.Orientation.VERTICAL
         )
         self.set_child(main_box)

@@ -150,8 +150,11 @@ class MeasurementInfoGroup(Adw.PreferencesGroup):
         self.qx_counter.update_counts(value=data.qx)
 
 class MeasurementBox(Gtk.Box):
-    def __init__(self, channels: int) -> None:
-        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+    def __init__(self, channels: int, spacing: int = 20) -> None:
+        super().__init__(
+            spacing=spacing,
+            orientation=Gtk.Orientation.VERTICAL
+        )
 
         self.singles_group = SinglesGroup(channels=channels)
         self.append(child=self.singles_group)
@@ -294,16 +297,18 @@ class Display(Gtk.ScrolledWindow):
         self.delay = 0
         self.refresh_rate = 250
     
+        margin = 20
         main_box = Gtk.Box(
-            margin_top=20,
-            margin_bottom=20,
-            margin_start=20,
-            margin_end=20,
+            margin_top=margin,
+            margin_bottom=margin,
+            margin_start=margin,
+            margin_end=margin,
+            spacing=margin,
             orientation=Gtk.Orientation.VERTICAL
         )
         self.set_child(main_box)
 
-        self.measurement_box = MeasurementBox(channels=8)
+        self.measurement_box = MeasurementBox(channels=8, spacing=margin)
         main_box.append(child=self.measurement_box)
 
         self.settings_box = SettingsGroup(
