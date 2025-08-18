@@ -242,11 +242,13 @@ class Data:
                     raise TypeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
 
             try:    
-                qber, qx, rate = get_qber(
-                    channels=raw_data.channels,
-                    timetags=raw_data.timetags,
-                    pattern=pattern
-                )
+                # qber, qx, rate = get_qber(
+                #     channels=raw_data.channels,
+                #     timetags=raw_data.timetags,
+                #     pattern=pattern
+                # )
+                qber = 1 - s1**2
+                qx = 1 - s2**2
             except:
                 qber = 0
                 qx = 0

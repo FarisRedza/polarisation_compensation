@@ -10,6 +10,7 @@ from gi.repository import Gtk, Gio, Adw, GObject, GLib
 from . import timetagger
 from . import page_settings
 from . import page_simple_display
+from . import page_display
 from . import page_channels
 from . import page_plot
 
@@ -187,6 +188,15 @@ class DeviceBox(Gtk.Box):
             child=self.simple_display,
             name='Simple Display',
             title='Simple Display'
+        )
+
+        self.display = page_display.Display(
+            get_data_callback=self.get_data
+        )
+        stack.add_titled(
+            child=self.display,
+            name='Display',
+            title='Display'
         )
 
         self.channels_page = page_channels.ChannelsPage()
