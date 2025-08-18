@@ -46,14 +46,14 @@ class SinglesGroup(Adw.PreferencesGroup):
         self.add(child=row)
 
         margin = 6
-        box = Gtk.Box(
+        main_box = Gtk.Box(
             margin_top=margin,
             margin_bottom=margin,
             margin_start=margin,
             margin_end=margin,
             orientation=Gtk.Orientation.HORIZONTAL
         )
-        row.set_child(child=box)
+        row.set_child(child=main_box)
 
         left_box = Gtk.Box(
             margin_top=margin,
@@ -62,8 +62,8 @@ class SinglesGroup(Adw.PreferencesGroup):
             margin_end=margin,
             orientation=Gtk.Orientation.VERTICAL
         )
-        box.append(child=left_box)
-        box.append(child=Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+        main_box.append(child=left_box)
+        main_box.append(child=Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         right_box = Gtk.Box(
             margin_top=margin,
             margin_bottom=margin,
@@ -71,7 +71,7 @@ class SinglesGroup(Adw.PreferencesGroup):
             margin_end=margin,
             orientation=Gtk.Orientation.VERTICAL
         )
-        box.append(child=right_box)
+        main_box.append(child=right_box)
 
         self.counters: list[Counter] = []
         for i in range(1, int(channels/2)+1):
@@ -163,7 +163,7 @@ class MeasurementBox(Gtk.Box):
         self.singles_group.update_counts(data=data)
         self.measurement_info_group.update_counts(data=data)
 
-class SettingsScale(Gtk.Box):
+class SettingsScale(Adw.ActionRow):
     def __init__(
             self,
             label_string: str,
@@ -173,14 +173,25 @@ class SettingsScale(Gtk.Box):
             default_value: float = 0,
             digits: int = 0
     ) -> None:
-        super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
+        super().__init__()
+        margin = 6
+        main_box = Gtk.Box(
+            margin_top=margin,
+            margin_bottom=margin,
+            margin_start=margin,
+            margin_end=margin,
+            spacing=margin,
+            orientation=Gtk.Orientation.HORIZONTAL
+        )
+        self.set_child(child=main_box)
+
         label = Gtk.Label(
             label=label_string,
             width_chars=7,
             wrap=True,
             justify=Gtk.Justification.CENTER
         )
-        self.append(child=label)
+        main_box.append(child=label)
 
         self.min_entry = Gtk.Entry(
             valign=Gtk.Align.CENTER,
@@ -189,7 +200,7 @@ class SettingsScale(Gtk.Box):
             text=str(min)
         )
         # self.min_entry.connect('activate', self.on_update_window_range)
-        self.append(child=self.min_entry)
+        main_box.append(child=self.min_entry)
 
         self.scale = Gtk.Scale(
             digits=digits,
@@ -206,7 +217,7 @@ class SettingsScale(Gtk.Box):
             self.on_set_value,
             set_value_callback
         )
-        self.append(child=self.scale)
+        main_box.append(child=self.scale)
 
         self.max_entry = Gtk.Entry(
             valign=Gtk.Align.CENTER,
@@ -215,7 +226,7 @@ class SettingsScale(Gtk.Box):
             text=str(max)
         )
         # self.max_entry.connect('activate', self.on_update_window_range)
-        self.append(child=self.max_entry)
+        main_box.append(child=self.max_entry)
 
     def on_set_value(
             self,
@@ -224,7 +235,7 @@ class SettingsScale(Gtk.Box):
     ) -> None:
         set_value_callback(value=int(scale.get_value()))
 
-class Settings(Gtk.Box):
+class SettingsGroup(Adw.PreferencesGroup):
     def __init__(
             self,
             set_window_callback: typing.Callable,
@@ -234,7 +245,9 @@ class Settings(Gtk.Box):
             set_delay_callback: typing.Callable,
             get_delay_callback: typing.Callable
     ) -> None:
-        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        super().__init__(title='Display Settings')
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.add(child=main_box)
 
         window_scale = SettingsScale(
             label_string='Window (ns)',
@@ -243,7 +256,7 @@ class Settings(Gtk.Box):
             default_value=get_window_callback(),
             set_value_callback=set_window_callback
         )
-        self.append(child=window_scale)
+        self.add(child=window_scale)
 
         delay_scale = SettingsScale(
             label_string='Delay (ns)',
@@ -252,7 +265,7 @@ class Settings(Gtk.Box):
             default_value=get_delay_callback(),
             set_value_callback=set_delay_callback
         )
-        self.append(child=delay_scale)
+        self.add(child=delay_scale)
 
         refresh_rate_scale = SettingsScale(
             label_string='Refresh Rate (ms)',
@@ -262,7 +275,7 @@ class Settings(Gtk.Box):
             # digits=3,
             set_value_callback=set_refresh_rate_callback
         )
-        self.append(child=refresh_rate_scale)
+        self.add(child=refresh_rate_scale)
 
 class Display(Gtk.ScrolledWindow):
     def __init__(
@@ -281,18 +294,19 @@ class Display(Gtk.ScrolledWindow):
         self.delay = 0
         self.refresh_rate = 250
     
-
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        main_box.set_margin_top(margin=20)
-        main_box.set_margin_bottom(margin=20)
-        main_box.set_margin_start(margin=20)
-        main_box.set_margin_end(margin=20)
+        main_box = Gtk.Box(
+            margin_top=20,
+            margin_bottom=20,
+            margin_start=20,
+            margin_end=20,
+            orientation=Gtk.Orientation.VERTICAL
+        )
         self.set_child(main_box)
 
         self.measurement_box = MeasurementBox(channels=8)
         main_box.append(child=self.measurement_box)
 
-        self.settings_box = Settings(
+        self.settings_box = SettingsGroup(
             set_window_callback=self.set_window,
             get_window_callback=self.get_window,
             set_delay_callback=self.set_delay,
@@ -301,23 +315,6 @@ class Display(Gtk.ScrolledWindow):
             get_refresh_rate_callback=self.get_refresh_rate
         )
         main_box.append(child=self.settings_box)
-
-        # self.singles_group = SinglesGroup(channels=8)
-        # displayBox.append(child=self.singles_group)
-
-        # self.measurement_info_group = MeasurementInfoGroup()
-        # displayBox.append(child=self.measurement_info_group)
-
-        # displayBox.append(
-        #     child=Settings(
-        #         set_window_callback=self.set_window,
-        #         get_window_callback=self.get_window,
-        #         set_delay_callback=self.set_delay,
-        #         get_delay_callback=self.get_delay,
-        #         set_refresh_rate_callback=self.set_refresh_rate,
-        #         get_refresh_rate_callback=self.get_refresh_rate
-        #     )
-        # )
 
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
@@ -331,8 +328,6 @@ class Display(Gtk.ScrolledWindow):
     ) -> bool:
         data: timetagger.Data = get_data_callback()
         self.measurement_box.update_data(data=data)
-        # self.singles_group.update_counts(data=data)
-        # self.measurement_info_group.update_counts(data=data)
         return True
 
     def set_window(self, value: int) -> None:
