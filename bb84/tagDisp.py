@@ -176,7 +176,7 @@ class MainWindow(Adw.ApplicationWindow):
         # local_device_infos += [
         #     d.device_info for d in qutag.list_devices()
         # ]
-        local_device_infos = [timetagger.TimeTagger().device_info]
+        local_device_infos += [timetagger.TimeTagger().device_info]
         local_device_group = DeviceListGroup(
             title='Local Devices',
             devices_infos=local_device_infos,
