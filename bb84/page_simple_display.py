@@ -5,7 +5,8 @@ import typing
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Adw, GLib
-import numpy
+
+import numpy as np
 
 sys.path.append(os.environ['TTAG'])
 import ttag
@@ -22,15 +23,32 @@ class Counter(Gtk.Box):
         self.channel_counts_label = Gtk.Label()
         self.channel_counts_label.set_halign(align=Gtk.Align.END)
         self.channel_counts_label.set_hexpand(expand=True)
-        self.channel_counts_label.set_markup(
-            f'<span font_desc="Monospace {counter_size}">{0}</span>'
-        )
         self.append(child=self.channel_counts_label)
+        self._build_template()
 
-    def update_counts(self, value: int) -> None:
-        self.channel_counts_label.set_markup(
-            f'<span font_desc="Monospace {self.counter_size}">{value}</span>'
-        )
+    def update_counts(self, value: int | float) -> None:
+        self._last_value = value
+        match value:
+            case int() | np.integer():
+                text = str(value)
+            case float():
+                text = f'{value:.2f}'
+            case _:
+                raise RuntimeError(f'Invalid value type: {type(value)}')
+
+        self.channel_counts_label.set_text(str=text)
+    
+    def set_counter_size(self, counter_size: int) -> None:
+        self.counter_size = counter_size
+        self._build_template()
+        self.update_counts(value=self._last_value)
+
+    def _build_template(self) -> None:
+        ctx = self.channel_counts_label.get_style_context()
+        css = f"label {{ font-family: Monospace; font-size: {self.counter_size}pt; }}"
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css.encode())
+        ctx.add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
 class ChannelScale(Adw.ActionRow):
     def __init__(

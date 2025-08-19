@@ -1,5 +1,3 @@
-import os
-import sys
 import typing
 import enum
 
@@ -14,7 +12,7 @@ import matplotlib.pyplot
 from . import timetagger
 
 class Counter(Gtk.Box):
-    def __init__(self, label: str, counter_size: int | float = 40) -> None:
+    def __init__(self, label: str, counter_size: int = 40) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
         self.counter_size = counter_size
         channel_label = Gtk.Label(label=label)
@@ -23,23 +21,32 @@ class Counter(Gtk.Box):
         self.channel_counts_label = Gtk.Label()
         self.channel_counts_label.set_halign(align=Gtk.Align.END)
         self.channel_counts_label.set_hexpand(expand=True)
-        self.channel_counts_label.set_markup(
-            f'<span font_desc="Monospace {counter_size}">{0}</span>'
-        )
         self.append(child=self.channel_counts_label)
+        self._build_template()
 
     def update_counts(self, value: int | float) -> None:
+        self._last_value = value
         match value:
-            case int() | np.int64():
-                self.channel_counts_label.set_markup(
-                    f'<span font_desc="Monospace {self.counter_size}">{value}</span>'
-                )
+            case int() | np.integer():
+                text = str(value)
             case float():
-                self.channel_counts_label.set_markup(
-                    f'<span font_desc="Monospace {self.counter_size}">{value:.2f}</span>'
-                )
+                text = f'{value:.2f}'
             case _:
                 raise RuntimeError(f'Invalid value type: {type(value)}')
+
+        self.channel_counts_label.set_text(str=text)
+    
+    def set_counter_size(self, counter_size: int) -> None:
+        self.counter_size = counter_size
+        self._build_template()
+        self.update_counts(value=self._last_value)
+
+    def _build_template(self) -> None:
+        ctx = self.channel_counts_label.get_style_context()
+        css = f"label {{ font-family: Monospace; font-size: {self.counter_size}pt; }}"
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css.encode())
+        ctx.add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
 class SinglesGroup(Adw.PreferencesGroup):
     def __init__(self, channels: int) -> None:
@@ -157,7 +164,6 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         BLUE = (0, 115/255, 229/255, 1.0)
         ORANGE = (233/255, 84/255, 32/255, 1.0)
         DARK = (61/255, 61/255, 61/255, 1.0)
-        # LIGHT = (247/255, 247/255, 247/255, 1.0)
         LIGHT = (1.0, 1.0, 1.0, 1.0)
     def __init__(self) -> None:
         super().__init__(title='Polarisation Ellipse')
@@ -165,7 +171,7 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self._t = np.linspace(
             start=0,
             stop=2 * np.pi,
-            num=50
+            num=36
         )
         self._cos_t = np.cos(self._t)
         self._sin_t = np.sin(self._t)
