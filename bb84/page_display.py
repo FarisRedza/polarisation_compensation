@@ -1,10 +1,11 @@
 import os
 import sys
 import typing
+import enum
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Adw, GLib
+from gi.repository import Gtk, Adw, GLib, GObject
 
 import numpy as np
 import matplotlib.backends.backend_gtk4agg
@@ -152,13 +153,18 @@ class MeasurementInfoGroup(Adw.PreferencesGroup):
         self.qx_counter.update_counts(value=data.qx)
 
 class PolEllipseGroup(Adw.PreferencesGroup):
+    class Colours(enum.Enum):
+        BLUE = (0, 115/255, 229/255, 1.0)
+        ORANGE = (233/255, 84/255, 32/255, 1.0)
+        DARK = (61/255, 61/255, 61/255, 1.0)
+        LIGHT = (247/255, 247/255, 247/255, 1.0)
     def __init__(self) -> None:
         super().__init__(title='Polarisation Ellipse')
 
-        self.fig, self.ax = matplotlib.pyplot.subplots()
-        self.ax.set_aspect(aspect='equal')
-        self.ax.axis('off')
-        self.fig.tight_layout()
+        self.figure, self.axes = matplotlib.pyplot.subplots()
+        self.axes.set_aspect(aspect='equal')
+        self.axes.axis('off')
+        self.figure.tight_layout()
 
         # circle
         circle = matplotlib.pyplot.Circle(
@@ -168,21 +174,29 @@ class PolEllipseGroup(Adw.PreferencesGroup):
             fill=False,
             linewidth=1
         )
-        self.ax.add_patch(p=circle)
+        self.axes.add_patch(p=circle)
 
         # circle cross
-        self.ax.plot([-1, 1], [0, 0], color='gray', linewidth=1)
-        self.ax.plot([0, 0], [-1, 1], color='gray', linewidth=1)
+        self.axes.plot([-1, 1], [0, 0], color='gray', linewidth=1)
+        self.axes.plot([0, 0], [-1, 1], color='gray', linewidth=1)
 
-        self.ellipse = self.ax.plot([], [], color='blue')[0]
-        self.major_axis = self.ax.plot([], [], color='blue')[0]
-        self.minor_axis = self.ax.plot([], [], color='blue')[0]
+        self.ellipse = self.axes.plot([], [], color='blue')[0]
+        self.major_axis = self.axes.plot([], [], color='blue')[0]
+        self.minor_axis = self.axes.plot([], [], color='blue')[0]
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
-            figure=self.fig
+            figure=self.figure
         )
-        # self.canvas.set_size_request(width=200, height=200)
         self.add(child=Gtk.Frame(child=self.canvas))
+
+        settings = Gtk.Settings.get_default()
+        settings.connect(
+            'notify::gtk-application-prefer-dark-theme',
+            self.on_theme_changed
+        )
+        self.dark_mode = settings.props.gtk_application_prefer_dark_theme
+        self._last_dark_mode = None
+        self.update_plot_theme()
 
     def update_data(self, data: timetagger.Data) -> None:
         theta = np.radians(data.azimuth)
@@ -228,6 +242,36 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.minor_axis.set_data(x_minor_rotated, y_minor_rotated)
 
         self.canvas.draw_idle()
+
+    def on_theme_changed(
+            self,
+            settings: Gtk.Settings,
+            g_param_spec: GObject.GParamSpec
+    ) -> None:
+        self.dark_mode = settings.props.gtk_application_prefer_dark_theme
+        self.update_plot_theme()
+
+    def update_plot_theme(self) -> None:
+        if self.dark_mode != self._last_dark_mode:
+            self._last_dark_mode = self.dark_mode
+
+            if self.dark_mode:
+                self.figure.set_facecolor(color=self.Colours.DARK.value)
+                self.axes.set_facecolor(color=self.Colours.DARK.value)
+                self.axes.tick_params(colors=self.Colours.LIGHT.value)
+                self.axes.spines[:].set_color(self.Colours.LIGHT.value)
+                self.axes.xaxis.label.set_color(color=self.Colours.LIGHT.value)
+                self.axes.yaxis.label.set_color(color=self.Colours.LIGHT.value)
+                self.axes.title.set_color(color=self.Colours.LIGHT.value)
+
+            else:
+                self.figure.set_facecolor(color=self.Colours.LIGHT.value)
+                self.axes.set_facecolor(color=self.Colours.LIGHT.value)
+                self.axes.tick_params(colors=self.Colours.DARK.value)
+                self.axes.spines[:].set_color(self.Colours.DARK.value)
+                self.axes.xaxis.label.set_color(color=self.Colours.DARK.value)
+                self.axes.yaxis.label.set_color(color=self.Colours.DARK.value)
+                self.axes.title.set_color(color=self.Colours.DARK.value)
 
 class MeasurementBox(Gtk.Box):
     def __init__(self, channels: int, spacing: int = 20) -> None:
