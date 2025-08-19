@@ -177,12 +177,22 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.axes.add_patch(p=circle)
 
         # circle cross
-        self.axes.plot([-1, 1], [0, 0], color='gray', linewidth=1)
-        self.axes.plot([0, 0], [-1, 1], color='gray', linewidth=1)
+        self.axes.plot(
+            [-1, 1],
+            [0, 0],
+            color='gray',
+            linewidth=1
+        )
+        self.axes.plot(
+            [0, 0], 
+            [-1, 1],
+            color='gray',
+            linewidth=1
+        )
 
-        self.ellipse = self.axes.plot([], [], color='blue')[0]
-        self.major_axis = self.axes.plot([], [], color='blue')[0]
-        self.minor_axis = self.axes.plot([], [], color='blue')[0]
+        self.ellipse = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
+        self.major_axis = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
+        self.minor_axis = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
             figure=self.figure
