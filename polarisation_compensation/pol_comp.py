@@ -13,6 +13,8 @@ import bb84.remote_timetagger as remote_timetagger
 import motor.thorlabs_motor as thorlabs_motor
 import motor.base_motor as base_motor
 
+import numpy
+
 MOTOR_SERVER_HOST = '137.195.89.222'
 MOTOR_SERVER_PORT = 5002
 MEASUREMENT_SERVER_HOST = '137.195.89.222'
@@ -170,22 +172,70 @@ def compensate(
         probe_direction=probe_direction_1,
     )
 
-    # new_prev_2 = None
-    # new_probe_direction_2 = None
-    new_prev_2, new_probe_direction_2 = adjust_motor(
-        motor_index=motor_2_index,
-        current_value=parameter_2_current_value,
-        target_value=parameter_2_target,
-        thresholds_velocities=parameter_2_velocities,
-        prev_value=prev_value_2,
-        probe_direction=probe_direction_2,
-    )
+    new_prev_2 = None
+    new_probe_direction_2 = None
+    # new_prev_2, new_probe_direction_2 = adjust_motor(
+    #     motor_index=motor_2_index,
+    #     current_value=parameter_2_current_value,
+    #     target_value=parameter_2_target,
+    #     thresholds_velocities=parameter_2_velocities,
+    #     prev_value=prev_value_2,
+    #     probe_direction=probe_direction_2,
+    # )
 
     return True, new_prev_1, new_prev_2, new_probe_direction_1, new_probe_direction_2
 
+def adjust_motor(
+        motor: base_motor.Motor,
+        current_value: float,
+        thresholds: list[tuple[float, float]],
+        mode: typing.Literal['direct', 'probe'],
+        target_value: float = 0,
+        prev_value: float = 0,
+        prev_direction: base_motor.MotorDirection = base_motor.MotorDirection.FORWARD,
+        check_counter: int = 0
+):
+    direction = prev_direction
+    max_velocity = None
+    for threshold, velocity in sorted(thresholds):
+        if current_value >= threshold:
+            max_velocity = velocity
+    if not max_velocity:
+        print(f'[Motor {motor.device_info.serial_number}] Stopping')
+        motor.stop()
+
+    else:
+        if mode == 'direct':
+            delta = target_value - current_value
+            direction = base_motor.MotorDirection.FORWARD if delta > 0 else base_motor.MotorDirection.BACKWARD
+
+        elif mode == 'probe':
+            improving = current_value <= prev_value
+            print(f'[Motor {motor.device_info.serial_number}] {improving=}')
+
+            if improving:
+                check_counter = 0
+            else:
+                check_counter += 1
+                if check_counter == 5:
+                    print(f'[Motor {motor.device_info.serial_number}] Switching directions')
+                    direction = base_motor.MotorDirection.FORWARD if prev_direction == base_motor.MotorDirection.BACKWARD else base_motor.MotorDirection.BACKWARD
+                    check_counter = 0
+            
+        print(f'[Motor {motor.device_info.serial_number}] {direction}, {max_velocity}')
+        if motor.direction != direction:
+            motor.jog(
+                direction=direction,
+                acceleration=20.0,
+                max_velocity=max_velocity
+            )
+    
+    prev_direction = direction
+    prev_value = qber_avg
+
+    return prev_value, prev_direction, check_counter
 
 if __name__ == '__main__':
-    # settings
     meaurement_rate = 0.1
     compensation_rate = 0.1
     cycles = 5
@@ -193,81 +243,59 @@ if __name__ == '__main__':
     QWP = '55353314'  # azimuth
     HWP = '55356974'  # ellipticity
     
-    M1 = QWP
-    M2 = HWP
+    M1 = HWP
+    M2 = QWP
     
     target_qber = 0
     target_qx = 0
 
-    # 5 mins maintained with cycles = 3
-    # qber_velocity = [
-    #     (0.5, 25.0),
-    #     (0.25, 15.0),
-    #     (0.1, 1.0),
-    # ]
-    # qx_velocity = [
-    #     (0.5, 25.0),
-    #     (0.25, 15.0),
-    #     (0.1, 0.1)
-    # ]
-
-    qber_velocity = [
-        (0.0, 5.0),
-    ]
-    qx_velocity = [
-        (0.0, 5.0)
+    param_1_thresholds = [
+        (0.5, 25.0),
+        (0.00, 5.0)
     ]
 
-    # setup logging
-    datetime_format = '%Y_%m_%d_%H_%M_%S'
-    handler = logging.StreamHandler()
-    handler.setFormatter(fmt=JsonFormatter())
+    param_2_thresholds = [
+        # (0.5, 25.0),
+        (0.05, 10.0),
+        # (0.1, 5.0),
+        # (0.05, 0.1)
+    ]
 
-    pathlib.Path('logs').mkdir(exist_ok=True)
-    file_handler = logging.FileHandler(
-        filename=f'logs/pol_comp_{datetime.datetime.now().strftime(datetime_format)}.log'
-    )
-    file_handler.setFormatter(fmt=JsonFormatter())
-
-    motor_logger = logging.getLogger(name='Motor')
-    motor_logger.setLevel(level=logging.INFO)
-    motor_logger.addHandler(hdlr=file_handler)
-
-    data_logger = logging.getLogger(name='Data')
-    data_logger.setLevel(level=logging.INFO)
-    data_logger.addHandler(hdlr=file_handler)
-
-    # devices
+    raw_data_container = [timetagger.RawData()]
     measurement_device = remote_timetagger.RemoteTimetagger(
         host=MEASUREMENT_SERVER_HOST,
         port=MEASUREMENT_SERVER_PORT,
         model='Logic-16'
     )
-    # measurement_device = timetagger.TimeTagger()
 
     motors = [
         thorlabs_motor.ThorlabsMotor(serial_number=m[0])
         for m in thorlabs_motor.list_thorlabs_motors()
     ]
 
-    raw_data_container = [timetagger.RawData()]
-    qber_avg = None
-    qx_avg = None
+    prev_param_1 = 0
+    prev_param_2 = 0
+    motor_1_prev_direction = base_motor.MotorDirection.FORWARD
+    motor_2_prev_direction = base_motor.MotorDirection.FORWARD
+    qber_values = collections.deque(maxlen=cycles)
+    qx_values = collections.deque(maxlen=cycles)
 
-    prev_qber = None
-    prev_qx = None
-    qber_direction = None
-    qx_direction = None
-    while True:
-        try:
+    motor_1_check_counter = 0
+    motor_2_check_counter = 0
+
+    motor_1_index = next(
+        (i for i, m in enumerate(motors) if m.device_info.serial_number == M1),
+        -1
+    )
+    motor_1 = motors[motor_1_index]
+    try:
+        while True:
             get_data(
                 measurement_device=measurement_device,
                 raw_data_container=raw_data_container,
                 measurement_rate=meaurement_rate
             )
             data = timetagger.Data().from_raw_data(raw_data=raw_data_container[0])
-            qber_values = collections.deque(maxlen=cycles)
-            qx_values = collections.deque(maxlen=cycles)
 
             qber_values.append(data.qber)
             qx_values.append(data.qx)
@@ -275,38 +303,180 @@ if __name__ == '__main__':
             qber_avg = sum(qber_values) / len(qber_values)
             qx_avg = sum(qx_values) / len(qx_values)
 
-            # print(qber_avg)
-            # print(qx_avg)
+            param_1 = qber_avg
+            param_2 = qber_avg - qx_avg
 
-            data_logger.info(
-                msg='Measurement taken',
-                extra={
-                    'singles': data.singles.tolist(),
-                    'QBER': data.qber,
-                    'Qx': data.qx
-                }
+            # get motors
+            motor_1_index = next(
+                (i for i, m in enumerate(motors) if m.device_info.serial_number == M1),
+                -1
             )
+            motor_1 = motors[motor_1_index]
 
-            _, prev_qber, prev_qx, qber_direction, qx_direction = compensate(
-                motor_list=motors,
-                motor_1_serial_no=M1,
-                motor_2_serial_no=M2,
-                parameter_1_target=target_qber,
-                parameter_2_target=target_qx,
-                parameter_1_velocities=qber_velocity,
-                parameter_2_velocities=qx_velocity,
-                parameter_1_current_value=qber_avg,
-                parameter_2_current_value=qx_avg,
+            motor_2_index = next(
+                (i for i, m in enumerate(motors) if m.device_info.serial_number == M2),
+                -1
+            )
+            motor_2 = motors[motor_2_index]
+
+            prev_param_1, motor_1_prev_direction, motor_1_check_counter = adjust_motor(
+                motor=motor_1,
+                current_value=param_1,
+                thresholds=param_1_thresholds,
                 mode='probe',
-                prev_value_1=prev_qber,
-                prev_value_2=prev_qx,
-                probe_direction_1=qber_direction,
-                probe_direction_2=qx_direction
+                prev_value=prev_param_1,
+                prev_direction=motor_1_prev_direction,
+                check_counter=motor_1_check_counter
             )
+
+            # prev_param_2, motor_2_prev_direction, motor_2_check_counter = adjust_motor(
+            #     motor=motor_2,
+            #     current_value=param_2,
+            #     thresholds=param_2_thresholds,
+            #     mode='direct',
+            #     target_value=0
+            #     # prev_value=prev_param_2,
+            #     # prev_direction=motor_2_prev_direction,
+            #     # check_counter=motor_2_check_counter
+            # )
+
             time.sleep(compensation_rate)
 
-        except KeyboardInterrupt:
-            for m in motors:
-                m.stop()
-                m.disconnect()
-            break
+    except KeyboardInterrupt:
+        for motor in motors:
+            motor.stop()
+            motor.disconnect()
+        measurement_device.disconnect()
+
+
+# if __name__ == '__main__':
+    # # settings
+    # meaurement_rate = 0.1
+    # compensation_rate = 0.1
+    # cycles = 5
+
+    # QWP = '55353314'  # azimuth
+    # HWP = '55356974'  # ellipticity
+    
+    # M1 = QWP
+    # M2 = HWP
+    
+    # target_qber = 0
+    # target_qx = 0
+
+    # # 5 mins maintained with cycles = 3
+    # qber_velocity = [
+    #     (0.5, 25.0),
+    #     (0.25, 15.0),
+    #     (0.1, 1.0),
+    #     (0.05, 0.1)
+    # ]
+    # qx_velocity = [
+    #     (0.5, 25.0),
+    #     (0.25, 15.0),
+    #     (0.1, 0.1)
+    # ]
+
+    # # qber_velocity = [
+    # #     (0.0, 5.0),
+    # # ]
+    # # qx_velocity = [
+    # #     (0.0, 5.0)
+    # # ]
+
+    # # setup logging
+    # datetime_format = '%Y_%m_%d_%H_%M_%S'
+    # handler = logging.StreamHandler()
+    # handler.setFormatter(fmt=JsonFormatter())
+
+    # pathlib.Path('logs').mkdir(exist_ok=True)
+    # file_handler = logging.FileHandler(
+    #     filename=f'logs/pol_comp_{datetime.datetime.now().strftime(datetime_format)}.log'
+    # )
+    # file_handler.setFormatter(fmt=JsonFormatter())
+
+    # motor_logger = logging.getLogger(name='Motor')
+    # motor_logger.setLevel(level=logging.INFO)
+    # motor_logger.addHandler(hdlr=file_handler)
+
+    # data_logger = logging.getLogger(name='Data')
+    # data_logger.setLevel(level=logging.INFO)
+    # data_logger.addHandler(hdlr=file_handler)
+
+    # # devices
+    # measurement_device = remote_timetagger.RemoteTimetagger(
+    #     host=MEASUREMENT_SERVER_HOST,
+    #     port=MEASUREMENT_SERVER_PORT,
+    #     model='Logic-16'
+    # )
+    # # measurement_device = timetagger.TimeTagger()
+
+    # motors = [
+    #     thorlabs_motor.ThorlabsMotor(serial_number=m[0])
+    #     for m in thorlabs_motor.list_thorlabs_motors()
+    # ]
+
+    # raw_data_container = [timetagger.RawData()]
+    # qber_avg = None
+    # qx_avg = None
+
+    # prev_qber = None
+    # prev_qx = None
+    # qber_direction = None
+    # qx_direction = None
+    # while True:
+    #     try:
+    #         get_data(
+    #             measurement_device=measurement_device,
+    #             raw_data_container=raw_data_container,
+    #             measurement_rate=meaurement_rate
+    #         )
+    #         data = timetagger.Data().from_raw_data(raw_data=raw_data_container[0])
+    #         qber_values = collections.deque(maxlen=cycles)
+    #         qx_values = collections.deque(maxlen=cycles)
+
+    #         qber_values.append(data.qber)
+    #         qx_values.append(data.qx)
+
+    #         qber_avg = sum(qber_values) / len(qber_values)
+    #         qx_avg = sum(qx_values) / len(qx_values)
+
+    #         new_compensate(
+    #             motors=motors,
+    #             motor_1_serial_number=M1,
+    #             parameter_1_value=qber_avg,
+    #             parameter_1_thresholds=qber_velocity
+    #         )
+
+    #         # data_logger.info(
+    #         #     msg='Measurement taken',
+    #         #     extra={
+    #         #         'singles': data.singles.tolist(),
+    #         #         'QBER': data.qber,
+    #         #         'Qx': data.qx
+    #         #     }
+    #         # )
+
+    #         # _, prev_qber, prev_qx, qber_direction, qx_direction = compensate(
+    #         #     motor_list=motors,
+    #         #     motor_1_serial_no=M1,
+    #         #     motor_2_serial_no=M2,
+    #         #     parameter_1_target=target_qber,
+    #         #     parameter_2_target=target_qx,
+    #         #     parameter_1_velocities=qber_velocity,
+    #         #     parameter_2_velocities=qx_velocity,
+    #         #     parameter_1_current_value=qber_avg,
+    #         #     parameter_2_current_value=qx_avg,
+    #         #     mode='probe',
+    #         #     prev_value_1=prev_qber,
+    #         #     prev_value_2=prev_qx,
+    #         #     probe_direction_1=qber_direction,
+    #         #     probe_direction_2=qx_direction
+    #         # )
+    #         time.sleep(compensation_rate)
+
+    #     except KeyboardInterrupt:
+    #         for m in motors:
+    #             m.stop()
+    #             m.disconnect()
+    #         break
