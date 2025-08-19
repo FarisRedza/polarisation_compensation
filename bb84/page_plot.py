@@ -193,7 +193,8 @@ class QBERPlot(Gtk.Box):
         BLUE = (0, 115/255, 229/255, 1.0)
         ORANGE = (233/255, 84/255, 32/255, 1.0)
         DARK = (61/255, 61/255, 61/255, 1.0)
-        LIGHT = (247/255, 247/255, 247/255, 1.0)
+        # LIGHT = (247/255, 247/255, 247/255, 1.0)
+        LIGHT = (1.0, 1.0, 1.0, 1.0)
     def __init__(self, get_data_callback: typing.Callable) -> None:
         super().__init__(
             orientation=Gtk.Orientation.VERTICAL,

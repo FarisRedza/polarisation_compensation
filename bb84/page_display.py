@@ -157,9 +157,18 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         BLUE = (0, 115/255, 229/255, 1.0)
         ORANGE = (233/255, 84/255, 32/255, 1.0)
         DARK = (61/255, 61/255, 61/255, 1.0)
-        LIGHT = (247/255, 247/255, 247/255, 1.0)
+        # LIGHT = (247/255, 247/255, 247/255, 1.0)
+        LIGHT = (1.0, 1.0, 1.0, 1.0)
     def __init__(self) -> None:
         super().__init__(title='Polarisation Ellipse')
+        # parametric angle
+        self._t = np.linspace(
+            start=0,
+            stop=2 * np.pi,
+            num=50
+        )
+        self._cos_t = np.cos(self._t)
+        self._sin_t = np.sin(self._t)
 
         self.figure, self.axes = matplotlib.pyplot.subplots()
         self.axes.set_aspect(aspect='equal')
@@ -211,21 +220,14 @@ class PolEllipseGroup(Adw.PreferencesGroup):
     def update_data(self, data: timetagger.Data) -> None:
         theta = np.radians(data.azimuth)
         eta = np.radians(data.ellipticity)
-
-        ## parametric angle
-        t = np.linspace(
-            start=0,
-            stop=2 * np.pi,
-            num=500
-        )
         
-        ## semi-axes
+        # semi-axes
         a = 1
         b = a * np.tan(eta)
 
-        ## ellipse
-        x = a * np.cos(t)
-        y = b * np.sin(t)
+        # ellipse
+        x = a * self._cos_t
+        y = b * self._sin_t
 
         # rotate ellipse by azimuth angle
         x_rotated = x * np.cos(theta) - y * np.sin(theta)
