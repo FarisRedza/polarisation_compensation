@@ -130,9 +130,7 @@ class DeviceBox(Gtk.Box):
         )
         self._measurement_thread.start()
 
-        self.window = 1
-        self.delay = 0
-        self.refresh_rate = 250
+        self.refresh_rate = 1
 
         self.dc_calibration_file = pathlib.Path()
 
@@ -277,31 +275,6 @@ class DeviceBox(Gtk.Box):
 
     def get_dc_calibration_file(self) -> pathlib.Path:
         return self.dc_calibration_file
-    
-    def set_window(self, value: int) -> None:
-        self.window = value
-
-    def get_window(self) -> int:
-        return self.window
-    
-    def set_delay(self, value: int) -> None:
-        self.delay = value
-
-    def get_delay(self) -> int:
-        return self.delay
-
-    def set_refresh_rate(self, value: int) -> None:
-        self.refresh_rate = value
-        if hasattr(self, '_timeout_id'):
-            GLib.source_remove(self._timeout_id)
-        self._timeout_id = GLib.timeout_add(
-            self.refresh_rate,
-            self.set_data,
-            self.simple_display,
-        )
-
-    def get_refresh_rate(self) -> int:
-        return self.refresh_rate
     
     def get_page(self):
         return self.stack.get_visible_child_name()
