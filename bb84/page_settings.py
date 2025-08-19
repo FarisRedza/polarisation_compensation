@@ -144,8 +144,11 @@ class SettingsGroup(Adw.PreferencesGroup):
         pass
 
 class UQDSettings(Adw.PreferencesPage):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(
+            self,
+            name: str
+    ) -> None:
+        super().__init__(name=name)
 
         settings_group = SettingsGroup()
         self.add(group=settings_group)

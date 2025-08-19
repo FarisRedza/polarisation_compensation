@@ -7,6 +7,8 @@ gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Adw, GLib
 
 import numpy as np
+import matplotlib.backends.backend_gtk4agg
+import matplotlib.pyplot
 
 from . import timetagger
 
@@ -90,7 +92,7 @@ class SinglesGroup(Adw.PreferencesGroup):
             self.counters.append(counter)
             right_box.append(child=counter)
 
-    def update_counts(self, data: timetagger.Data) -> None:
+    def update_data(self, data: timetagger.Data) -> None:
         for counter, value in zip(self.counters, data.singles):
             counter.update_counts(value=value)
 
@@ -141,13 +143,91 @@ class MeasurementInfoGroup(Adw.PreferencesGroup):
         )
         box.append(child=self.qx_counter)
 
-    def update_counts(self, data: timetagger.Data) -> None:
+    def update_data(self, data: timetagger.Data) -> None:
         self.s1_counter.update_counts(value=data.normalised_s1)
         self.s2_counter.update_counts(value=data.normalised_s2)
         self.s3_counter.update_counts(value=data.normalised_s3)
 
         self.qber_counter.update_counts(value=data.qber)
         self.qx_counter.update_counts(value=data.qx)
+
+class PolEllipseGroup(Adw.PreferencesGroup):
+    def __init__(self) -> None:
+        super().__init__(title='Polarisation Ellipse')
+
+        self.fig, self.ax = matplotlib.pyplot.subplots()
+        self.ax.set_aspect(aspect='equal')
+        self.ax.axis('off')
+        self.fig.tight_layout()
+
+        # circle
+        circle = matplotlib.pyplot.Circle(
+            xy=(0, 0),
+            radius=1.0,
+            color='gray',
+            fill=False,
+            linewidth=1
+        )
+        self.ax.add_patch(p=circle)
+
+        # circle cross
+        self.ax.plot([-1, 1], [0, 0], color='gray', linewidth=1)
+        self.ax.plot([0, 0], [-1, 1], color='gray', linewidth=1)
+
+        self.ellipse = self.ax.plot([], [], color='blue')[0]
+        self.major_axis = self.ax.plot([], [], color='blue')[0]
+        self.minor_axis = self.ax.plot([], [], color='blue')[0]
+
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
+            figure=self.fig
+        )
+        # self.canvas.set_size_request(width=200, height=200)
+        self.add(child=Gtk.Frame(child=self.canvas))
+
+    def update_data(self, data: timetagger.Data) -> None:
+        theta = np.radians(data.azimuth)
+        eta = np.radians(data.ellipticity)
+
+        ## parametric angle
+        t = np.linspace(
+            start=0,
+            stop=2 * np.pi,
+            num=500
+        )
+        
+        ## semi-axes
+        a = 1
+        b = a * np.tan(eta)
+
+        ## ellipse
+        x = a * np.cos(t)
+        y = b * np.sin(t)
+
+        # rotate ellipse by azimuth angle
+        x_rotated = x * np.cos(theta) - y * np.sin(theta)
+        y_rotated = x * np.sin(theta) + y * np.cos(theta)
+
+        self.ellipse.set_data(x_rotated, y_rotated)
+
+        # ellipse cross
+        ## major/minor axes
+        x_major = np.array([-a, a])
+        y_major = np.array([0, 0])
+
+        x_minor = np.array([0, 0])
+        y_minor = np.array([-b, b])
+
+        ## rotate axes
+        x_major_rotated = x_major * np.cos(theta) - y_major * np.sin(theta)
+        y_major_rotated = x_major * np.sin(theta) + y_major * np.cos(theta)
+
+        x_minor_rotated = x_minor * np.cos(theta) - y_minor * np.sin(theta)
+        y_minor_rotated = x_minor * np.sin(theta) + y_minor * np.cos(theta)
+
+        self.major_axis.set_data(x_major_rotated, y_major_rotated)
+        self.minor_axis.set_data(x_minor_rotated, y_minor_rotated)
+
+        self.canvas.draw_idle()
 
 class MeasurementBox(Gtk.Box):
     def __init__(self, channels: int, spacing: int = 20) -> None:
@@ -159,12 +239,22 @@ class MeasurementBox(Gtk.Box):
         self.singles_group = SinglesGroup(channels=channels)
         self.append(child=self.singles_group)
 
+        bottom_box = Gtk.Box(
+            spacing=spacing,
+            orientation=Gtk.Orientation.HORIZONTAL
+        )
+        self.append(child=bottom_box)
+
         self.measurement_info_group = MeasurementInfoGroup()
-        self.append(child=self.measurement_info_group)
+        bottom_box.append(child=self.measurement_info_group)
+
+        self.polarisation_ellipse_group = PolEllipseGroup()
+        bottom_box.append(child=self.polarisation_ellipse_group)
 
     def update_data(self, data: timetagger.Data) -> None:
-        self.singles_group.update_counts(data=data)
-        self.measurement_info_group.update_counts(data=data)
+        self.singles_group.update_data(data=data)
+        self.measurement_info_group.update_data(data=data)
+        self.polarisation_ellipse_group.update_data(data=data)
 
 class SettingsScale(Adw.ActionRow):
     def __init__(
@@ -283,9 +373,15 @@ class SettingsGroup(Adw.PreferencesGroup):
 class Display(Gtk.ScrolledWindow):
     def __init__(
             self,
+            name: str,
+            get_page_callback: typing.Callable,
             get_data_callback: typing.Callable
     ) -> None:
-        super().__init__(vexpand=True)
+        super().__init__(
+            name=name,
+            vexpand=True
+        )
+        self.get_page_callback = get_page_callback
         self.get_data_callback = get_data_callback
 
         self.set_policy(
@@ -323,16 +419,13 @@ class Display(Gtk.ScrolledWindow):
 
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_data,
-            self.get_data_callback
+            self.update_data
         )
 
-    def update_data(
-            self,
-            get_data_callback: typing.Callable
-    ) -> bool:
-        data: timetagger.Data = get_data_callback()
-        self.measurement_box.update_data(data=data)
+    def update_data(self) -> bool:
+        if self.get_page_callback() == self.get_name():
+            data: timetagger.Data = self.get_data_callback()
+            self.measurement_box.update_data(data=data)
         return True
 
     def set_window(self, value: int) -> None:
@@ -351,10 +444,10 @@ class Display(Gtk.ScrolledWindow):
         self.refresh_rate = value
         if hasattr(self, '_timeout_id'):
             GLib.source_remove(self._timeout_id)
+
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_data,
-            self.get_data_callback
+            self.update_data
         )
 
     def get_refresh_rate(self) -> int:

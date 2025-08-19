@@ -251,9 +251,15 @@ class SettingsGroup(Adw.PreferencesGroup):
 class SimpleDisplay(Gtk.ScrolledWindow):
     def __init__(
             self,
+            name: str,
+            get_page_callback: typing.Callable,
             get_data_callback: typing.Callable
     ) -> None:
-        super().__init__(vexpand=True)
+        super().__init__(
+            name=name,
+            vexpand=True
+        )
+        self.get_page_callback = get_page_callback
         self.get_data_callback = get_data_callback
 
         self.set_policy(
@@ -291,16 +297,13 @@ class SimpleDisplay(Gtk.ScrolledWindow):
 
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_counts,
-            self.get_data_callback
+            self.update_counts
         )
 
-    def update_counts(
-            self,
-            get_data_callback: typing.Callable
-    ) -> bool:
-        data: timetagger.Data = get_data_callback()
-        self.counts_group.update_data(data=data)
+    def update_counts(self) -> bool:
+        if self.get_page_callback() == self.get_name():
+            data: timetagger.Data = self.get_data_callback()
+            self.counts_group.update_data(data=data)
         return True
 
     def set_window(self, value: int) -> None:
@@ -321,8 +324,7 @@ class SimpleDisplay(Gtk.ScrolledWindow):
             GLib.source_remove(self._timeout_id)
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_counts,
-            self.get_data_callback
+            self.update_counts
         )
 
     def get_refresh_rate(self) -> int:

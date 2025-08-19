@@ -130,8 +130,11 @@ class AddChannelGroup(Adw.PreferencesGroup):
         add_pattern_callback(title=self.group_title)
 
 class ChannelsPage(Adw.PreferencesPage):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(
+            self,
+            name: str
+    ) -> None:
+        super().__init__(name=name)
 
         self.add_channel_group = AddChannelGroup(
             add_pattern_callback=self.add_channels

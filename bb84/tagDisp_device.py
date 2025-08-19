@@ -163,53 +163,61 @@ class DeviceBox(Gtk.Box):
         )
         content_header_bar.pack_start(child=toggle_sidebar_button)
 
-        stack = Gtk.Stack()
-        stack.set_transition_type(
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(
             transition=Gtk.StackTransitionType.CROSSFADE
         )
-        stack.connect(
+        self.stack.connect(
             'notify::visible-child-name',
             self.on_page_changed,
             window_title
         )
-        sidebar.set_stack(stack=stack)
-        content_box.append(child=stack)
+        sidebar.set_stack(stack=self.stack)
+        content_box.append(child=self.stack)
 
-        stack.add_titled(
-            child=page_settings.UQDSettings(),
-            name='Settings',
-            title='Settings'
+        settings_name = 'Settings'
+        self.stack.add_titled(
+            child=page_settings.UQDSettings(name=settings_name),
+            name=settings_name,
+            title=settings_name
         )
 
+        simple_display_name = 'Simple Display'
         self.simple_display = page_simple_display.SimpleDisplay(
+            name=simple_display_name,
+            get_page_callback=self.get_page,
             get_data_callback=self.get_data
         )
-        stack.add_titled(
+        self.stack.add_titled(
             child=self.simple_display,
-            name='Simple Display',
-            title='Simple Display'
+            name=simple_display_name,
+            title=simple_display_name
         )
 
+        display_name = 'Display'
         self.display = page_display.Display(
+            name=display_name,
+            get_page_callback=self.get_page,
             get_data_callback=self.get_data
         )
-        stack.add_titled(
+        self.stack.add_titled(
             child=self.display,
-            name='Display',
-            title='Display'
+            name=display_name,
+            title=display_name
         )
 
-        self.channels_page = page_channels.ChannelsPage()
-        stack.add_titled(
+        channels_name = 'Channels'
+        self.channels_page = page_channels.ChannelsPage(name=channels_name)
+        self.stack.add_titled(
             child=self.channels_page,
-            name='Channels',
-            title='Channels'
+            name=channels_name,
+            title=channels_name
         )
 
         plot_page = page_plot.PlotPage(
             get_data_callback=self.get_data
         )
-        stack.add_titled(
+        self.stack.add_titled(
             child=plot_page,
             name='Plot',
             title='Plot'
@@ -219,7 +227,6 @@ class DeviceBox(Gtk.Box):
             self.refresh_rate,
             self.set_data
         )
-
 
     def _measure(self, _) -> None:
         while True:
@@ -295,3 +302,6 @@ class DeviceBox(Gtk.Box):
 
     def get_refresh_rate(self) -> int:
         return self.refresh_rate
+    
+    def get_page(self):
+        return self.stack.get_visible_child_name()
