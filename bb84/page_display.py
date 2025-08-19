@@ -7,6 +7,7 @@ from gi.repository import Gtk, Adw, GLib, GObject
 
 import numpy as np
 import matplotlib.backends.backend_gtk4agg
+import matplotlib.figure
 import matplotlib.pyplot
 
 from . import timetagger
@@ -291,6 +292,227 @@ class PolEllipseGroup(Adw.PreferencesGroup):
                 self.axes.yaxis.label.set_color(color=self.Colours.DARK.value)
                 self.axes.title.set_color(color=self.Colours.DARK.value)
 
+class BlochSphereGroup(Adw.PreferencesGroup):
+    class Colours(enum.Enum):
+        BLUE = (0, 115/255, 229/255, 1.0)
+        ORANGE = (233/255, 84/255, 32/255, 1.0)
+        DARK = (61/255, 61/255, 61/255, 1.0)
+        LIGHT = (1.0, 1.0, 1.0, 1.0)
+    def __init__(self) -> None:
+        super().__init__(title='Bloch Sphere')
+        self.figure = matplotlib.figure.Figure(figsize=(4, 4))
+        self.axes = self.figure.add_subplot(111, projection='3d')
+        self.axes.axis('off')
+        self.axes.set_box_aspect([1, 1, 1])
+        self.figure.tight_layout()
+
+        # sphere surface
+        u = np.linspace(
+            start=0,
+            stop=2 * np.pi,
+            num=20
+        )
+        v = np.linspace(
+            start=0,
+            stop=np.pi,
+            num=20
+        )
+        x = np.outer(a=np.cos(u), b=np.sin(v))
+        y = np.outer(a=np.sin(u), b=np.sin(v))
+        z = np.outer(a=np.ones_like(u), b=np.cos(v))
+        self.axes.plot_wireframe(
+            x,
+            y,
+            z,
+            color='gray',
+            linewidth=0.5,
+            alpha=0.3
+        )
+
+        self.axes.plot3D(
+            [-1, 1],
+            [0, 0],
+            [0, 0],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
+
+        # D–A axis s2
+        self.axes.plot3D(
+            [0, 0],
+            [-1, 1],
+            [0, 0],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
+
+        # R–L axis s3
+        self.axes.plot3D(
+            [0, 0],
+            [0, 0],
+            [-1, 1],
+            color='gray',
+            linestyle='--',
+            linewidth=1
+        )
+
+        # polarisation basis labels
+        self._h_label = self.axes.text(
+            x=1.05,
+            y=0,
+            z=0,
+            s='H',
+            ha='center',
+            va='center',
+            fontsize=10
+        )
+        self._v_label = self.axes.text(
+            x=-1.05,
+            y=0,
+            z=0,
+            s='V',
+            ha='center',
+            va='center',
+            fontsize=10
+        )
+
+        self._d_label = self.axes.text(
+            x=0,
+            y=1.05,
+            z=0,
+            s='D',
+            ha='center',
+            va='center',
+            fontsize=10
+        )
+        self._a_label = self.axes.text(
+            x=0,
+            y=-1.05,
+            z=0,
+            s='A',
+            ha='center',
+            va='center',
+            fontsize=10
+        )
+
+        self._r_label = self.axes.text(
+            x=0,
+            y=0,
+            z=1.05,
+            s='R',
+            ha='center',
+            va='center',
+            fontsize=10
+        )
+        self._l_label = self.axes.text(
+            x=0,
+            y=0,
+            z=-1.05,
+            s='L',
+            ha='center',
+            va='center',
+            fontsize=10
+        )
+
+        # dot
+        self.point = self.axes.plot(
+            [0],
+            [0],
+            [0],
+            'o',
+            color=self.Colours.BLUE.value,
+            markersize=6
+        )[0]
+
+        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
+            figure=self.figure
+        )
+        self.canvas.set_size_request(width=200, height=200)
+        self.add(child=Gtk.Frame(child=self.canvas))
+
+        settings = Gtk.Settings.get_default()
+        settings.connect(
+            'notify::gtk-application-prefer-dark-theme',
+            self.on_theme_changed
+        )
+        self.dark_mode = settings.props.gtk_application_prefer_dark_theme
+        self._last_dark_mode = None
+        self.update_plot_theme()
+
+    def is_behind_camera(self, x, y, z) -> bool:
+        # Get current 3D projection matrix
+        proj = self.axes.get_proj()
+
+        vec = np.array([x, y, z, 1.0])
+
+        transformed = proj @ vec
+
+        # if z < 0, it's behind the viewer
+        return transformed[2] < 0
+
+    def update_data(self, data: timetagger.Data) -> None:
+        x = data.normalised_s1
+        y = data.normalised_s2
+        z = data.normalised_s3
+
+        norm = np.sqrt(x**2 + y**2 + z**2)
+        if norm > 1e-6:
+            x, y, z = x / norm, y / norm, z / norm
+
+        self.point.set_data([x], [y])
+        self.point.set_3d_properties([z])
+
+        is_behind = self.is_behind_camera(x, y, z)
+
+        # add transparency if dot behind sphere
+        self.point.set_alpha(0.3 if is_behind else 1.0)
+
+        self.canvas.draw_idle()
+
+    def on_theme_changed(
+            self,
+            settings: Gtk.Settings,
+            g_param_spec: GObject.GParamSpec
+    ) -> None:
+        self.dark_mode = settings.props.gtk_application_prefer_dark_theme
+        self.update_plot_theme()
+
+    def update_plot_theme(self) -> None:
+        if self.dark_mode != self._last_dark_mode:
+            self._last_dark_mode = self.dark_mode
+
+            if self.dark_mode:
+                self.figure.set_facecolor(color=self.Colours.DARK.value)
+                self.axes.set_facecolor(color=self.Colours.DARK.value)
+                self.axes.tick_params(colors=self.Colours.LIGHT.value)
+                self.axes.spines[:].set_color(self.Colours.LIGHT.value)
+                self.axes.xaxis.label.set_color(color=self.Colours.LIGHT.value)
+                self.axes.yaxis.label.set_color(color=self.Colours.LIGHT.value)
+                self.axes.title.set_color(color=self.Colours.LIGHT.value)
+                self._h_label.set_color(color=self.Colours.LIGHT.value)
+                self._v_label.set_color(color=self.Colours.LIGHT.value)
+                self._d_label.set_color(color=self.Colours.LIGHT.value)
+                self._a_label.set_color(color=self.Colours.LIGHT.value)
+                self._r_label.set_color(color=self.Colours.LIGHT.value)
+                self._l_label.set_color(color=self.Colours.LIGHT.value)
+
+            else:
+                self.figure.set_facecolor(color=self.Colours.LIGHT.value)
+                self.axes.set_facecolor(color=self.Colours.LIGHT.value)
+                self.axes.tick_params(colors=self.Colours.DARK.value)
+                self.axes.spines[:].set_color(self.Colours.DARK.value)
+                self.axes.xaxis.label.set_color(color=self.Colours.DARK.value)
+                self.axes.yaxis.label.set_color(color=self.Colours.DARK.value)
+                self.axes.title.set_color(color=self.Colours.DARK.value)
+                self._h_label.set_color(color=self.Colours.DARK.value)
+                self._v_label.set_color(color=self.Colours.DARK.value)
+                self._d_label.set_color(color=self.Colours.DARK.value)
+                self._a_label.set_color(color=self.Colours.DARK.value)
+                self._r_label.set_color(color=self.Colours.DARK.value)
+                self._l_label.set_color(color=self.Colours.DARK.value)
+
 class MeasurementBox(Gtk.Box):
     def __init__(self, channels: int, spacing: int = 20) -> None:
         super().__init__(
@@ -301,22 +523,26 @@ class MeasurementBox(Gtk.Box):
         self.singles_group = SinglesGroup(channels=channels)
         self.append(child=self.singles_group)
 
+        self.measurement_info_group = MeasurementInfoGroup()
+        self.append(child=self.measurement_info_group)
+
         bottom_box = Gtk.Box(
             spacing=spacing,
             orientation=Gtk.Orientation.HORIZONTAL
         )
         self.append(child=bottom_box)
 
-        self.measurement_info_group = MeasurementInfoGroup()
-        bottom_box.append(child=self.measurement_info_group)
-
         self.polarisation_ellipse_group = PolEllipseGroup()
         bottom_box.append(child=self.polarisation_ellipse_group)
+
+        self.bloch_sphere_group = BlochSphereGroup()
+        bottom_box.append(child=self.bloch_sphere_group)
 
     def update_data(self, data: timetagger.Data) -> None:
         self.singles_group.update_data(data=data)
         self.measurement_info_group.update_data(data=data)
         self.polarisation_ellipse_group.update_data(data=data)
+        self.bloch_sphere_group.update_data(data=data)
 
 class SettingsScale(Adw.ActionRow):
     def __init__(
