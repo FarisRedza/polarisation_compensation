@@ -171,10 +171,12 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         }
         self.context = row.get_style_context()
         if not self._colours.get('light'):
-            self._colours['light'] = tuple(self.context.get_color())
+            light = self.context.get_color()
+            self._colours['light'] = (light.red, light.green, light.blue, light.alpha)
         self.add(child=row)
         if not self._colours.get('dark'):
-            self._colours['dark'] = tuple(self.context.get_color())
+            dark = self.context.get_color()
+            self._colours['dark'] = (dark.red, dark.green, dark.blue, dark.alpha)
 
         # parametric angle
         self._t = np.linspace(
@@ -336,10 +338,13 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         }
         self.context = row.get_style_context()
         if not self._colours.get('light'):
-            self._colours['light'] = tuple(self.context.get_color())
+            light = self.context.get_color()
+            self._colours['light'] = (light.red, light.green, light.blue, light.alpha)
         self.add(child=row)
         if not self._colours.get('dark'):
-            self._colours['dark'] = tuple(self.context.get_color())
+            dark = self.context.get_color()
+            self._colours['dark'] = (dark.red, dark.green, dark.blue, dark.alpha)
+
 
         self.figure = matplotlib.figure.Figure()
         self.axes = self.figure.add_subplot(111, projection='3d')
