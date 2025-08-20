@@ -2,154 +2,15 @@ import typing
 import collections
 import enum
 
-import numpy as np
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Adw, GLib, GObject
 
+import numpy as np
 import matplotlib.backends.backend_gtk4agg
 import matplotlib.pyplot
 
 from . import timetagger
-
-class PolEllipsePlot(Gtk.Box):
-    class Colours(enum.Enum):
-        BLUE = (0, 115/255, 229/255, 1.0)
-        ORANGE = (233/255, 84/255, 32/255, 1.0)
-        DARK = (61/255, 61/255, 61/255, 1.0)
-        LIGHT = (247/255, 247/255, 247/255, 1.0)
-    def __init__(
-            self,
-            get_data_callback: typing.Callable
-    ) -> None:
-        super().__init__()
-        self.refresh_rate = 33
-
-        self.figure, self.axes = matplotlib.pyplot.subplots()
-        self.axes.set_aspect(aspect='equal')
-        self.axes.axis('off')
-        self.figure.tight_layout()
-
-        # circle
-        circle = matplotlib.pyplot.Circle(
-            xy=(0, 0),
-            radius=1.0,
-            color='gray',
-            fill=False,
-            linewidth=1
-        )
-        self.axes.add_patch(p=circle)
-
-        # circle cross
-        self.axes.plot([-1, 1], [0, 0], color='gray', linewidth=1)
-        self.axes.plot([0, 0], [-1, 1], color='gray', linewidth=1)
-
-        self.ellipse = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
-        self.major_axis = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
-        self.minor_axis = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
-
-        self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
-            figure=self.figure
-        )
-        self.canvas.set_size_request(width=200, height=200)
-        self.append(child=Gtk.Frame(child=self.canvas))
-
-        settings = Gtk.Settings.get_default()
-        settings.connect(
-            'notify::gtk-application-prefer-dark-theme',
-            self.on_theme_changed
-        )
-        self.dark_mode = settings.props.gtk_application_prefer_dark_theme
-        self._last_dark_mode = None
-        self.update_plot_theme()
-
-        self._timeout_id = GLib.timeout_add(
-            self.refresh_rate,
-            self.update_plot,
-            get_data_callback
-        )
-
-    def update_plot(
-            self,
-            get_data_callback: typing.Callable
-    ) -> bool:
-        data: timetagger.Data = get_data_callback()
-
-        theta = np.radians(data.azimuth)
-        eta = np.radians(data.ellipticity)
-
-        ## parametric angle
-        t = np.linspace(
-            start=0,
-            stop=2 * np.pi,
-            num=500
-        )
-        
-        ## semi-axes
-        a = 1
-        b = a * np.tan(eta)
-
-        ## ellipse
-        x = a * np.cos(t)
-        y = b * np.sin(t)
-
-        # rotate ellipse by azimuth angle
-        x_rotated = x * np.cos(theta) - y * np.sin(theta)
-        y_rotated = x * np.sin(theta) + y * np.cos(theta)
-
-        self.ellipse.set_data(x_rotated, y_rotated)
-
-        # ellipse cross
-        ## major/minor axes
-        x_major = np.array([-a, a])
-        y_major = np.array([0, 0])
-
-        x_minor = np.array([0, 0])
-        y_minor = np.array([-b, b])
-
-        ## rotate axes
-        x_major_rotated = x_major * np.cos(theta) - y_major * np.sin(theta)
-        y_major_rotated = x_major * np.sin(theta) + y_major * np.cos(theta)
-
-        x_minor_rotated = x_minor * np.cos(theta) - y_minor * np.sin(theta)
-        y_minor_rotated = x_minor * np.sin(theta) + y_minor * np.cos(theta)
-
-        self.major_axis.set_data(x_major_rotated, y_major_rotated)
-        self.minor_axis.set_data(x_minor_rotated, y_minor_rotated)
-
-        self.canvas.draw_idle()
-        return True
-    
-    def on_theme_changed(
-            self,
-            settings: Gtk.Settings,
-            g_param_spec: GObject.GParamSpec
-    ) -> None:
-        self.dark_mode = settings.props.gtk_application_prefer_dark_theme
-        self.update_plot_theme()
-
-    def update_plot_theme(self) -> None:
-        if self.dark_mode != self._last_dark_mode:
-            self._last_dark_mode = self.dark_mode
-
-            if self.dark_mode:
-                self.figure.set_facecolor(color=self.Colours.DARK.value)
-                self.axes.set_facecolor(color=self.Colours.DARK.value)
-                self.axes.tick_params(colors=self.Colours.LIGHT.value)
-                self.axes.spines[:].set_color(self.Colours.LIGHT.value)
-                self.axes.xaxis.label.set_color(color=self.Colours.LIGHT.value)
-                self.axes.yaxis.label.set_color(color=self.Colours.LIGHT.value)
-                self.axes.title.set_color(color=self.Colours.LIGHT.value)
-
-            else:
-                self.figure.set_facecolor(color=self.Colours.LIGHT.value)
-                self.axes.set_facecolor(color=self.Colours.LIGHT.value)
-                self.axes.tick_params(colors=self.Colours.DARK.value)
-                self.axes.spines[:].set_color(self.Colours.DARK.value)
-                self.axes.xaxis.label.set_color(color=self.Colours.DARK.value)
-                self.axes.yaxis.label.set_color(color=self.Colours.DARK.value)
-                self.axes.title.set_color(color=self.Colours.DARK.value)
-
 
 class EntryRow(Adw.ActionRow):
     def __init__(
@@ -188,18 +49,14 @@ class SwitchRow(Adw.ActionRow):
             widget=switch
         )
 
-class QBERPlot(Gtk.Box):
+class QBERPlot(Adw.PreferencesGroup):
     class Colours(enum.Enum):
         BLUE = (0, 115/255, 229/255, 1.0)
         ORANGE = (233/255, 84/255, 32/255, 1.0)
         DARK = (61/255, 61/255, 61/255, 1.0)
-        # LIGHT = (247/255, 247/255, 247/255, 1.0)
         LIGHT = (1.0, 1.0, 1.0, 1.0)
     def __init__(self, get_data_callback: typing.Callable) -> None:
-        super().__init__(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=6
-        )
+        super().__init__()
         self.refresh_rate = 33
         self.plot_length = 1000
         self.cycles = 5
@@ -226,30 +83,38 @@ class QBERPlot(Gtk.Box):
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
             figure=self.figure
         )
-        self.append(child=Gtk.Frame(child=self.canvas))
-
-        plot_settings_group = Adw.PreferencesGroup(title='Plot Settings')
-        self.append(child=plot_settings_group)
+        self.canvas.set_size_request(width=0, height=300)
+        row = Adw.PreferencesRow(can_target=False)
+        self.add(child=row)
+        margin = 2
+        box = Gtk.Box(
+            margin_top=margin,
+            margin_bottom=margin,
+            margin_start=margin,
+            margin_end=margin,
+        )
+        row.set_child(child=box)
+        box.append(child=self.canvas)
 
         cycles_row = EntryRow(
             title='Cycles',
             text=str(self.cycles),
             on_set_callback=self.on_set_cycles
         )
-        plot_settings_group.add(child=cycles_row)
+        self.add(child=cycles_row)
 
         points_row = EntryRow(
             title='Points',
             text=str(self.plot_length),
             on_set_callback=self.on_set_plot_length
         )
-        plot_settings_group.add(child=points_row)
+        self.add(child=points_row)
 
         grid_row = SwitchRow(
             title='Grid',
             on_set_callback=self.on_set_grid
         )
-        plot_settings_group.add(child=grid_row)
+        self.add(child=grid_row)
 
         settings = Gtk.Settings.get_default()
         settings.connect(
@@ -319,8 +184,8 @@ class QBERPlot(Gtk.Box):
         self.axes.set_xlim(0, self.plot_length)
         self.axes.grid(visible=self.grid)
 
-        self.axes.get_legend().get_texts()[0].set_text(f'QBER - {qber_avg:.3f}')
-        self.axes.get_legend().get_texts()[1].set_text(f'Qx - {qx_avg:.3f}')
+        self.axes.get_legend().get_texts()[0].set_text(s=f'QBER - {qber_avg:.3f}')
+        self.axes.get_legend().get_texts()[1].set_text(s=f'Qx - {qx_avg:.3f}')
 
         self.canvas.draw()
         return True
@@ -380,6 +245,3 @@ class PlotPage(Gtk.ScrolledWindow):
 
         qber_plot = QBERPlot(get_data_callback=get_data_callback)
         main_box.append(child=qber_plot)
-
-        # pol_plot = PolEllipsePlot(get_data_callback=get_data_callback)
-        # main_box.append(child=pol_plot)

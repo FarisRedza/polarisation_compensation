@@ -190,27 +190,49 @@ class PolEllipseGroup(Adw.PreferencesGroup):
             linewidth=1
         )
         self.axes.add_patch(p=self.circle)
-
-        # circle cross
-        self.circle_h, = self.axes.plot(
+        self.circle_h_line = self.axes.plot(
             [-1, 1],
             [0, 0],
             linewidth=1
-        )
-        self.circle_v, = self.axes.plot(
+        )[0]
+        self.circle_v_line = self.axes.plot(
             [0, 0], 
             [-1, 1],
             linewidth=1
-        )
+        )[0]
 
-        self.ellipse = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
-        self.major_axis = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
-        self.minor_axis = self.axes.plot([], [], color=self.Colours.BLUE.value)[0]
+        self.ellipse = self.axes.plot(
+            [],
+            [],
+            color=self.Colours.BLUE.value
+        )[0]
+        self.major_axis = self.axes.plot(
+            [],
+            [],
+            color=self.Colours.BLUE.value
+        )[0]
+        self.minor_axis = self.axes.plot(
+            [],
+            [],
+            color=self.Colours.BLUE.value
+        )[0]
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
             figure=self.figure
         )
-        self.add(child=Gtk.Frame(child=self.canvas))
+        self.canvas.set_size_request(width=200, height=200)
+
+        row = Adw.PreferencesRow(can_target=False)
+        self.add(child=row)
+        margin = 2
+        box = Gtk.Box(
+            margin_top=margin,
+            margin_bottom=margin,
+            margin_start=margin,
+            margin_end=margin,
+        )
+        row.set_child(child=box)
+        box.append(child=self.canvas)
 
         settings = Gtk.Settings.get_default()
         settings.connect(
@@ -224,6 +246,8 @@ class PolEllipseGroup(Adw.PreferencesGroup):
     def update_data(self, data: timetagger.Data) -> None:
         theta = np.radians(data.azimuth)
         eta = np.radians(data.ellipticity)
+        sin_theta = np.sin(theta)
+        cos_theta = np.cos(theta)
         
         # semi-axes
         a = 1
@@ -234,8 +258,8 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         y = b * self._sin_t
 
         # rotate ellipse by azimuth angle
-        x_rotated = x * np.cos(theta) - y * np.sin(theta)
-        y_rotated = x * np.sin(theta) + y * np.cos(theta)
+        x_rotated = x * cos_theta - y * sin_theta
+        y_rotated = x * sin_theta + y * cos_theta
 
         self.ellipse.set_data(x_rotated, y_rotated)
 
@@ -248,11 +272,11 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         y_minor = np.array([-b, b])
 
         ## rotate axes
-        x_major_rotated = x_major * np.cos(theta) - y_major * np.sin(theta)
-        y_major_rotated = x_major * np.sin(theta) + y_major * np.cos(theta)
+        x_major_rotated = x_major * cos_theta - y_major * sin_theta
+        y_major_rotated = x_major * sin_theta + y_major * cos_theta
 
-        x_minor_rotated = x_minor * np.cos(theta) - y_minor * np.sin(theta)
-        y_minor_rotated = x_minor * np.sin(theta) + y_minor * np.cos(theta)
+        x_minor_rotated = x_minor * cos_theta - y_minor * sin_theta
+        y_minor_rotated = x_minor * sin_theta + y_minor * cos_theta
 
         self.major_axis.set_data(x_major_rotated, y_major_rotated)
         self.minor_axis.set_data(x_minor_rotated, y_minor_rotated)
@@ -280,8 +304,8 @@ class PolEllipseGroup(Adw.PreferencesGroup):
                 self.axes.yaxis.label.set_color(color=self.Colours.LIGHT.value)
                 self.axes.title.set_color(color=self.Colours.LIGHT.value)
                 self.circle.set_color(c=self.Colours.LIGHT.value)
-                self.circle_h.set_color(color=self.Colours.LIGHT.value)
-                self.circle_v.set_color(color=self.Colours.LIGHT.value)
+                self.circle_h_line.set_color(color=self.Colours.LIGHT.value)
+                self.circle_v_line.set_color(color=self.Colours.LIGHT.value)
 
             else:
                 self.figure.set_facecolor(color=self.Colours.LIGHT.value)
@@ -292,8 +316,8 @@ class PolEllipseGroup(Adw.PreferencesGroup):
                 self.axes.yaxis.label.set_color(color=self.Colours.DARK.value)
                 self.axes.title.set_color(color=self.Colours.DARK.value)
                 self.circle.set_color(c=self.Colours.DARK.value)
-                self.circle_h.set_color(color=self.Colours.DARK.value)
-                self.circle_v.set_color(color=self.Colours.DARK.value)
+                self.circle_h_line.set_color(color=self.Colours.DARK.value)
+                self.circle_v_line.set_color(color=self.Colours.DARK.value)
 
 class BlochSphereGroup(Adw.PreferencesGroup):
     class Colours(enum.Enum):
@@ -303,7 +327,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         LIGHT = (1.0, 1.0, 1.0, 1.0)
     def __init__(self) -> None:
         super().__init__(title='Bloch Sphere')
-        self.figure = matplotlib.figure.Figure(figsize=(4, 4))
+        self.figure = matplotlib.figure.Figure()
         self.axes = self.figure.add_subplot(111, projection='3d')
         self.axes.axis('off')
         self.axes.set_box_aspect([1, 1, 1])
@@ -323,6 +347,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         x = np.outer(a=np.cos(u), b=np.sin(v))
         y = np.outer(a=np.sin(u), b=np.sin(v))
         z = np.outer(a=np.ones_like(u), b=np.cos(v))
+
         self.sphere_wireframe = self.axes.plot_wireframe(
             x,
             y,
@@ -330,36 +355,32 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             linewidth=0.5,
             alpha=0.3
         )
-
-        self.sphere_hv_line, = self.axes.plot3D(
+        self.sphere_hv_line = self.axes.plot3D(
             [-1, 1],
             [0, 0],
             [0, 0],
             linestyle='--',
             linewidth=1
-        )
-
-        # D–A axis s2
-        self.sphere_da_line, = self.axes.plot3D(
+        )[0]
+        self.sphere_da_line = self.axes.plot3D(
             [0, 0],
             [-1, 1],
             [0, 0],
             linestyle='--',
             linewidth=1
-        )
-
-        # R–L axis s3
-        self.sphere_rl_line, = self.axes.plot3D(
+        )[0]
+        self.sphere_rl_line = self.axes.plot3D(
             [0, 0],
             [0, 0],
             [-1, 1],
             linestyle='--',
             linewidth=1
-        )
+        )[0]
 
         # polarisation basis labels
+        spacing = 1.2
         self._h_label = self.axes.text(
-            x=1.1,
+            x=spacing,
             y=0,
             z=0,
             s='H',
@@ -368,7 +389,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             fontsize=10
         )
         self._v_label = self.axes.text(
-            x=-1.1,
+            x=-spacing,
             y=0,
             z=0,
             s='V',
@@ -379,7 +400,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
 
         self._d_label = self.axes.text(
             x=0,
-            y=1.1,
+            y=spacing,
             z=0,
             s='D',
             ha='center',
@@ -388,7 +409,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         )
         self._a_label = self.axes.text(
             x=0,
-            y=-1.1,
+            y=-spacing,
             z=0,
             s='A',
             ha='center',
@@ -399,7 +420,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         self._r_label = self.axes.text(
             x=0,
             y=0,
-            z=1.1,
+            z=spacing,
             s='R',
             ha='center',
             va='center',
@@ -408,7 +429,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         self._l_label = self.axes.text(
             x=0,
             y=0,
-            z=-1.1,
+            z=-spacing,
             s='L',
             ha='center',
             va='center',
@@ -420,7 +441,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             [0],
             [0],
             [0],
-            'o',
+            marker='o',
             color=self.Colours.BLUE.value,
             markersize=6
         )[0]
@@ -429,7 +450,18 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             figure=self.figure
         )
         self.canvas.set_size_request(width=200, height=200)
-        self.add(child=Gtk.Frame(child=self.canvas))
+
+        row = Adw.PreferencesRow(activatable=False)
+        self.add(child=row)
+        margin = 2
+        box = Gtk.Box(
+            margin_top=margin,
+            margin_bottom=margin,
+            margin_start=margin,
+            margin_end=margin,
+        )
+        row.set_child(child=box)
+        box.append(child=self.canvas)
 
         settings = Gtk.Settings.get_default()
         settings.connect(
@@ -440,7 +472,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         self._last_dark_mode = None
         self.update_plot_theme()
 
-    def is_behind_camera(self, x, y, z) -> bool:
+    def is_behind_camera(self, x: float, y: float, z: float) -> bool:
         # Get current 3D projection matrix
         proj = self.axes.get_proj()
 
@@ -463,7 +495,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         self.point.set_data([x], [y])
         self.point.set_3d_properties([z])
 
-        is_behind = self.is_behind_camera(x, y, z)
+        is_behind = self.is_behind_camera(x=x, y=y, z=z)
 
         # add transparency if dot behind sphere
         # self.point.set_alpha(0.3 if is_behind else 1.0)
