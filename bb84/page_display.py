@@ -183,26 +183,23 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.figure.tight_layout()
 
         # circle
-        circle = matplotlib.pyplot.Circle(
+        self.circle = matplotlib.pyplot.Circle(
             xy=(0, 0),
             radius=1.0,
-            color='gray',
             fill=False,
             linewidth=1
         )
-        self.axes.add_patch(p=circle)
+        self.axes.add_patch(p=self.circle)
 
         # circle cross
-        self.axes.plot(
+        self.circle_h, = self.axes.plot(
             [-1, 1],
             [0, 0],
-            color='gray',
             linewidth=1
         )
-        self.axes.plot(
+        self.circle_v, = self.axes.plot(
             [0, 0], 
             [-1, 1],
-            color='gray',
             linewidth=1
         )
 
@@ -282,6 +279,9 @@ class PolEllipseGroup(Adw.PreferencesGroup):
                 self.axes.xaxis.label.set_color(color=self.Colours.LIGHT.value)
                 self.axes.yaxis.label.set_color(color=self.Colours.LIGHT.value)
                 self.axes.title.set_color(color=self.Colours.LIGHT.value)
+                self.circle.set_color(c=self.Colours.LIGHT.value)
+                self.circle_h.set_color(color=self.Colours.LIGHT.value)
+                self.circle_v.set_color(color=self.Colours.LIGHT.value)
 
             else:
                 self.figure.set_facecolor(color=self.Colours.LIGHT.value)
@@ -291,6 +291,9 @@ class PolEllipseGroup(Adw.PreferencesGroup):
                 self.axes.xaxis.label.set_color(color=self.Colours.DARK.value)
                 self.axes.yaxis.label.set_color(color=self.Colours.DARK.value)
                 self.axes.title.set_color(color=self.Colours.DARK.value)
+                self.circle.set_color(c=self.Colours.DARK.value)
+                self.circle_h.set_color(color=self.Colours.DARK.value)
+                self.circle_v.set_color(color=self.Colours.DARK.value)
 
 class BlochSphereGroup(Adw.PreferencesGroup):
     class Colours(enum.Enum):
@@ -320,47 +323,43 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         x = np.outer(a=np.cos(u), b=np.sin(v))
         y = np.outer(a=np.sin(u), b=np.sin(v))
         z = np.outer(a=np.ones_like(u), b=np.cos(v))
-        self.axes.plot_wireframe(
+        self.sphere_wireframe = self.axes.plot_wireframe(
             x,
             y,
             z,
-            color='gray',
             linewidth=0.5,
             alpha=0.3
         )
 
-        self.axes.plot3D(
+        self.sphere_hv_line, = self.axes.plot3D(
             [-1, 1],
             [0, 0],
             [0, 0],
-            color='gray',
             linestyle='--',
             linewidth=1
         )
 
         # D–A axis s2
-        self.axes.plot3D(
+        self.sphere_da_line, = self.axes.plot3D(
             [0, 0],
             [-1, 1],
             [0, 0],
-            color='gray',
             linestyle='--',
             linewidth=1
         )
 
         # R–L axis s3
-        self.axes.plot3D(
+        self.sphere_rl_line, = self.axes.plot3D(
             [0, 0],
             [0, 0],
             [-1, 1],
-            color='gray',
             linestyle='--',
             linewidth=1
         )
 
         # polarisation basis labels
         self._h_label = self.axes.text(
-            x=1.05,
+            x=1.1,
             y=0,
             z=0,
             s='H',
@@ -369,7 +368,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             fontsize=10
         )
         self._v_label = self.axes.text(
-            x=-1.05,
+            x=-1.1,
             y=0,
             z=0,
             s='V',
@@ -380,7 +379,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
 
         self._d_label = self.axes.text(
             x=0,
-            y=1.05,
+            y=1.1,
             z=0,
             s='D',
             ha='center',
@@ -389,7 +388,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         )
         self._a_label = self.axes.text(
             x=0,
-            y=-1.05,
+            y=-1.1,
             z=0,
             s='A',
             ha='center',
@@ -400,7 +399,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         self._r_label = self.axes.text(
             x=0,
             y=0,
-            z=1.05,
+            z=1.1,
             s='R',
             ha='center',
             va='center',
@@ -409,7 +408,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         self._l_label = self.axes.text(
             x=0,
             y=0,
-            z=-1.05,
+            z=-1.1,
             s='L',
             ha='center',
             va='center',
@@ -467,7 +466,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         is_behind = self.is_behind_camera(x, y, z)
 
         # add transparency if dot behind sphere
-        self.point.set_alpha(0.3 if is_behind else 1.0)
+        # self.point.set_alpha(0.3 if is_behind else 1.0)
 
         self.canvas.draw_idle()
 
@@ -497,6 +496,10 @@ class BlochSphereGroup(Adw.PreferencesGroup):
                 self._a_label.set_color(color=self.Colours.LIGHT.value)
                 self._r_label.set_color(color=self.Colours.LIGHT.value)
                 self._l_label.set_color(color=self.Colours.LIGHT.value)
+                self.sphere_wireframe.set_color(c=self.Colours.LIGHT.value)
+                self.sphere_hv_line.set_color(color=self.Colours.LIGHT.value)
+                self.sphere_da_line.set_color(color=self.Colours.LIGHT.value)
+                self.sphere_rl_line.set_color(color=self.Colours.LIGHT.value)
 
             else:
                 self.figure.set_facecolor(color=self.Colours.LIGHT.value)
@@ -512,6 +515,10 @@ class BlochSphereGroup(Adw.PreferencesGroup):
                 self._a_label.set_color(color=self.Colours.DARK.value)
                 self._r_label.set_color(color=self.Colours.DARK.value)
                 self._l_label.set_color(color=self.Colours.DARK.value)
+                self.sphere_wireframe.set_color(c=self.Colours.DARK.value)
+                self.sphere_hv_line.set_color(color=self.Colours.DARK.value)
+                self.sphere_da_line.set_color(color=self.Colours.DARK.value)
+                self.sphere_rl_line.set_color(color=self.Colours.DARK.value)
 
 class MeasurementBox(Gtk.Box):
     def __init__(self, channels: int, spacing: int = 20) -> None:

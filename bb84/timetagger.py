@@ -4,7 +4,7 @@ import math
 import struct
 import time
 
-import numpy
+import numpy as np
 import tomtag as tomt
 
 Percent = typing.NewType('Percent', float)
@@ -29,8 +29,8 @@ C_780_R = None
 C_780_L = None
 
 def find_delay(
-        tags_1550: numpy.ndarray,
-        tags_780: numpy.ndarray,
+        tags_1550: np.ndarray,
+        tags_780: np.ndarray,
         tcc: int = 15
     ) -> int:
     """
@@ -38,14 +38,14 @@ def find_delay(
     """
     # find delay between 1550 and 780 nm
     cc = []
-    for delay in numpy.arange(-3000, 3000,10):
+    for delay in np.arange(-3000, 3000,10):
         cc.append(
             tomt.count_twofolds(
                 tags_1550, tags_780 + delay,
                 len(tags_1550), len(tags_780), 15
             )
         )
-    return numpy.arange(-3000, 3000,10)[numpy.argmax(cc)]
+    return np.arange(-3000, 3000,10)[np.argmax(cc)]
 
 def get_qber(
         channels,
@@ -137,11 +137,11 @@ class DeviceInfo:
 
 @dataclasses.dataclass
 class RawData:
-    timetags: numpy.ndarray = dataclasses.field(
-        default_factory=lambda: numpy.array([])
+    timetags: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([])
     )
-    channels: numpy.ndarray = dataclasses.field(
-        default_factory=lambda: numpy.array([])
+    channels: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([])
     )
 
     def serialise(self) -> bytes:
@@ -172,8 +172,8 @@ class RawData:
         offset_timetags = header_size
         offset_channels = offset_timetags + timetags_bytes
 
-        timetags = numpy.frombuffer(payload[offset_timetags:offset_channels], dtype='>i8').astype(numpy.int64)
-        channels = numpy.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype='>u1').astype(numpy.uint8)
+        timetags = np.frombuffer(payload[offset_timetags:offset_channels], dtype='>i8').astype(np.int64)
+        channels = np.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype='>u1').astype(np.uint8)
 
         return RawData(timetags=timetags, channels=channels)
 
@@ -194,8 +194,8 @@ default_pattern = {
 
 @dataclasses.dataclass
 class Data:
-    singles: numpy.ndarray = dataclasses.field(
-        default_factory=lambda: numpy.array([])
+    singles: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([])
     )
     azimuth: float = 0.0
     ellipticity: float = 0.0
@@ -211,10 +211,10 @@ class Data:
             raw_data: RawData,
             pattern: dict[str, int | None] | None = None
     ) -> 'Data':
-        singles = numpy.bincount(raw_data.channels.astype(numpy.int64), minlength=8)
+        singles = np.bincount(raw_data.channels.astype(np.int64), minlength=8)
     
         if pattern:
-            with numpy.errstate(invalid='ignore'):
+            with np.errstate(invalid='ignore'):
                 try:
                     s1 = float((singles[pattern['1H']] - singles[pattern['1V']])/(singles[pattern['1H']] + singles[pattern['1V']]))
                 except:
@@ -230,13 +230,16 @@ class Data:
 
             match (s1, s2, s3):
                 case (float(), None, float()):
-                    s2 = math.sqrt(1 - s1**2 - s3**2)
+                    s2 = math.sqrt(max(0.0, 1.0 - s1**2 - s3**2))
 
                 case (None, float(), float()):
-                    s1 = math.sqrt(1 - s2**2 - s3**2)
+                    s1 = math.sqrt(max(0.0, 1.0 - s2**2 - s3**2))
 
                 case (float(), float(), None):
-                    s3 = math.sqrt(1 - s1**2 - s2**2)
+                    s3 = math.sqrt(max(0.0, 1.0 - s1**2 - s2**2))
+
+                case (float(), float(), float()):
+                    pass
 
                 case _:
                     raise TypeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
@@ -284,19 +287,49 @@ class Data:
 class TimeTagger:
     def __init__(self) -> None:
         self.device_info = DeviceInfo()
-        self.pattern = None
+        self.pattern = {
+            '1H': 0,
+            '1V': 1,
+            '1D': 2,
+            '1A': 3,
+            '1R': None,
+            '1L': None,
+            '2H': None,
+            '2V': None,
+            '2D': None,
+            '2A': None,
+            '2R': None,
+            '2L': None
+        }
 
     def measure(self) -> RawData:
-        data_points = 10000
-        timetags = numpy.array(
-            object=range(data_points),
-            dtype=numpy.int64
-        )
-        channels = numpy.random.randint(
-            low=0,
-            high=8,
-            size=data_points
-        ).astype(dtype=numpy.uint8)
+        total_counts = np.random.randint(low=30000, high=35000)
+
+        detector_proportions = {
+            "H": 0.5,
+            "V": 0.0,
+            "D": 0.495,
+            "A": 0.005,
+            # "R": 0.0,
+            # "L": 0.0
+        }
+
+        noisy_props = np.array(list(detector_proportions.values())) + np.random.normal(loc=0, scale=0.0001, size=len(detector_proportions))
+        noisy_props = np.clip(a=noisy_props, a_min=0, a_max=None)
+        noisy_props = noisy_props / noisy_props.sum()
+
+        dark_counts = np.random.poisson(lam=200, size=len(detector_proportions))
+
+        counts = np.random.multinomial(n=total_counts, pvals=noisy_props) + dark_counts
+
+        channels = np.concatenate([
+            np.full(c, i, dtype=np.uint8)
+            for i, c in enumerate(counts)
+        ])
+        np.random.shuffle(channels)
+
+        timetags = np.arange(total_counts, dtype=np.int64)
+
         raw_data = RawData(
             timetags=timetags,
             channels=channels
