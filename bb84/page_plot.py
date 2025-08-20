@@ -50,13 +50,21 @@ class SwitchRow(Adw.ActionRow):
         )
 
 class QBERPlot(Adw.PreferencesGroup):
-    class Colours(enum.Enum):
-        BLUE = (0, 115/255, 229/255, 1.0)
-        ORANGE = (233/255, 84/255, 32/255, 1.0)
-        DARK = (61/255, 61/255, 61/255, 1.0)
-        LIGHT = (1.0, 1.0, 1.0, 1.0)
     def __init__(self, get_data_callback: typing.Callable) -> None:
         super().__init__()
+        row = Adw.PreferencesRow(can_target=False)
+
+        self._colours = {
+            'blue':(0, 115/255, 229/255, 1.0),
+            'orange': (233/255, 84/255, 32/255, 1.0),
+        }
+        self.context = row.get_style_context()
+        if not self._colours.get('light'):
+            self._colours['light'] = tuple(self.context.get_color())
+        self.add(child=row)
+        if not self._colours.get('dark'):
+            self._colours['dark'] = tuple(self.context.get_color())
+
         self.refresh_rate = 33
         self.plot_length = 1000
         self.cycles = 5
@@ -70,8 +78,18 @@ class QBERPlot(Adw.PreferencesGroup):
         self.figure, self.axes = matplotlib.pyplot.subplots()
         self.figure.tight_layout()
 
-        self.qber_line, = self.axes.plot([], [], color=self.Colours.BLUE.value, label='QBER')
-        self.qx_line, = self.axes.plot([], [], color=self.Colours.ORANGE.value, label='Qx')
+        self.qber_line = self.axes.plot(
+            [],
+            [],
+            color=self._colours['blue'],
+            label='QBER'
+        )[0]
+        self.qx_line = self.axes.plot(
+            [],
+            [],
+            color=self._colours['orange'],
+            label='Qx'
+        )[0]
         
         self.axes.set_ylim(0, 1)
         self.axes.set_xlim(0, self.plot_length)
@@ -84,8 +102,7 @@ class QBERPlot(Adw.PreferencesGroup):
             figure=self.figure
         )
         self.canvas.set_size_request(width=0, height=300)
-        row = Adw.PreferencesRow(can_target=False)
-        self.add(child=row)
+
         margin = 2
         box = Gtk.Box(
             margin_top=margin,
@@ -203,26 +220,26 @@ class QBERPlot(Adw.PreferencesGroup):
             self._last_dark_mode = self.dark_mode
 
             if self.dark_mode:
-                self.figure.set_facecolor(color=self.Colours.DARK.value)
-                self.axes.set_facecolor(color=self.Colours.DARK.value)
-                self.axes.tick_params(colors=self.Colours.LIGHT.value)
-                self.axes.spines[:].set_color(self.Colours.LIGHT.value)
-                self.axes.xaxis.label.set_color(color=self.Colours.LIGHT.value)
-                self.axes.yaxis.label.set_color(color=self.Colours.LIGHT.value)
-                self.axes.title.set_color(color=self.Colours.LIGHT.value)
+                self.figure.set_facecolor(color=self._colours['dark'])
+                self.axes.set_facecolor(color=self._colours['dark'])
+                self.axes.tick_params(colors=self._colours['light'])
+                self.axes.spines[:].set_color(c=self._colours['light'])
+                self.axes.xaxis.label.set_color(color=self._colours['light'])
+                self.axes.yaxis.label.set_color(color=self._colours['light'])
+                self.axes.title.set_color(color=self._colours['light'])
                 for text in self.axes.get_legend().get_texts():
-                    text.set_color(color=self.Colours.LIGHT.value)
+                    text.set_color(color=self._colours['light'])
 
             else:
-                self.figure.set_facecolor(color=self.Colours.LIGHT.value)
-                self.axes.set_facecolor(color=self.Colours.LIGHT.value)
-                self.axes.tick_params(colors=self.Colours.DARK.value)
-                self.axes.spines[:].set_color(self.Colours.DARK.value)
-                self.axes.xaxis.label.set_color(color=self.Colours.DARK.value)
-                self.axes.yaxis.label.set_color(color=self.Colours.DARK.value)
-                self.axes.title.set_color(color=self.Colours.DARK.value)
+                self.figure.set_facecolor(color=self._colours['light'])
+                self.axes.set_facecolor(color=self._colours['light'])
+                self.axes.tick_params(colors=self._colours['dark'])
+                self.axes.spines[:].set_color(c=self._colours['dark'])
+                self.axes.xaxis.label.set_color(color=self._colours['dark'])
+                self.axes.yaxis.label.set_color(color=self._colours['dark'])
+                self.axes.title.set_color(color=self._colours['dark'])
                 for text in self.axes.get_legend().get_texts():
-                    text.set_color(color=self.Colours.DARK.value)
+                    text.set_color(color=self._colours['dark'])
 
 class PlotPage(Gtk.ScrolledWindow):
     def __init__(
