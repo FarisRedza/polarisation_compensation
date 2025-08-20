@@ -81,7 +81,6 @@ class PolarisationCompensator:
     def _run(self):
         """Main SPSA loop."""
         # Initialize
-        print('hello')
         theta = np.array(self.initial_angles, dtype=float)
         self._set_angles(theta)
         time.sleep(0.1)  # let system settle
