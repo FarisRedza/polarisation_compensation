@@ -1,9 +1,9 @@
 import typing
-import enum
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Adw, GLib, GObject
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Adw, GLib, GObject, Gdk
 
 import numpy as np
 import matplotlib.backends.backend_gtk4agg
@@ -11,6 +11,50 @@ import matplotlib.figure
 import matplotlib.pyplot
 
 from . import timetagger
+
+def rgba_to_tuple(rgba: Gdk.RGBA) -> tuple[float, float, float, float]:
+    return (rgba.red, rgba.green, rgba.blue, rgba.alpha)
+
+class Colours:
+    BLUE: tuple[float, float, float, float]
+    TEAL: tuple[float, float, float, float]
+    GREEN: tuple[float, float, float, float]
+    YELLOW: tuple[float, float, float, float]
+    ORANGE: tuple[float, float, float, float]
+    RED: tuple[float, float, float, float]
+    PINK: tuple[float, float, float, float]
+    PURPLE: tuple[float, float, float, float]
+    SLATE: tuple[float, float, float, float]
+    BROWN: tuple[float, float, float, float]
+    LIGHT: tuple[float, float, float, float]
+    DARK: tuple[float, float, float, float]
+
+    def __init__(self) -> None:
+        if Adw.get_minor_version() >= 6:
+            colours = {}
+            for colour in Adw.AccentColor:
+                colours[colour.name] = rgba_to_tuple(colour.to_rgba())
+
+            colours['LIGHT'] = (1, 1, 1, 1)
+            colours['DARK'] = (61/255, 61/255, 61/255, 1)
+        else:
+            colours = {
+                'BLUE': (0.207843, 0.517647, 0.894118, 1.000000),
+                'TEAL': (0.129412, 0.564706, 0.643137, 1.000000),
+                'GREEN':(0.227451, 0.580392, 0.290196, 1.000000),
+                'YELLOW': (0.784314, 0.533333, 0.000000, 1.000000),
+                'ORANGE': (0.929412, 0.356863, 0.000000, 1.000000),
+                'RED': (0.901961, 0.176471, 0.258824, 1.000000),
+                'PINK': (0.835294, 0.380392, 0.600000, 1.000000),
+                'PURPLE': (0.568627, 0.254902, 0.674510, 1.000000),
+                'SLATE': (0.435294, 0.513726, 0.588235, 1.000000),
+                'BROWN': (0.701961, 0.568627, 0.411765, 1.000000),
+                'LIGHT': (1, 1, 1, 1),
+                'DARK': (53/255, 53/255, 53/255, 1)
+            }
+
+        for name, rgba in colours.items():
+            setattr(self, name, rgba)
 
 class Counter(Gtk.Box):
     def __init__(self, label: str, counter_size: int = 40) -> None:
@@ -23,7 +67,7 @@ class Counter(Gtk.Box):
         self.channel_counts_label.set_halign(align=Gtk.Align.END)
         self.channel_counts_label.set_hexpand(expand=True)
         self.append(child=self.channel_counts_label)
-        self._build_template()
+        self._build_tetupleate()
 
     def update_counts(self, value: int | float) -> None:
         self._last_value = value
@@ -39,10 +83,10 @@ class Counter(Gtk.Box):
     
     def set_counter_size(self, counter_size: int) -> None:
         self.counter_size = counter_size
-        self._build_template()
+        self._build_tetupleate()
         self.update_counts(value=self._last_value)
 
-    def _build_template(self) -> None:
+    def _build_tetupleate(self) -> None:
         ctx = self.channel_counts_label.get_style_context()
         css = f"label {{ font-family: Monospace; font-size: {self.counter_size}pt; }}"
         provider = Gtk.CssProvider()
@@ -163,20 +207,9 @@ class MeasurementInfoGroup(Adw.PreferencesGroup):
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:
         super().__init__(title='Polarisation Ellipse')
-        row = Adw.PreferencesRow(can_target=False)
 
-        self._colours = {
-            'blue':(0, 115/255, 229/255, 1.0),
-            'orange': (233/255, 84/255, 32/255, 1.0),
-        }
-        self.context = row.get_style_context()
-        if not self._colours.get('light'):
-            light = self.context.get_color()
-            self._colours['light'] = (light.red, light.green, light.blue, light.alpha)
+        row = Adw.PreferencesRow(can_target=False)
         self.add(child=row)
-        if not self._colours.get('dark'):
-            dark = self.context.get_color()
-            self._colours['dark'] = (dark.red, dark.green, dark.blue, dark.alpha)
 
         # parametric angle
         self._t = np.linspace(
@@ -214,17 +247,14 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.ellipse = self.axes.plot(
             [],
             [],
-            color=self._colours['blue']
         )[0]
         self.major_axis = self.axes.plot(
             [],
             [],
-            color=self._colours['blue']
         )[0]
         self.minor_axis = self.axes.plot(
             [],
             [],
-            color=self._colours['blue']
         )[0]
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
@@ -289,6 +319,16 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.major_axis.set_data(x_major_rotated, y_major_rotated)
         self.minor_axis.set_data(x_minor_rotated, y_minor_rotated)
 
+        accent_colour = rgba_to_tuple(
+            rgba=self.get_style_context().lookup_color(
+                color_name='accent_color'
+            )[1]
+        )
+        if self.ellipse.get_color() != accent_colour:
+            self.ellipse.set_color(color=accent_colour)
+            self.major_axis.set_color(color=accent_colour)
+            self.minor_axis.set_color(color=accent_colour)
+
         self.canvas.draw_idle()
 
     def on_theme_changed(
@@ -304,47 +344,34 @@ class PolEllipseGroup(Adw.PreferencesGroup):
             self._last_dark_mode = self.dark_mode
 
             if self.dark_mode:
-                self.figure.set_facecolor(color=self._colours['dark'])
-                self.axes.set_facecolor(color=self._colours['dark'])
-                self.axes.tick_params(colors=self._colours['light'])
-                self.axes.spines[:].set_color(c=self._colours['light'])
-                self.axes.xaxis.label.set_color(color=self._colours['light'])
-                self.axes.yaxis.label.set_color(color=self._colours['light'])
-                self.axes.title.set_color(color=self._colours['light'])
-                self.circle.set_color(c=self._colours['light'])
-                self.circle_h_line.set_color(color=self._colours['light'])
-                self.circle_v_line.set_color(color=self._colours['light'])
+                self.figure.set_facecolor(color=Colours().DARK)
+                self.axes.set_facecolor(color=Colours().DARK)
+                self.axes.tick_params(colors=Colours().LIGHT)
+                self.axes.spines[:].set_color(c=Colours().LIGHT)
+                self.axes.xaxis.label.set_color(color=Colours().LIGHT)
+                self.axes.yaxis.label.set_color(color=Colours().LIGHT)
+                self.axes.title.set_color(color=Colours().LIGHT)
+                self.circle.set_color(c=Colours().LIGHT)
+                self.circle_h_line.set_color(color=Colours().LIGHT)
+                self.circle_v_line.set_color(color=Colours().LIGHT)
 
             else:
-                self.figure.set_facecolor(color=self._colours['light'])
-                self.axes.set_facecolor(color=self._colours['light'])
-                self.axes.tick_params(colors=self._colours['dark'])
-                self.axes.spines[:].set_color(c=self._colours['dark'])
-                self.axes.xaxis.label.set_color(color=self._colours['dark'])
-                self.axes.yaxis.label.set_color(color=self._colours['dark'])
-                self.axes.title.set_color(color=self._colours['dark'])
-                self.circle.set_color(c=self._colours['dark'])
-                self.circle_h_line.set_color(color=self._colours['dark'])
-                self.circle_v_line.set_color(color=self._colours['dark'])
+                self.figure.set_facecolor(color=Colours().LIGHT)
+                self.axes.set_facecolor(color=Colours().LIGHT)
+                self.axes.tick_params(colors=Colours().DARK)
+                self.axes.spines[:].set_color(c=Colours().DARK)
+                self.axes.xaxis.label.set_color(color=Colours().DARK)
+                self.axes.yaxis.label.set_color(color=Colours().DARK)
+                self.axes.title.set_color(color=Colours().DARK)
+                self.circle.set_color(c=Colours().DARK)
+                self.circle_h_line.set_color(color=Colours().DARK)
+                self.circle_v_line.set_color(color=Colours().DARK)
 
 class BlochSphereGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:
         super().__init__(title='Bloch Sphere')
         row = Adw.PreferencesRow(activatable=False)
-
-        self._colours = {
-            'blue':(0, 115/255, 229/255, 1.0),
-            'orange': (233/255, 84/255, 32/255, 1.0),
-        }
-        self.context = row.get_style_context()
-        if not self._colours.get('light'):
-            light = self.context.get_color()
-            self._colours['light'] = (light.red, light.green, light.blue, light.alpha)
         self.add(child=row)
-        if not self._colours.get('dark'):
-            dark = self.context.get_color()
-            self._colours['dark'] = (dark.red, dark.green, dark.blue, dark.alpha)
-
 
         self.figure = matplotlib.figure.Figure()
         self.axes = self.figure.add_subplot(111, projection='3d')
@@ -465,7 +492,6 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             [0],
             [0],
             marker='o',
-            color=self._colours['blue'],
             markersize=6
         )[0]
 
@@ -521,6 +547,13 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         # add transparency if dot behind sphere
         # self.point.set_alpha(0.3 if is_behind else 1.0)
 
+        accent_colour = rgba_to_tuple(
+            rgba=self.get_style_context().lookup_color(
+                color_name='accent_color'
+            )[1]
+        )
+        if self.point.get_color() != accent_colour:
+            self.point.set_color(color=accent_colour)
         self.canvas.draw_idle()
 
     def on_theme_changed(
@@ -536,42 +569,42 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             self._last_dark_mode = self.dark_mode
 
             if self.dark_mode:
-                self.figure.set_facecolor(color=self._colours['dark'])
-                self.axes.set_facecolor(color=self._colours['dark'])
-                self.axes.tick_params(colors=self._colours['light'])
-                self.axes.spines[:].set_color(self._colours['light'])
-                self.axes.xaxis.label.set_color(color=self._colours['light'])
-                self.axes.yaxis.label.set_color(color=self._colours['light'])
-                self.axes.title.set_color(color=self._colours['light'])
-                self._h_label.set_color(color=self._colours['light'])
-                self._v_label.set_color(color=self._colours['light'])
-                self._d_label.set_color(color=self._colours['light'])
-                self._a_label.set_color(color=self._colours['light'])
-                self._r_label.set_color(color=self._colours['light'])
-                self._l_label.set_color(color=self._colours['light'])
-                self.sphere_wireframe.set_color(c=self._colours['light'])
-                self.sphere_hv_line.set_color(color=self._colours['light'])
-                self.sphere_da_line.set_color(color=self._colours['light'])
-                self.sphere_rl_line.set_color(color=self._colours['light'])
+                self.figure.set_facecolor(color=Colours().DARK)
+                self.axes.set_facecolor(color=Colours().DARK)
+                self.axes.tick_params(colors=Colours().LIGHT)
+                self.axes.spines[:].set_color(Colours().LIGHT)
+                self.axes.xaxis.label.set_color(color=Colours().LIGHT)
+                self.axes.yaxis.label.set_color(color=Colours().LIGHT)
+                self.axes.title.set_color(color=Colours().LIGHT)
+                self._h_label.set_color(color=Colours().LIGHT)
+                self._v_label.set_color(color=Colours().LIGHT)
+                self._d_label.set_color(color=Colours().LIGHT)
+                self._a_label.set_color(color=Colours().LIGHT)
+                self._r_label.set_color(color=Colours().LIGHT)
+                self._l_label.set_color(color=Colours().LIGHT)
+                self.sphere_wireframe.set_color(c=Colours().LIGHT)
+                self.sphere_hv_line.set_color(color=Colours().LIGHT)
+                self.sphere_da_line.set_color(color=Colours().LIGHT)
+                self.sphere_rl_line.set_color(color=Colours().LIGHT)
 
             else:
-                self.figure.set_facecolor(color=self._colours['light'])
-                self.axes.set_facecolor(color=self._colours['light'])
-                self.axes.tick_params(colors=self._colours['dark'])
-                self.axes.spines[:].set_color(self._colours['dark'])
-                self.axes.xaxis.label.set_color(color=self._colours['dark'])
-                self.axes.yaxis.label.set_color(color=self._colours['dark'])
-                self.axes.title.set_color(color=self._colours['dark'])
-                self._h_label.set_color(color=self._colours['dark'])
-                self._v_label.set_color(color=self._colours['dark'])
-                self._d_label.set_color(color=self._colours['dark'])
-                self._a_label.set_color(color=self._colours['dark'])
-                self._r_label.set_color(color=self._colours['dark'])
-                self._l_label.set_color(color=self._colours['dark'])
-                self.sphere_wireframe.set_color(c=self._colours['dark'])
-                self.sphere_hv_line.set_color(color=self._colours['dark'])
-                self.sphere_da_line.set_color(color=self._colours['dark'])
-                self.sphere_rl_line.set_color(color=self._colours['dark'])
+                self.figure.set_facecolor(color=Colours().LIGHT)
+                self.axes.set_facecolor(color=Colours().LIGHT)
+                self.axes.tick_params(colors=Colours().DARK)
+                self.axes.spines[:].set_color(Colours().DARK)
+                self.axes.xaxis.label.set_color(color=Colours().DARK)
+                self.axes.yaxis.label.set_color(color=Colours().DARK)
+                self.axes.title.set_color(color=Colours().DARK)
+                self._h_label.set_color(color=Colours().DARK)
+                self._v_label.set_color(color=Colours().DARK)
+                self._d_label.set_color(color=Colours().DARK)
+                self._a_label.set_color(color=Colours().DARK)
+                self._r_label.set_color(color=Colours().DARK)
+                self._l_label.set_color(color=Colours().DARK)
+                self.sphere_wireframe.set_color(c=Colours().DARK)
+                self.sphere_hv_line.set_color(color=Colours().DARK)
+                self.sphere_da_line.set_color(color=Colours().DARK)
+                self.sphere_rl_line.set_color(color=Colours().DARK)
 
 class MeasurementBox(Gtk.Box):
     def __init__(self, channels: int, spacing: int = 20) -> None:

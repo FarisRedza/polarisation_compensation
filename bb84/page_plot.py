@@ -1,16 +1,60 @@
 import typing
 import collections
-import enum
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Adw, GLib, GObject
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Adw, GLib, GObject, Gdk
 
 import numpy as np
 import matplotlib.backends.backend_gtk4agg
 import matplotlib.pyplot
 
 from . import timetagger
+
+def rgba_to_tuple(rgba: Gdk.RGBA) -> tuple[float, float, float, float]:
+    return (rgba.red, rgba.green, rgba.blue, rgba.alpha)
+
+class Colours:
+    BLUE: tuple[float, float, float, float]
+    TEAL: tuple[float, float, float, float]
+    GREEN: tuple[float, float, float, float]
+    YELLOW: tuple[float, float, float, float]
+    ORANGE: tuple[float, float, float, float]
+    RED: tuple[float, float, float, float]
+    PINK: tuple[float, float, float, float]
+    PURPLE: tuple[float, float, float, float]
+    SLATE: tuple[float, float, float, float]
+    BROWN: tuple[float, float, float, float]
+    LIGHT: tuple[float, float, float, float]
+    DARK: tuple[float, float, float, float]
+
+    def __init__(self) -> None:
+        if Adw.get_minor_version() >= 6:
+            colours = {}
+            for colour in Adw.AccentColor:
+                colours[colour.name] = rgba_to_tuple(colour.to_rgba())
+
+            colours['LIGHT'] = (1, 1, 1, 1)
+            colours['DARK'] = (61/255, 61/255, 61/255, 1)
+        else:
+            colours = {
+                'BLUE': (0.207843, 0.517647, 0.894118, 1.000000),
+                'TEAL': (0.129412, 0.564706, 0.643137, 1.000000),
+                'GREEN':(0.227451, 0.580392, 0.290196, 1.000000),
+                'YELLOW': (0.784314, 0.533333, 0.000000, 1.000000),
+                'ORANGE': (0.929412, 0.356863, 0.000000, 1.000000),
+                'RED': (0.901961, 0.176471, 0.258824, 1.000000),
+                'PINK': (0.835294, 0.380392, 0.600000, 1.000000),
+                'PURPLE': (0.568627, 0.254902, 0.674510, 1.000000),
+                'SLATE': (0.435294, 0.513726, 0.588235, 1.000000),
+                'BROWN': (0.701961, 0.568627, 0.411765, 1.000000),
+                'LIGHT': (1, 1, 1, 1),
+                'DARK': (53/255, 53/255, 53/255, 1)
+            }
+
+        for name, rgba in colours.items():
+            setattr(self, name, rgba)
 
 class EntryRow(Adw.ActionRow):
     def __init__(
@@ -61,11 +105,11 @@ class QBERPlot(Adw.PreferencesGroup):
         self.context = row.get_style_context()
         if not self._colours.get('light'):
             light = self.context.get_color()
-            self._colours['light'] = (light.red, light.green, light.blue, light.alpha)
+            Colours().LIGHT = (light.red, light.green, light.blue, light.alpha)
         self.add(child=row)
         if not self._colours.get('dark'):
             dark = self.context.get_color()
-            self._colours['dark'] = (dark.red, dark.green, dark.blue, dark.alpha)
+            Colours().DARK = (dark.red, dark.green, dark.blue, dark.alpha)
 
 
         self.refresh_rate = 33
@@ -84,13 +128,13 @@ class QBERPlot(Adw.PreferencesGroup):
         self.qber_line = self.axes.plot(
             [],
             [],
-            color=self._colours['blue'],
+            color=Colours().BLUE,
             label='QBER'
         )[0]
         self.qx_line = self.axes.plot(
             [],
             [],
-            color=self._colours['orange'],
+            color=Colours().ORANGE,
             label='Qx'
         )[0]
         
@@ -223,26 +267,26 @@ class QBERPlot(Adw.PreferencesGroup):
             self._last_dark_mode = self.dark_mode
 
             if self.dark_mode:
-                self.figure.set_facecolor(color=self._colours['dark'])
-                self.axes.set_facecolor(color=self._colours['dark'])
-                self.axes.tick_params(colors=self._colours['light'])
-                self.axes.spines[:].set_color(c=self._colours['light'])
-                self.axes.xaxis.label.set_color(color=self._colours['light'])
-                self.axes.yaxis.label.set_color(color=self._colours['light'])
-                self.axes.title.set_color(color=self._colours['light'])
+                self.figure.set_facecolor(color=Colours().DARK)
+                self.axes.set_facecolor(color=Colours().DARK)
+                self.axes.tick_params(colors=Colours().LIGHT)
+                self.axes.spines[:].set_color(c=Colours().LIGHT)
+                self.axes.xaxis.label.set_color(color=Colours().LIGHT)
+                self.axes.yaxis.label.set_color(color=Colours().LIGHT)
+                self.axes.title.set_color(color=Colours().LIGHT)
                 for text in self.axes.get_legend().get_texts():
-                    text.set_color(color=self._colours['light'])
+                    text.set_color(color=Colours().LIGHT)
 
             else:
-                self.figure.set_facecolor(color=self._colours['light'])
-                self.axes.set_facecolor(color=self._colours['light'])
-                self.axes.tick_params(colors=self._colours['dark'])
-                self.axes.spines[:].set_color(c=self._colours['dark'])
-                self.axes.xaxis.label.set_color(color=self._colours['dark'])
-                self.axes.yaxis.label.set_color(color=self._colours['dark'])
-                self.axes.title.set_color(color=self._colours['dark'])
+                self.figure.set_facecolor(color=Colours().LIGHT)
+                self.axes.set_facecolor(color=Colours().LIGHT)
+                self.axes.tick_params(colors=Colours().DARK)
+                self.axes.spines[:].set_color(c=Colours().DARK)
+                self.axes.xaxis.label.set_color(color=Colours().DARK)
+                self.axes.yaxis.label.set_color(color=Colours().DARK)
+                self.axes.title.set_color(color=Colours().DARK)
                 for text in self.axes.get_legend().get_texts():
-                    text.set_color(color=self._colours['dark'])
+                    text.set_color(color=Colours().DARK)
 
 class PlotPage(Gtk.ScrolledWindow):
     def __init__(
