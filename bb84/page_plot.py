@@ -93,7 +93,7 @@ class SwitchRow(Adw.ActionRow):
             widget=switch
         )
 
-class QBERPlot(Adw.PreferencesGroup):
+class QBERPlotGroup(Adw.PreferencesGroup):
     def __init__(self, get_data_callback: typing.Callable) -> None:
         super().__init__()
         row = Adw.PreferencesRow(can_target=False)
@@ -104,33 +104,22 @@ class QBERPlot(Adw.PreferencesGroup):
         self.cycles = 5
         self.grid = False
 
-        self.qber_values = collections.deque(maxlen=self.cycles)
-        self.qx_values = collections.deque(maxlen=self.cycles)
-        self.azimuth_values = collections.deque(maxlen=self.cycles)
-        self.ellipticity_values = collections.deque(maxlen=self.cycles)
-
         self.figure, self.axes = matplotlib.pyplot.subplots()
         self.figure.tight_layout()
 
-        self.qber_line = self.axes.plot(
-            [],
-            [],
-            color=Colours().BLUE,
-            label='QBER'
-        )[0]
-        self.qx_line = self.axes.plot(
-            [],
-            [],
-            color=Colours().ORANGE,
-            label='Qx'
-        )[0]
+        self.plots = {}
+        self.add_line_to_plot(
+            name='QBER',
+            colour=Colours().BLUE
+        )
+        self.add_line_to_plot(
+            name='Qx',
+            colour=Colours().ORANGE
+        )
         
         self.axes.set_ylim(0, 1)
         self.axes.set_xlim(0, self.plot_length)
         self.axes.legend(frameon=False)
-
-        self.qber = collections.deque(maxlen=self.plot_length)
-        self.qx = collections.deque(maxlen=self.plot_length)
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
             figure=self.figure
@@ -182,6 +171,17 @@ class QBERPlot(Adw.PreferencesGroup):
             get_data_callback
         )
 
+    def add_line_to_plot(
+            self,
+            name: str,
+            colour: tuple[float, float, float, float]
+    ) -> None:
+        self.plots[name] = {
+            'current_value': collections.deque(maxlen=self.cycles),
+            'value_history': collections.deque(maxlen=self.plot_length),
+            'line': self.axes.plot([], [], color=colour, label=name)[0]
+        }
+
     def on_set_cycles(self, entry: Gtk.Entry) -> None:
         try:
             value = int(entry.get_text())
@@ -190,8 +190,9 @@ class QBERPlot(Adw.PreferencesGroup):
             print(f'Invalid entry: {entry.get_text()}')
         else:
             self.cycles = value
-            self.qber_values = collections.deque(maxlen=self.cycles)
-            self.qx_values = collections.deque(maxlen=self.cycles)
+
+            for _, info in self.plots.items():
+                info['current_value'] = collections.deque(maxlen=self.cycles)
 
     def on_set_plot_length(self, entry: Gtk.Entry) -> None:
         try:
@@ -215,28 +216,24 @@ class QBERPlot(Adw.PreferencesGroup):
     ) -> bool:
         data: timetagger.Data = get_data_callback()
 
-        self.qber_values.append(data.qber)
-        self.qx_values.append(data.qx)
+        for name, info in self.plots.items():
+            value = getattr(data, name.lower(), None)
+            if value is not None:
+                info['current_value'].append(value)
+                avg = np.mean(info['current_value'])
+                info['value_history'].append(avg)
 
-        qber_avg = np.mean(self.qber_values)
-        qx_avg = np.mean(self.qx_values)
+                info['line'].set_data(
+                    range(len(info['value_history'])),
+                    info['value_history']
+                )
 
-        self.qber.append(qber_avg)
-        self.qx.append(qx_avg)
+                for text in self.axes.get_legend().get_texts():
+                    if text.get_text().startswith(name):
+                        text.set_text(f'{name} - {avg:.3f}')
 
-        self.qber_line.set_data(
-            range(len(self.qber)),
-            self.qber
-        )
-        self.qx_line.set_data(
-            range(len(self.qx)),
-            self.qx
-        )
         self.axes.set_xlim(0, self.plot_length)
         self.axes.grid(visible=self.grid)
-
-        self.axes.get_legend().get_texts()[0].set_text(s=f'QBER - {qber_avg:.3f}')
-        self.axes.get_legend().get_texts()[1].set_text(s=f'Qx - {qx_avg:.3f}')
 
         self.canvas.draw()
         return True
@@ -294,5 +291,5 @@ class PlotPage(Gtk.ScrolledWindow):
         )
         self.set_child(child=main_box)
 
-        qber_plot = QBERPlot(get_data_callback=get_data_callback)
+        qber_plot = QBERPlotGroup(get_data_callback=get_data_callback)
         main_box.append(child=qber_plot)
