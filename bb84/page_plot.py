@@ -118,11 +118,6 @@ class QBERPlotGroup(Adw.PreferencesGroup):
             attribute='qx',
             colour=Colours().ORANGE
         )
-        self.add_line_to_plot(
-            name='S1',
-            attribute='normalised_s1',
-            colour=Colours().PURPLE
-        )
         
         self.axes.set_ylim(0, 1)
         self.axes.set_xlim(0, self.plot_length)
