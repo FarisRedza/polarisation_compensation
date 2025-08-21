@@ -97,6 +97,7 @@ class QBERPlot(Adw.PreferencesGroup):
     def __init__(self, get_data_callback: typing.Callable) -> None:
         super().__init__()
         row = Adw.PreferencesRow(can_target=False)
+        self.add(child=row)
 
         self.refresh_rate = 33
         self.plot_length = 1000
