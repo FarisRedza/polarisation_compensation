@@ -98,20 +98,6 @@ class QBERPlot(Adw.PreferencesGroup):
         super().__init__()
         row = Adw.PreferencesRow(can_target=False)
 
-        self._colours = {
-            'blue':(0, 115/255, 229/255, 1.0),
-            'orange': (233/255, 84/255, 32/255, 1.0),
-        }
-        self.context = row.get_style_context()
-        if not self._colours.get('light'):
-            light = self.context.get_color()
-            Colours().LIGHT = (light.red, light.green, light.blue, light.alpha)
-        self.add(child=row)
-        if not self._colours.get('dark'):
-            dark = self.context.get_color()
-            Colours().DARK = (dark.red, dark.green, dark.blue, dark.alpha)
-
-
         self.refresh_rate = 33
         self.plot_length = 1000
         self.cycles = 5
