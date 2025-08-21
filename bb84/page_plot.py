@@ -110,11 +110,18 @@ class QBERPlotGroup(Adw.PreferencesGroup):
         self.plots = {}
         self.add_line_to_plot(
             name='QBER',
+            attribute='qber',
             colour=Colours().BLUE
         )
         self.add_line_to_plot(
             name='Qx',
+            attribute='qx',
             colour=Colours().ORANGE
+        )
+        self.add_line_to_plot(
+            name='S1',
+            attribute='normalised_s1',
+            colour=Colours().PURPLE
         )
         
         self.axes.set_ylim(0, 1)
@@ -174,9 +181,11 @@ class QBERPlotGroup(Adw.PreferencesGroup):
     def add_line_to_plot(
             self,
             name: str,
+            attribute: str,
             colour: tuple[float, float, float, float]
     ) -> None:
         self.plots[name] = {
+            'attribute': attribute,
             'current_value': collections.deque(maxlen=self.cycles),
             'value_history': collections.deque(maxlen=self.plot_length),
             'line': self.axes.plot([], [], color=colour, label=name)[0]
@@ -217,7 +226,7 @@ class QBERPlotGroup(Adw.PreferencesGroup):
         data: timetagger.Data = get_data_callback()
 
         for name, info in self.plots.items():
-            value = getattr(data, name.lower(), None)
+            value = getattr(data, info['attribute'], None)
             if value is not None:
                 info['current_value'].append(value)
                 avg = np.mean(info['current_value'])
