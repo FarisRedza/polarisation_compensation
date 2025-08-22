@@ -406,8 +406,6 @@ class PlotsGroup(Adw.PreferencesGroup):
 
         if row:
             self.remove(child=row)
-        self.add(child=new_row)
-        if row:
             self.add(child=row)
 
     def on_add_plot(
