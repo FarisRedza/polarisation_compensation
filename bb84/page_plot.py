@@ -102,7 +102,8 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
         self.add(child=row)
 
         self.refresh_rate = 33
-        self.plot_length = 1000
+        self.time_window = 30
+        self.plot_length = int(self.time_window / (self.refresh_rate / 1000)) + 1
         self.cycles = 5
         self.grid = False
 
@@ -110,7 +111,6 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
         self.figure.tight_layout()
 
         self.plots = {}
-        self.sample_index = 0
         
         self.axes.set_ylim(0, 1)
         self.axes.set_xlim(0, self.plot_length)
@@ -137,12 +137,12 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
         )
         self.add(child=cycles_row)
 
-        points_row = EntryRow(
-            title='Points',
-            text=str(self.plot_length),
-            on_set_callback=self.on_set_plot_length
+        time_window_row = EntryRow(
+            title='Time window (s)',
+            text=str(self.time_window),
+            on_set_callback=self.on_set_time_window
         )
-        self.add(child=points_row)
+        self.add(child=time_window_row)
 
         grid_row = SwitchRow(
             title='Grid',
@@ -190,7 +190,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                 self.axes.legend(frameon=False)
             self.canvas.draw() 
 
-    def get_plots(self):
+    def get_plots(self) -> typing.KeysView:
         return self.plots.keys()
 
     def on_set_cycles(self, entry: Gtk.Entry) -> None:
@@ -205,14 +205,20 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
             for _, info in self.plots.items():
                 info['current_value'] = collections.deque(maxlen=self.cycles)
 
-    def on_set_plot_length(self, entry: Gtk.Entry) -> None:
+    def on_set_time_window(self, entry: Gtk.Entry) -> None:
         try:
             value = int(entry.get_text())
             _ = value / value
         except:
             print(f'Invalid entry: {entry.get_text()}')
         else:
-            self.plot_length = value
+            self.time_window = value
+            dt = self.refresh_rate / 1000
+            self.plot_length = int(self.time_window / dt) + 1
+            for _, info in self.plots.items():
+                old_history = info['value_history']
+                info['value_history'] = collections.deque(old_history, maxlen=self.plot_length)
+
 
     def on_set_grid(
             self,
@@ -226,8 +232,8 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
             get_data_callback: typing.Callable
     ) -> bool:
         data: timetagger.Data = get_data_callback()
-        self.sample_index += 1
 
+        dt = self.refresh_rate / 1000
         for name, info in self.plots.items():
             value = getattr(data, info['attribute'], None)
             if value is not None:
@@ -235,10 +241,12 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                 avg = np.mean(info['current_value'])
                 info['value_history'].append(avg)
 
-                x_values = range(
-                    self.sample_index - len(info['value_history']) + 1,
-                    self.sample_index + 1
+                x_values = np.linspace(
+                    -dt * (len(info['value_history']) - 1),
+                    0,
+                    len(info['value_history'])
                 )
+                    
                 info['line'].set_data(
                     # range(len(info['value_history'])),
                     x_values,
@@ -250,8 +258,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                         text.set_text(f'{name} - {avg:.3f}')
                         text.set_color(color=Colours().LIGHT) if self.dark_mode else text.set_color(color=Colours().DARK)
 
-        # self.axes.set_xlim(0, self.plot_length)
-        self.axes.set_xlim(max(0, self.sample_index - self.plot_length), self.sample_index)
+        self.axes.set_xlim(-dt * self.plot_length, 0)
         self.axes.grid(visible=self.grid)
 
         # self.axes.relim()
@@ -347,6 +354,7 @@ class PlotsGroup(Adw.PreferencesGroup):
             halign=Gtk.Align.CENTER,
             valign=Gtk.Align.CENTER
         )
+        add_plot_button.add_css_class(css_class='suggested-action')
         add_plot_button.connect(
             'clicked',
             self.on_add_plot,
@@ -396,6 +404,7 @@ class PlotsGroup(Adw.PreferencesGroup):
             halign=Gtk.Align.CENTER,
             valign=Gtk.Align.CENTER
         )
+        remove_plot_button.add_css_class(css_class='destructive-action')
         remove_plot_button.connect(
             'clicked',
             self.on_remove_plot,
