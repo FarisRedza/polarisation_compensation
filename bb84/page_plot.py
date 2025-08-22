@@ -1,5 +1,6 @@
 import typing
 import collections
+import dataclasses
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -15,6 +16,7 @@ from . import timetagger
 def rgba_to_tuple(rgba: Gdk.RGBA) -> tuple[float, float, float, float]:
     return (rgba.red, rgba.green, rgba.blue, rgba.alpha)
 
+@dataclasses.dataclass
 class Colours:
     BLUE: tuple[float, float, float, float]
     TEAL: tuple[float, float, float, float]
@@ -93,7 +95,7 @@ class SwitchRow(Adw.ActionRow):
             widget=switch
         )
 
-class QBERPlotGroup(Adw.PreferencesGroup):
+class PlotDisplayGroup(Adw.PreferencesGroup):
     def __init__(self, get_data_callback: typing.Callable) -> None:
         super().__init__()
         row = Adw.PreferencesRow(can_target=False)
@@ -108,20 +110,10 @@ class QBERPlotGroup(Adw.PreferencesGroup):
         self.figure.tight_layout()
 
         self.plots = {}
-        self.add_line_to_plot(
-            name='QBER',
-            attribute='qber',
-            colour=Colours().BLUE
-        )
-        self.add_line_to_plot(
-            name='Qx',
-            attribute='qx',
-            colour=Colours().ORANGE
-        )
+        self.sample_index = 0
         
         self.axes.set_ylim(0, 1)
         self.axes.set_xlim(0, self.plot_length)
-        self.axes.legend(frameon=False)
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
             figure=self.figure
@@ -185,6 +177,21 @@ class QBERPlotGroup(Adw.PreferencesGroup):
             'value_history': collections.deque(maxlen=self.plot_length),
             'line': self.axes.plot([], [], color=colour, label=name)[0]
         }
+        self.axes.legend(frameon=False)
+
+    def remove_line_from_plot(
+            self,
+            name: str
+    ) -> None:
+        info = self.plots.pop(name, None)
+        if info is not None:
+            info['line'].remove()
+            if self.axes.get_legend():
+                self.axes.legend(frameon=False)
+            self.canvas.draw() 
+
+    def get_plots(self):
+        return self.plots.keys()
 
     def on_set_cycles(self, entry: Gtk.Entry) -> None:
         try:
@@ -219,6 +226,7 @@ class QBERPlotGroup(Adw.PreferencesGroup):
             get_data_callback: typing.Callable
     ) -> bool:
         data: timetagger.Data = get_data_callback()
+        self.sample_index += 1
 
         for name, info in self.plots.items():
             value = getattr(data, info['attribute'], None)
@@ -227,8 +235,13 @@ class QBERPlotGroup(Adw.PreferencesGroup):
                 avg = np.mean(info['current_value'])
                 info['value_history'].append(avg)
 
+                x_values = range(
+                    self.sample_index - len(info['value_history']) + 1,
+                    self.sample_index + 1
+                )
                 info['line'].set_data(
-                    range(len(info['value_history'])),
+                    # range(len(info['value_history'])),
+                    x_values,
                     info['value_history']
                 )
 
@@ -236,9 +249,12 @@ class QBERPlotGroup(Adw.PreferencesGroup):
                     if text.get_text().startswith(name):
                         text.set_text(f'{name} - {avg:.3f}')
 
-        self.axes.set_xlim(0, self.plot_length)
+        # self.axes.set_xlim(0, self.plot_length)
+        self.axes.set_xlim(max(0, self.sample_index - self.plot_length), self.sample_index)
         self.axes.grid(visible=self.grid)
 
+        # self.axes.relim()
+        # self.axes.autoscale_view(scalex=False, scaley=True)
         self.canvas.draw()
         return True
     
@@ -262,8 +278,9 @@ class QBERPlotGroup(Adw.PreferencesGroup):
                 self.axes.xaxis.label.set_color(color=Colours().LIGHT)
                 self.axes.yaxis.label.set_color(color=Colours().LIGHT)
                 self.axes.title.set_color(color=Colours().LIGHT)
-                for text in self.axes.get_legend().get_texts():
-                    text.set_color(color=Colours().LIGHT)
+                if self.axes.get_legend():
+                    for text in self.axes.get_legend().get_texts():
+                        text.set_color(color=Colours().LIGHT)
 
             else:
                 self.figure.set_facecolor(color=Colours().LIGHT)
@@ -273,8 +290,164 @@ class QBERPlotGroup(Adw.PreferencesGroup):
                 self.axes.xaxis.label.set_color(color=Colours().DARK)
                 self.axes.yaxis.label.set_color(color=Colours().DARK)
                 self.axes.title.set_color(color=Colours().DARK)
-                for text in self.axes.get_legend().get_texts():
-                    text.set_color(color=Colours().DARK)
+                if self.axes.get_legend():
+                    for text in self.axes.get_legend().get_texts():
+                        text.set_color(color=Colours().DARK)
+
+class PlotsGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            add_line_to_plot_callback: typing.Callable,
+            remove_line_from_plot_callback: typing.Callable,
+            get_plots_callback: typing.Callable
+    ) -> None:
+        super().__init__(title='Plots')
+        self.plot_strings = Gtk.StringList()
+
+        self.add_plot(
+            name='qber',
+            colour=Colours().BLUE,
+            add_line_to_plot_callback=add_line_to_plot_callback,
+            remove_line_from_plot_callback=remove_line_from_plot_callback,
+            get_plots_callback=get_plots_callback
+        )
+        self.add_plot(
+            name='qx',
+            colour=Colours().ORANGE,
+            add_line_to_plot_callback=add_line_to_plot_callback,
+            remove_line_from_plot_callback=remove_line_from_plot_callback,
+            get_plots_callback=get_plots_callback
+        )
+
+        add_plot_row = Adw.ActionRow(title='Add plot')
+        self.add(child=add_plot_row)
+
+        colour_dropown = Gtk.DropDown(
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER
+        )
+        add_plot_row.add_suffix(widget=colour_dropown)
+        colour_strings = Gtk.StringList()
+        colour_dropown.props.model = colour_strings
+        for field in dataclasses.fields(Colours)[:-2]:
+            colour_strings.append(string=field.name)
+
+        plot_dropown = Gtk.DropDown(
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER
+        )
+        add_plot_row.add_suffix(widget=plot_dropown)
+        plot_dropown.props.model = self.plot_strings
+        strings = []
+        for i, _ in enumerate(self.plot_strings):
+            strings.append(self.plot_strings.get_string(i))
+        for field in dataclasses.fields(timetagger.Data):
+            if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
+                self.plot_strings.append(string=field.name)
+
+        add_plot_button = Gtk.Button(
+            icon_name='list-add-symbolic',
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER
+        )
+        add_plot_button.connect(
+            'clicked',
+            self.on_add_plot,
+            plot_dropown,
+            colour_dropown,
+            add_plot_row,
+            add_line_to_plot_callback,
+            remove_line_from_plot_callback,
+            get_plots_callback
+        )
+        add_plot_row.add_suffix(widget=add_plot_button)
+
+    def on_remove_plot(
+            self,
+            button: Gtk.Button,
+            row: Adw.ActionRow,
+            remove_line_from_plot_callback: typing.Callable,
+            get_plots_callback: typing.Callable
+    ) -> None:
+        remove_line_from_plot_callback(name=row.get_title())
+        strings = []
+        for i, _ in enumerate(self.plot_strings):
+            strings.append(self.plot_strings.get_string(i))
+        for field in dataclasses.fields(timetagger.Data):
+            if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
+                self.plot_strings.append(string=field.name)
+        self.remove(child=row)
+
+    def add_plot(
+            self,
+            name: str,
+            colour: tuple[float, float, float, float],
+            add_line_to_plot_callback: typing.Callable,
+            remove_line_from_plot_callback: typing.Callable,
+            get_plots_callback: typing.Callable,
+            row: Adw.ActionRow | None = None
+    ) -> None:
+        add_line_to_plot_callback(
+            name=name,
+            attribute=name,
+            colour=colour
+        )
+        self.plot_strings.remove(
+            position=self.plot_strings.find(name)
+        )
+        strings = []
+        for i, _ in enumerate(self.plot_strings):
+            strings.append(self.plot_strings.get_string(i))
+        for field in dataclasses.fields(timetagger.Data):
+            if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
+                self.plot_strings.append(string=field.name)
+
+        new_row = Adw.ActionRow(title=name)
+        self.add(child=new_row)
+        remove_plot_button = Gtk.Button(
+            icon_name='list-remove-symbolic',
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER
+        )
+        remove_plot_button.connect(
+            'clicked',
+            self.on_remove_plot,
+            new_row,
+            remove_line_from_plot_callback,
+            get_plots_callback
+        )
+        new_row.add_suffix(widget=remove_plot_button)
+
+        if row:
+            self.remove(child=row)
+        self.add(child=new_row)
+        if row:
+            self.add(child=row)
+
+    def on_add_plot(
+            self,
+            button: Gtk.Button,
+            dropown: Gtk.DropDown,
+            colour_dropown: Gtk.DropDown,
+            row: Adw.ActionRow,
+            add_line_to_plot_callback: typing.Callable,
+            remove_line_from_plot_callback: typing.Callable,
+            get_plots_callback: typing.Callable
+    ) -> None:
+        name: str = dropown.props.selected_item.props.string
+        colour: tuple[float, float, float, float] = getattr(
+            Colours(),
+            colour_dropown.props.selected_item.props.string
+        )
+
+        self.add_plot(
+            name=name,
+            colour=colour,
+            row=row,
+            add_line_to_plot_callback=add_line_to_plot_callback,
+            remove_line_from_plot_callback=remove_line_from_plot_callback,
+            get_plots_callback=get_plots_callback
+        )
 
 class PlotPage(Gtk.ScrolledWindow):
     def __init__(
@@ -295,5 +468,12 @@ class PlotPage(Gtk.ScrolledWindow):
         )
         self.set_child(child=main_box)
 
-        qber_plot = QBERPlotGroup(get_data_callback=get_data_callback)
-        main_box.append(child=qber_plot)
+        plot_display_group = PlotDisplayGroup(get_data_callback=get_data_callback)
+        main_box.append(child=plot_display_group)
+
+        plots_group = PlotsGroup(
+            add_line_to_plot_callback=plot_display_group.add_line_to_plot,
+            remove_line_from_plot_callback=plot_display_group.remove_line_from_plot,
+            get_plots_callback=plot_display_group.get_plots
+        )
+        main_box.append(child=plots_group)

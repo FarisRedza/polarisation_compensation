@@ -8,9 +8,6 @@ from gi.repository import Gtk, Adw, GLib
 
 import numpy as np
 
-sys.path.append(os.environ['TTAG'])
-import ttag
-
 from . import timetagger
 
 class Counter(Gtk.Box):
