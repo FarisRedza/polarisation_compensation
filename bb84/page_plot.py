@@ -338,12 +338,8 @@ class PlotsGroup(Adw.PreferencesGroup):
         )
         add_plot_row.add_suffix(widget=plot_dropown)
         plot_dropown.props.model = self.plot_strings
-        strings = []
-        for i, _ in enumerate(self.plot_strings):
-            strings.append(self.plot_strings.get_string(i))
-        for field in dataclasses.fields(timetagger.Data):
-            if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
-                self.plot_strings.append(string=field.name)
+
+        self.set_plot_strings_list(get_plots_callback=get_plots_callback)
 
         add_plot_button = Gtk.Button(
             icon_name='list-add-symbolic',
@@ -370,12 +366,7 @@ class PlotsGroup(Adw.PreferencesGroup):
             get_plots_callback: typing.Callable
     ) -> None:
         remove_line_from_plot_callback(name=row.get_title())
-        strings = []
-        for i, _ in enumerate(self.plot_strings):
-            strings.append(self.plot_strings.get_string(i))
-        for field in dataclasses.fields(timetagger.Data):
-            if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
-                self.plot_strings.append(string=field.name)
+        self.set_plot_strings_list(get_plots_callback=get_plots_callback)
         self.remove(child=row)
 
     def add_plot(
@@ -392,15 +383,10 @@ class PlotsGroup(Adw.PreferencesGroup):
             attribute=name,
             colour=colour
         )
-        strings = []
-        for i, _ in enumerate(self.plot_strings):
-            strings.append(self.plot_strings.get_string(i))
-        if name in strings:
-            self.plot_strings.remove(strings.index(name))
-            strings.remove(name)
-        for field in dataclasses.fields(timetagger.Data):
-            if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
-                self.plot_strings.append(string=field.name)
+        self.set_plot_strings_list(
+            name=name,
+            get_plots_callback=get_plots_callback
+        )
 
         new_row = Adw.ActionRow(title=name)
         self.add(child=new_row)
@@ -448,6 +434,21 @@ class PlotsGroup(Adw.PreferencesGroup):
             remove_line_from_plot_callback=remove_line_from_plot_callback,
             get_plots_callback=get_plots_callback
         )
+
+    def set_plot_strings_list(
+            self,
+            get_plots_callback: typing.Callable,
+            name: str | None = None,
+    ) -> None:
+        strings = []
+        for i, _ in enumerate(self.plot_strings):
+            strings.append(self.plot_strings.get_string(i))
+        if name and name in strings:
+            self.plot_strings.remove(strings.index(name))
+            strings.remove(name)
+        for field in dataclasses.fields(timetagger.Data):
+            if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
+                self.plot_strings.append(string=field.name)
 
 class PlotPage(Gtk.ScrolledWindow):
     def __init__(
