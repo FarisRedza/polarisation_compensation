@@ -645,9 +645,14 @@ class SettingsScale(Adw.ActionRow):
             max: float,
             set_value_callback: typing.Callable,
             default_value: float = 0,
-            digits: int = 0
+            digits: int = 0,
+            abs_min: float | None = None,
+            abs_max: float | None = None
     ) -> None:
         super().__init__()
+        self.min = min
+        self.max = max
+
         margin = 6
         main_box = Gtk.Box(
             margin_top=margin,
@@ -671,9 +676,13 @@ class SettingsScale(Adw.ActionRow):
             valign=Gtk.Align.CENTER,
             max_length=5,
             max_width_chars=5,
-            text=str(min)
+            text=str(self.min)
         )
-        # self.min_entry.connect('activate', self.on_update_window_range)
+        self.min_entry.connect(
+            'activate',
+            self.on_set_min_value,
+            abs_min
+        )
         main_box.append(child=self.min_entry)
 
         self.scale = Gtk.Scale(
@@ -682,8 +691,8 @@ class SettingsScale(Adw.ActionRow):
             hexpand=True,
         )
         self.scale.set_range(
-            min=min,
-            max=max
+            min=self.min,
+            max=self.max
         )
         self.scale.set_value(value=default_value)
         self.scale.connect(
@@ -697,9 +706,13 @@ class SettingsScale(Adw.ActionRow):
             valign=Gtk.Align.CENTER,
             max_length=5,
             max_width_chars=5,
-            text=str(max)
+            text=str(self.max)
         )
-        # self.max_entry.connect('activate', self.on_update_window_range)
+        self.max_entry.connect(
+            'activate',
+            self.on_set_max_value,
+            abs_max
+        )
         main_box.append(child=self.max_entry)
 
     def on_set_value(
@@ -708,6 +721,33 @@ class SettingsScale(Adw.ActionRow):
             set_value_callback: typing.Callable
     ) -> None:
         set_value_callback(value=int(scale.get_value()))
+
+    def on_set_min_value(self, entry: Gtk.Entry, abs_min: float) -> None:
+        try:
+            value = float(entry.get_text())
+            _ = value / value
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            if abs_min and value < abs_min:
+                print(f'Value too small: {entry.get_text()}')
+            else:
+                self.min = value
+                self.scale.set_range(min=self.min, max=self.max)
+                
+
+    def on_set_max_value(self, entry: Gtk.Entry, abs_max: float) -> None:
+        try:
+            value = float(entry.get_text())
+            _ = value / value
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            if abs_max and value > abs_max:
+                print(f'Value too large: {entry.get_text()}')
+            else:
+                self.max = value
+                self.scale.set_range(min=self.min, max=self.max)
 
 class SettingsGroup(Adw.PreferencesGroup):
     def __init__(
@@ -728,7 +768,8 @@ class SettingsGroup(Adw.PreferencesGroup):
             min=1,
             max=2000,
             default_value=get_window_callback(),
-            set_value_callback=set_window_callback
+            set_value_callback=set_window_callback,
+            abs_min=1
         )
         self.add(child=window_scale)
 
@@ -747,7 +788,8 @@ class SettingsGroup(Adw.PreferencesGroup):
             max=500,
             default_value=get_refresh_rate_callback(),
             # digits=3,
-            set_value_callback=set_refresh_rate_callback
+            set_value_callback=set_refresh_rate_callback,
+            abs_min=1
         )
         self.add(child=refresh_rate_scale)
 
