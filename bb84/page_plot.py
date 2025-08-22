@@ -392,12 +392,12 @@ class PlotsGroup(Adw.PreferencesGroup):
             attribute=name,
             colour=colour
         )
-        self.plot_strings.remove(
-            position=self.plot_strings.find(name)
-        )
         strings = []
         for i, _ in enumerate(self.plot_strings):
             strings.append(self.plot_strings.get_string(i))
+        if name in strings:
+            self.plot_strings.remove(strings.index(name))
+            strings.remove(name)
         for field in dataclasses.fields(timetagger.Data):
             if field.name != 'singles' and field.name not in list(get_plots_callback()) and field.name not in strings:
                 self.plot_strings.append(string=field.name)
