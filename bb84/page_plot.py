@@ -248,6 +248,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                 for text in self.axes.get_legend().get_texts():
                     if text.get_text().startswith(name):
                         text.set_text(f'{name} - {avg:.3f}')
+                        text.set_color(color=Colours().LIGHT) if self.dark_mode else text.set_color(color=Colours().DARK)
 
         # self.axes.set_xlim(0, self.plot_length)
         self.axes.set_xlim(max(0, self.sample_index - self.plot_length), self.sample_index)
