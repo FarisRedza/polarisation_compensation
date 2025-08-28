@@ -122,9 +122,10 @@ class RemoteTimetagger(timetagger.TimeTagger):
         payload = self._handle_response(
             expected_response_id=remote_protocol.Response.RAWDATA,
         )
-        return timetagger.RawData.deserialise(
+        raw_data = timetagger.RawData.deserialise(
             payload=payload
         )
+        return raw_data
 
     def _handle_response(
             self,
@@ -167,11 +168,13 @@ if __name__ == '__main__':
     )
     try:
         while True:
+            raw_data=tt.measure()
             data = timetagger.Data.from_raw_data(
-                raw_data=tt.measure(),
+                raw_data=raw_data,
                 channel_groups=timetagger.default_channel_groups
             )
             print(data.qber, data.qx)
+            # print(raw_data.timetags[:10])
 
     except KeyboardInterrupt:
         tt.disconnect()
