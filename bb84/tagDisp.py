@@ -10,7 +10,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gio
 
 from . import timetagger
-from . import uqd
+# from . import uqd
 from . import remote_timetagger
 from . import tagDisp_device
 
@@ -173,13 +173,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.main_stack.add_child(child=self.device_select_page)
         self.main_stack.set_visible_child(child=self.device_select_page)
 
-        local_device_infos = [
-            d.device_info for d in uqd.list_devices()
-        ]
+        local_device_infos = []
+        try:
+            from . import uqd
+        except:
+            pass
+        else:
+            local_device_infos = [
+                d.device_info for d in uqd.list_devices()
+            ]
         # local_device_infos += [
         #     d.device_info for d in qutag.list_devices()
         # ]
         local_device_infos += [timetagger.TimeTagger().device_info]
+
         local_device_group = DeviceListGroup(
             title='Local Devices',
             devices_infos=local_device_infos,
@@ -223,9 +230,14 @@ class MainWindow(Adw.ApplicationWindow):
         if not remote:
             match model:
                 case 'Logic-16':
-                    self.timetagger_box = tagDisp_device.DeviceBox(
-                        tt=uqd.UQD()
-                    )
+                    try:
+                        from . import uqd
+                    except:
+                        pass
+                    else:
+                        self.timetagger_box = tagDisp_device.DeviceBox(
+                            tt=uqd.UQD()
+                        )
                 case _:
                     self.timetagger_box = tagDisp_device.DeviceBox(
                         tt=timetagger.TimeTagger()
