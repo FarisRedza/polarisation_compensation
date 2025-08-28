@@ -320,11 +320,15 @@ class PolEllipseGroup(Adw.PreferencesGroup):
         self.major_axis.set_data(x_major_rotated, y_major_rotated)
         self.minor_axis.set_data(x_minor_rotated, y_minor_rotated)
 
-        accent_colour = rgba_to_tuple(
-            rgba=self.get_style_context().lookup_color(
-                color_name='accent_color'
-            )[1]
-        )
+        try:
+            accent_colour = rgba_to_tuple(
+                rgba=self.get_style_context().lookup_color(
+                    color_name='accent_color'
+                )[1]
+            )
+        except:
+            accent_colour = Colours().BLUE
+
         if self.ellipse.get_color() != accent_colour:
             self.ellipse.set_color(color=accent_colour)
             self.major_axis.set_color(color=accent_colour)
@@ -548,11 +552,14 @@ class BlochSphereGroup(Adw.PreferencesGroup):
         # add transparency if dot behind sphere
         # self.point.set_alpha(0.3 if is_behind else 1.0)
 
-        accent_colour = rgba_to_tuple(
-            rgba=self.get_style_context().lookup_color(
-                color_name='accent_color'
-            )[1]
-        )
+        try:
+            accent_colour = rgba_to_tuple(
+                rgba=self.get_style_context().lookup_color(
+                    color_name='accent_color'
+                )[1]
+            )
+        except:
+            accent_colour = Colours().BLUE
         if self.point.get_color() != accent_colour:
             self.point.set_color(color=accent_colour)
         self.canvas.draw_idle()
