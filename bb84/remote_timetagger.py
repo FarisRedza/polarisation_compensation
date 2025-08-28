@@ -3,11 +3,11 @@ import struct
 import time
 
 from . import timetagger
-from . import remote_server
+from . import remote_protocol
 
 def send_command(
         sock: socket.socket,
-        command: remote_server.Command,
+        command: remote_protocol.Command,
         args : tuple | None = None
 ) -> None:
     encoded_args = [
@@ -33,7 +33,7 @@ def receive_response(sock: socket.socket) -> tuple[int, bytes]:
     header = recvall(size=5, sock=sock)
     total_len, response_id = struct.unpack('IB', header)
     try:
-        response = remote_server.Response(response_id)
+        response = remote_protocol.Response(response_id)
     except ValueError:
         raise ValueError(f'Invalid response ID: {response_id}')
     else:
@@ -62,12 +62,12 @@ def list_device_info(
 
     send_command(
         sock=sock,
-        command=remote_server.Command.LIST_DEVICES
+        command=remote_protocol.Command.LIST_DEVICES
     )
     response, payload = receive_response(sock=sock)
     
     device_infos = []
-    if response == remote_server.Response.LIST_DEVICES:
+    if response == remote_protocol.Response.LIST_DEVICES:
         (num_devices,) = struct.unpack('I', payload[:4])
         offset = 4
         for _ in range(num_devices):
@@ -116,11 +116,11 @@ class RemoteTimetagger(timetagger.TimeTagger):
     def measure(self) -> timetagger.RawData:
         send_command(
             sock=self._sock,
-            command=remote_server.Command.MEASURE,
+            command=remote_protocol.Command.MEASURE,
             args=(self.device_info.model,)
         )
         payload = self._handle_response(
-            expected_response_id=remote_server.Response.RAWDATA,
+            expected_response_id=remote_protocol.Response.RAWDATA,
         )
         return timetagger.RawData.deserialise(
             payload=payload
@@ -128,7 +128,7 @@ class RemoteTimetagger(timetagger.TimeTagger):
 
     def _handle_response(
             self,
-            expected_response_id: remote_server.Response
+            expected_response_id: remote_protocol.Response
     ) -> bytes:
         response, payload = receive_response(self._sock)
 
@@ -136,7 +136,7 @@ class RemoteTimetagger(timetagger.TimeTagger):
             case r if r == expected_response_id:
                 return payload
             
-            case remote_server.Response.ERROR:
+            case remote_protocol.Response.ERROR:
                 error_msg = payload.decode(encoding='utf-8')
                 raise RuntimeError(f'Server error: {error_msg}')
             
@@ -149,11 +149,11 @@ class RemoteTimetagger(timetagger.TimeTagger):
     ) -> None:
         send_command(
             sock=self._sock,
-            command=remote_server.Command.DEVICE_INFO,
+            command=remote_protocol.Command.DEVICE_INFO,
             args=(model,)
         )
         payload = self._handle_response(
-            expected_response_id=remote_server.Response.DEVICE_INFO,
+            expected_response_id=remote_protocol.Response.DEVICE_INFO,
         )
         self.device_info = timetagger.DeviceInfo.deserialise(
             payload=payload

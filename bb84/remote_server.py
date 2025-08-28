@@ -3,22 +3,9 @@ import threading
 import struct
 import enum
 
+from . import remote_protocol
 from . import uqd
 from . import qutag
-
-class Command(enum.IntEnum):
-    LIST_DEVICES = 1
-    DEVICE_INFO = 2
-    SET_WAVELENGTH = 3
-    SET_WAVEPLATE_ROTATION = 4
-    MEASURE = 5
-
-class Response(enum.IntEnum):
-    ERROR = 0
-    LIST_DEVICES = 1
-    DEVICE_INFO = 2
-    STATUS = 3
-    RAWDATA = 4
 
 def recvall(size: int, sock: socket.socket) -> bytes:
     data = bytearray()
@@ -31,12 +18,12 @@ def recvall(size: int, sock: socket.socket) -> bytes:
 
 def receive_command(
         sock: socket.socket
-) -> tuple[Command, list]:
+) -> tuple[remote_protocol.Command, list]:
     header = recvall(size=8, sock=sock)
     command_id, num_args = struct.unpack('II', header)
 
     try:
-        command = Command(command_id)
+        command = remote_protocol.Command(command_id)
     except ValueError:
         raise ValueError(f'Invalid command ID: {command_id}')
 
@@ -51,7 +38,7 @@ def receive_command(
 def send_message(
         sock: socket.socket,
         message: str,
-        response_id: Response
+        response_id: remote_protocol.Response
 ) -> None:
     payload = struct.pack(
         f'I{len(message)}s',
@@ -68,7 +55,7 @@ def send_message(
 def send_payload(
         sock: socket.socket,
         payload: bytes,
-        response_id: Response
+        response_id: remote_protocol.Response
 ) -> None:
     header = struct.pack('IB', len(payload) +1, response_id)
     sock.sendall(header + payload)
@@ -86,7 +73,7 @@ def handle_client(
                     print(f'[{address}] Disconnected: {e}')
                     break
 
-                if command == Command.LIST_DEVICES:
+                if command == remote_protocol.Command.LIST_DEVICES:
                     dev_infos = [dev.device_info.serialise() for dev in devices]
                     payload = struct.pack('I', len(dev_infos))
 
@@ -96,7 +83,7 @@ def handle_client(
                     send_payload(
                         sock=sock,
                         payload=payload,
-                        response_id=Response.LIST_DEVICES
+                        response_id=remote_protocol.Response.LIST_DEVICES
                     )
 
                 elif args:
@@ -109,37 +96,37 @@ def handle_client(
                         send_message(
                             sock=sock,
                             message=f'Device {model} not found',
-                            response_id=Response.ERROR
+                            response_id=remote_protocol.Response.ERROR
                         )
                         continue
 
                     match command:
-                        case Command.DEVICE_INFO:
+                        case remote_protocol.Command.DEVICE_INFO:
                             send_payload(
                                 sock=sock,
                                 payload=device.device_info.serialise(),
-                                response_id=Response.DEVICE_INFO
+                                response_id=remote_protocol.Response.DEVICE_INFO
                             )
 
-                        case Command.MEASURE:
+                        case remote_protocol.Command.MEASURE:
                             send_payload(
                                 sock=sock,
                                 payload=device.measure().serialise(),
-                                response_id=Response.RAWDATA
+                                response_id=remote_protocol.Response.RAWDATA
                             )
 
                         case _:
                             send_message(
                                 sock=sock,
                                 message=f'Unsupported command: {command}',
-                                response_id=Response.ERROR
+                                response_id=remote_protocol.Response.ERROR
                             )
 
                 else:
                     send_message(
                         sock=sock,
                         message=f'No arguments provided',
-                        response_id=Response.ERROR    
+                        response_id=remote_protocol.Response.ERROR    
                     )
 
         except Exception as e:

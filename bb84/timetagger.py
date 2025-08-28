@@ -90,7 +90,7 @@ def get_qber(
     qber: float =  (VH + HV) / (HH + HV + VH + VV)
     if verbose == True and qber > 1:
         print('qber =',qber)
-        print( HH, HV, VH, VV)
+        print(HH, HV, VH, VV)
 
     DD: int = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
     DA: int = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
