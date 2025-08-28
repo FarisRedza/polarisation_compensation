@@ -101,10 +101,13 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
         row = Adw.PreferencesRow(can_target=False)
         self.add(child=row)
 
+        self.ylim_min = 0
+        self.ylim_max = 1
+
         self.refresh_rate = 33
         self.time_window = 30
         self.plot_length = int(self.time_window / (self.refresh_rate / 1000)) + 1
-        self.cycles = 5
+        self.samples = 5
         self.grid = False
 
         self.figure, self.axes = matplotlib.pyplot.subplots()
@@ -112,7 +115,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
 
         self.plots = {}
         
-        self.axes.set_ylim(0, 1)
+        self.axes.set_ylim(self.ylim_min, self.ylim_max)
         self.axes.set_xlim(0, self.plot_length)
 
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
@@ -130,12 +133,12 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
         row.set_child(child=box)
         box.append(child=self.canvas)
 
-        cycles_row = EntryRow(
-            title='Cycles',
-            text=str(self.cycles),
-            on_set_callback=self.on_set_cycles
+        samples_row = EntryRow(
+            title='Samples',
+            text=str(self.samples),
+            on_set_callback=self.on_set_samples
         )
-        self.add(child=cycles_row)
+        self.add(child=samples_row)
 
         time_window_row = EntryRow(
             title='Time window (s)',
@@ -143,6 +146,20 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
             on_set_callback=self.on_set_time_window
         )
         self.add(child=time_window_row)
+
+        ylim_min_row = EntryRow(
+            title='Y limit minimum value',
+            text=str(self.ylim_min),
+            on_set_callback=self.on_set_ylim_min
+        )
+        self.add(child=ylim_min_row)
+
+        ylim_max_row = EntryRow(
+            title='Y limit maximum value',
+            text=str(self.ylim_max),
+            on_set_callback=self.on_set_ylim_max
+        )
+        self.add(child=ylim_max_row)
 
         grid_row = SwitchRow(
             title='Grid',
@@ -173,7 +190,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
     ) -> None:
         self.plots[name] = {
             'attribute': attribute,
-            'current_value': collections.deque(maxlen=self.cycles),
+            'current_value': collections.deque(maxlen=self.samples),
             'value_history': collections.deque(maxlen=self.plot_length),
             'line': self.axes.plot([], [], color=colour, label=name)[0]
         }
@@ -193,17 +210,17 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
     def get_plots(self) -> typing.KeysView:
         return self.plots.keys()
 
-    def on_set_cycles(self, entry: Gtk.Entry) -> None:
+    def on_set_samples(self, entry: Gtk.Entry) -> None:
         try:
             value = int(entry.get_text())
             _ = value / value
         except:
             print(f'Invalid entry: {entry.get_text()}')
         else:
-            self.cycles = value
+            self.samples = value
 
             for _, info in self.plots.items():
-                info['current_value'] = collections.deque(maxlen=self.cycles)
+                info['current_value'] = collections.deque(maxlen=self.samples)
 
     def on_set_time_window(self, entry: Gtk.Entry) -> None:
         try:
@@ -219,6 +236,23 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                 old_history = info['value_history']
                 info['value_history'] = collections.deque(old_history, maxlen=self.plot_length)
 
+    def on_set_ylim_min(self, entry: Gtk.Entry) -> None:
+        try:
+            value = float(entry.get_text())
+            _ = value / value
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.ylim_min = value
+
+    def on_set_ylim_max(self, entry: Gtk.Entry) -> None:
+        try:
+            value = float(entry.get_text())
+            _ = value / value
+        except:
+            print(f'Invalid entry: {entry.get_text()}')
+        else:
+            self.ylim_max = value
 
     def on_set_grid(
             self,
@@ -226,6 +260,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
             g_param_spec: GObject.GParamSpec
     ) -> None:
         self.grid = switch.get_active()
+
 
     def update_plot(
             self,
@@ -246,7 +281,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                     0,
                     len(info['value_history'])
                 )
-                    
+
                 info['line'].set_data(
                     # range(len(info['value_history'])),
                     x_values,
@@ -258,6 +293,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                         text.set_text(f'{name} - {avg:.3f}')
                         text.set_color(color=Colours().LIGHT) if self.dark_mode else text.set_color(color=Colours().DARK)
 
+        self.axes.set_ylim(self.ylim_min, self.ylim_max)
         self.axes.set_xlim(-dt * self.plot_length, 0)
         self.axes.grid(visible=self.grid)
 

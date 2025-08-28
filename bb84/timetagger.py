@@ -28,6 +28,53 @@ C_780_A = 7
 C_780_R = None
 C_780_L = None
 
+# default_pattern = {
+#     '1H': 4,
+#     '1V': 5,
+#     '1D': 6,
+#     '1A': 7,
+#     '1R': None,
+#     '1L': None,
+#     '2H': 0,
+#     '2V': 1,
+#     '2D': 2,
+#     '2A': 3,
+#     '2R': None,
+#     '2L': None,
+# }
+
+# will replace dict system
+@dataclasses.dataclass
+class ChannelGroup:
+    name: str
+    H: int | None = None
+    V: int | None = None
+    A: int | None = None
+    D: int | None = None
+    R: int | None = None
+    L: int | None = None
+
+default_channel_groups = [
+    ChannelGroup(
+        name='780',
+        H=4,
+        V=5,
+        D=6,
+        A=7,
+        R=None,
+        L=None
+    ),
+    ChannelGroup(
+        name='1550',
+        H=0,
+        V=1,
+        D=2,
+        A=3,
+        R=None,
+        L=None
+    )
+]
+
 def find_delay(
         tags_1550: np.ndarray,
         tags_780: np.ndarray,
@@ -48,53 +95,40 @@ def find_delay(
     return np.arange(-3000, 3000,10)[np.argmax(cc)]
 
 def get_qber(
-        channels,
-        timetags,
-        pattern: dict[str, int | None],
-        delay=0,
-        tcc=50,
-        verbose: bool = False
-) -> tuple[float,float,float]:
-    """
-    Assume that channels are HVDAHVDA
-    """
-    # tags_H_1550 = timetags[channels == 0]
-    # tags_V_1550 = timetags[channels == 1]
-    # tags_D_1550 = timetags[channels == 2]
-    # tags_A_1550 = timetags[channels == 3]
-    # tags_H_780 = timetags[channels == 4] + delay
-    # tags_V_780 = timetags[channels == 5] + delay
-    # tags_D_780 = timetags[channels == 6] + delay
-    # tags_A_780 = timetags[channels == 7] + delay
+        channels: np.typing.NDArray[np.uint8],
+        timetags: np.typing.NDArray[np.int64],
+        channel_group_1: ChannelGroup,
+        channel_group_2: ChannelGroup,
+        delay: float = 0,
+        tcc: float = 50,
+        verbose: bool = True
+) -> tuple[float, float, float]:
+    tags_H_1550 = timetags[channels == channel_group_2.H]
+    tags_V_1550 = timetags[channels == channel_group_2.V]
+    tags_D_1550 = timetags[channels == channel_group_2.D]
+    tags_A_1550 = timetags[channels == channel_group_2.A]
+    tags_H_780 = timetags[channels == channel_group_1.H] + delay
+    tags_V_780 = timetags[channels == channel_group_1.V] + delay
+    tags_D_780 = timetags[channels == channel_group_1.D] + delay
+    tags_A_780 = timetags[channels == channel_group_1.A] + delay
 
-    tags_H_1550 = timetags[pattern['1H']]
-    tags_V_1550 = timetags[pattern['1V']]
-    tags_D_1550 = timetags[pattern['1D']]
-    tags_A_1550 = timetags[pattern['1A']]
-    tags_H_780 = timetags[pattern['2H']] + delay
-    tags_V_780 = timetags[pattern['2V']] + delay
-    tags_D_780 = timetags[pattern['2D']] + delay
-    tags_A_780 = timetags[pattern['2A']] + delay
+    HH: int = tomt.count_twofolds(tags_H_1550, tags_H_780, len(tags_H_1550), len(tags_H_780),tcc)
+    HV: int = tomt.count_twofolds(tags_H_1550, tags_V_780, len(tags_H_1550), len(tags_V_780),tcc)
+    VH: int = tomt.count_twofolds(tags_V_1550, tags_H_780, len(tags_V_1550), len(tags_H_780),tcc)
+    VV: int = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
 
-    # self.find_delay(tags_H_1550, tags_H_780, tcc)
-
-    HH = tomt.count_twofolds(tags_H_1550, tags_H_780, len(tags_H_1550), len(tags_H_780),tcc)
-    HV = tomt.count_twofolds(tags_H_1550, tags_V_780, len(tags_H_1550), len(tags_V_780),tcc)
-    VH = tomt.count_twofolds(tags_V_1550, tags_H_780, len(tags_V_1550), len(tags_H_780),tcc)
-    VV = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
-
-    qber =  (VH + VH) / (HH + HV + VH + VV)
-    if verbose == True:
+    qber: float =  (VH + HV) / (HH + HV + VH + VV)
+    if verbose == True and qber > 1:
         print('qber =',qber)
         print( HH, HV, VH, VV)
 
-    DD = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
-    DA = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
-    AD = tomt.count_twofolds(tags_A_1550, tags_D_780, len(tags_A_1550), len(tags_D_780),tcc)
-    AA = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
+    DD: int = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
+    DA: int = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
+    AD: int = tomt.count_twofolds(tags_A_1550, tags_D_780, len(tags_A_1550), len(tags_D_780),tcc)
+    AA: int = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
 
-    qx =  (DA + AD) / (DD + AD + DA + AA)
-    if verbose == True:
+    qx: float =  (DA + AD) / (DD + AD + DA + AA)
+    if verbose == True and qx > 1:
         print('qx =', qx)
         print(DD, AD, DA, AA)
 
@@ -137,19 +171,19 @@ class DeviceInfo:
 
 @dataclasses.dataclass
 class RawData:
-    timetags: np.ndarray = dataclasses.field(
-        default_factory=lambda: np.array([])
+    timetags: np.typing.NDArray[np.int64] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.int64)
     )
-    channels: np.ndarray = dataclasses.field(
-        default_factory=lambda: np.array([])
+    channels: np.typing.NDArray[np.uint8] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.uint8)
     )
 
     def serialise(self) -> bytes:
         n_data_points = len(self.timetags)
 
         header = struct.pack('!II', n_data_points, n_data_points)
-        timetags_bytes = self.timetags.astype(dtype='>i8').tobytes()
-        channels_bytes = self.channels.astype(dtype='>u1').tobytes()
+        timetags_bytes = self.timetags.tobytes()
+        channels_bytes = self.channels.tobytes()
 
         return header + timetags_bytes + channels_bytes
 
@@ -177,24 +211,9 @@ class RawData:
 
         return RawData(timetags=timetags, channels=channels)
 
-default_pattern = {
-    '1H': 4,
-    '1V': 5,
-    '1D': 6,
-    '1A': 7,
-    '1R': None,
-    '1L': None,
-    '2H': 0,
-    '2V': 1,
-    '2D': 2,
-    '2A': 3,
-    '2R': None,
-    '2L': None,
-}
-
 @dataclasses.dataclass
 class Data:
-    singles: np.ndarray = dataclasses.field(
+    singles: np.typing.NDArray[np.int64] = dataclasses.field(
         default_factory=lambda: np.array([])
     )
     azimuth: float = 0.0
@@ -209,58 +228,79 @@ class Data:
     def from_raw_data(
             cls,
             raw_data: RawData,
-            pattern: dict[str, int | None] | None = None
+            # pattern: dict[str, dict[str, int | None]] | None = None
+            channel_groups: list[ChannelGroup] | None = None
     ) -> 'Data':
-        singles = np.bincount(raw_data.channels.astype(np.int64), minlength=8)
-    
-        if pattern:
+        singles = np.bincount(raw_data.channels, minlength=8)
+
+        # if not pattern:
+        #     with np.errstate(invalid='ignore'):
+        #         try:
+        #             s1 = float((singles[pattern['780']['1H']] - singles[pattern['780']['1V']])/(singles[pattern['780']['1H']] + singles[pattern['780']['1V']]))
+        #         except:
+        #             s1 = None
+        #         try:
+        #             s2 = float((singles[pattern['780']['1D']] - singles[pattern['780']['1A']])/(singles[pattern['780']['1D']] + singles[pattern['780']['1A']]))
+        #         except:
+        #             s2 = None
+        #         try:
+        #             s3 = float((singles[pattern['780']['1R']] - singles[pattern['780']['1L']])/(singles[pattern['780']['1R']] + singles[pattern['780']['1L']]))
+        #         except:
+        #             s3 = None
+
+        if channel_groups:
             with np.errstate(invalid='ignore'):
                 try:
-                    s1 = float((singles[pattern['1H']] - singles[pattern['1V']])/(singles[pattern['1H']] + singles[pattern['1V']]))
+                    s1 = float((singles[getattr(channel_groups[0], 'H')] - singles[getattr(channel_groups[0], 'V')])/(singles[getattr(channel_groups[0], 'H')] + singles[getattr(channel_groups[0], 'V')]))
                 except:
                     s1 = None
                 try:
-                    s2 = float((singles[pattern['1D']] - singles[pattern['1A']])/(singles[pattern['1D']] + singles[pattern['1A']]))
+                    s2 = float((singles[getattr(channel_groups[0], 'D')] - singles[getattr(channel_groups[0], 'A')])/(singles[getattr(channel_groups[0], 'D')] + singles[getattr(channel_groups[0], 'A')]))
                 except:
                     s2 = None
                 try:
-                    s3 = float((singles[pattern['1R']] - singles[pattern['1L']])/(singles[pattern['1R']] + singles[pattern['1L']]))
+                    s3 = float((singles[getattr(channel_groups[0], 'R')] - singles[getattr(channel_groups[0], 'L')])/(singles[getattr(channel_groups[0], 'R')] + singles[getattr(channel_groups[0], 'L')]))
                 except:
                     s3 = None
 
             match (s1, s2, s3):
                 case (float(), None, float()):
-                    s2 = math.sqrt(max(0.0, 1.0 - s1**2 - s3**2))
+                    s2 = math.sqrt(max(0.0, 1 - s1**2 - s3**2))
 
                 case (None, float(), float()):
-                    s1 = math.sqrt(max(0.0, 1.0 - s2**2 - s3**2))
+                    s1 = math.sqrt(max(0.0, 1 - s2**2 - s3**2))
 
                 case (float(), float(), None):
-                    s3 = math.sqrt(max(0.0, 1.0 - s1**2 - s2**2))
-
-                case (float(), float(), float()):
-                    pass
+                    s3 = math.sqrt(max(0.0, 1 - s1**2 - s2**2))
 
                 case _:
                     raise TypeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
 
-            try:    
-                # qber, qx, rate = get_qber(
-                #     channels=raw_data.channels,
-                #     timetags=raw_data.timetags,
-                #     pattern=pattern
-                # )
-                qber = 1 - s1**2
-                qx = 1 - s2**2
+            try:
+                # for entangment case
+                if len(channel_groups) > 1:
+                    qber, qx, rate = get_qber(
+                        channels=raw_data.channels,
+                        timetags=raw_data.timetags,
+                        # pattern_group_1=pattern['780'],
+                        # pattern_group_2=pattern['1550']
+                        channel_group_1=channel_groups[1],
+                        channel_group_2=channel_groups[0]
+                    )
+                ## for singles with one bb84 case
+                else:
+                    qber = 1 - s1**2
+                    qx = 1 - s2**2
             except:
                 qber = 0
                 qx = 0
             try:
-                eta = math.asin(s3)/2
+                eta = np.asin(s3)/2
             except:
                 eta = 0
             try:
-                theta = math.acos(s1/math.cos(2*eta))/2
+                # theta = np.acos(s1/np.cos(2*eta))/2
+                theta = 0.5 * np.arctan2(s2, s1)
             except:
                 theta = 0
         
@@ -275,8 +315,8 @@ class Data:
 
         return cls(
             singles=singles,
-            azimuth=math.degrees(theta),
-            ellipticity=math.degrees(eta),
+            azimuth=np.degrees(theta),
+            ellipticity=np.degrees(eta),
             normalised_s1=s1,
             normalised_s2=s2,
             normalised_s3=s3,
@@ -286,21 +326,29 @@ class Data:
 
 class TimeTagger:
     def __init__(self) -> None:
-        self.device_info = DeviceInfo()
-        self.pattern = {
-            '1H': 0,
-            '1V': 1,
-            '1D': 2,
-            '1A': 3,
-            '1R': None,
-            '1L': None,
-            '2H': None,
-            '2V': None,
-            '2D': None,
-            '2A': None,
-            '2R': None,
-            '2L': None
-        }
+        self.device_info = DeviceInfo(
+            manufacturer='Dummy Device'
+        )
+        self.channel_groups = [
+            ChannelGroup(
+                name='780',
+                H=0,
+                V=1,
+                D=2,
+                A=3,
+                R=None,
+                L=None
+            ),
+            ChannelGroup(
+                name='1550',
+                H=4,
+                V=5,
+                D=6,
+                A=7,
+                R=None,
+                L=None
+            )
+        ]
 
     def measure(self) -> RawData:
         total_counts = np.random.randint(low=30000, high=35000)
@@ -339,18 +387,16 @@ class TimeTagger:
     def disconnect(self) -> None:
         pass
 
-    def _set_pattern(self, pattern: dict[str, int | None]) -> None:
-        self.pattern = pattern
+    # def _set_pattern(self, pattern: dict[str, int | None]) -> None:
+    #     self.pattern = pattern
 
-    def _get_pattern(self) -> dict[str, int | None] | None:
-        return self.pattern
+    # def _get_pattern(self) -> dict[str, int | None] | None:
+    #     return self.pattern
 
 if __name__ == '__main__':
     tt = TimeTagger()
-    tt._set_pattern(pattern=default_pattern)
     for _ in range(5):
         print(Data().from_raw_data(
             raw_data=tt.measure(),
-            pattern=tt.pattern
         ))
         time.sleep(0.5)

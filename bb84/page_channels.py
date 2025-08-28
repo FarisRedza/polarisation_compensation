@@ -4,11 +4,14 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Adw, GLib, Gio
 
+from . import timetagger
+
 class ChannelRow(Adw.ActionRow):
     def __init__(
             self,
             title: str,
-            set_channel_number_callback: typing.Callable
+            set_channel_number_callback: typing.Callable,
+            text: str | None = None
     ) -> None:
         super().__init__(title=title)
         channel_number_entry = Gtk.Entry(
@@ -16,6 +19,8 @@ class ChannelRow(Adw.ActionRow):
             halign=Gtk.Align.CENTER,
             valign=Gtk.Align.CENTER
         )
+        if text and text != 'None':
+            channel_number_entry.set_text(text=text)
         channel_number_entry.connect(
             'changed',
             self.on_set_channel_number,
@@ -37,62 +42,68 @@ class ChannelRow(Adw.ActionRow):
         else:
             pass
 
-
 class ChannelGroup(Adw.PreferencesGroup):
-    def __init__(self, title: str) -> None:
-        super().__init__(title=title)
-        self.channels: dict[str, int | None] = {
-            'H': None,
-            'V': None,
-            'D': None,
-            'A': None,
-            'R': None,
-            'L': None,
-        }
+    def __init__(
+            self,
+            channel_group: timetagger.ChannelGroup
+    ) -> None:
+        super().__init__(title=channel_group.name)
+        self.channel_group = channel_group
 
         h_row = ChannelRow(
             title='H',
-            set_channel_number_callback=self.set_channel_number
+            set_channel_number_callback=self.set_channel_number,
+            text=str(self.channel_group.H)
         )
         self.add(child=h_row)
 
         v_row = ChannelRow(
             title='V',
-            set_channel_number_callback=self.set_channel_number
+            set_channel_number_callback=self.set_channel_number,
+            text=str(self.channel_group.V)
         )
         self.add(child=v_row)
 
         d_row = ChannelRow(
             title='D',
-            set_channel_number_callback=self.set_channel_number
+            set_channel_number_callback=self.set_channel_number,
+            text=str(self.channel_group.D)
         )
         self.add(child=d_row)
 
         a_row = ChannelRow(
             title='A',
-            set_channel_number_callback=self.set_channel_number
+            set_channel_number_callback=self.set_channel_number,
+            text=str(self.channel_group.A)
         )
         self.add(child=a_row)
 
         r_row = ChannelRow(
             title='R',
-            set_channel_number_callback=self.set_channel_number
+            set_channel_number_callback=self.set_channel_number,
+            text=str(self.channel_group.R)
         )
         self.add(child=r_row)
 
         l_row = ChannelRow(
             title='L',
-            set_channel_number_callback=self.set_channel_number
+            set_channel_number_callback=self.set_channel_number,
+            text=str(self.channel_group.L)
         )
         self.add(child=l_row)
 
     def set_channel_number(self, channel: str, number: int | None) -> None:
-        self.channels[channel] = number
+        setattr(self.channel_group, channel, number)
 
-class AddChannelGroup(Adw.PreferencesGroup):
-    def __init__(self, add_pattern_callback: typing.Callable) -> None:
+class SettingsGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            add_channel_group_callback: typing.Callable,
+            set_channel_groups_callback: typing.Callable,
+            get_channel_groups_callback: typing.Callable
+    ) -> None:
         super().__init__()
-        self.group_title = 'Group'
+        self.group_name = 'Group'
 
         add_group_row = Adw.ActionRow(
             title='Add channel group'
@@ -104,7 +115,7 @@ class AddChannelGroup(Adw.PreferencesGroup):
             halign=Gtk.Align.CENTER,
             valign=Gtk.Align.CENTER
         )
-        add_group_entry.connect('changed', self.on_set_group_title)
+        add_group_entry.connect('changed', self.on_set_group_name)
         add_group_row.add_suffix(widget=add_group_entry)
 
         add_group_button = Gtk.Button(
@@ -114,37 +125,94 @@ class AddChannelGroup(Adw.PreferencesGroup):
         )
         add_group_button.connect(
             'clicked',
-            self.on_add_group,
-            add_pattern_callback
+            self.on_add_channel_group,
+            add_channel_group_callback
         )
         add_group_row.add_suffix(widget=add_group_button)
 
-    def on_set_group_title(self, entry: Gtk.Entry) -> None:
-        self.group_title = entry.get_text()
+        self.set_channel_groups_row = Adw.ActionRow()
+        self.add(child=self.set_channel_groups_row)
+        set_channel_groups_button = Gtk.Button(
+            label='Set channel groups',
+            valign=Gtk.Align.CENTER
+        )
+        set_channel_groups_button.add_css_class(
+            css_class='flat'
+        )
+        set_channel_groups_button.connect(
+            'clicked',
+            self.on_set_channel_groups,
+            set_channel_groups_callback
+        )
+        self.set_channel_groups_row.set_child(
+            child=set_channel_groups_button
+        )
 
-    def on_add_group(
+    def on_set_channel_groups(
             self,
             button: Gtk.Button,
-            add_pattern_callback: typing.Callable
+            set_channel_groups_callback: typing.Callable
     ) -> None:
-        add_pattern_callback(title=self.group_title)
+        set_channel_groups_callback()
+
+    def on_set_group_name(self, entry: Gtk.Entry) -> None:
+        self.group_name = entry.get_text()
+
+    def on_add_channel_group(
+            self,
+            button: Gtk.Button,
+            add_channel_group_callback: typing.Callable
+    ) -> None:
+        add_channel_group_callback(
+            channel_group=timetagger.ChannelGroup(name=self.group_name)
+        )
+        self.group_name = 'Group'
 
 class ChannelsPage(Adw.PreferencesPage):
     def __init__(
             self,
-            name: str
+            name: str,
+            set_channel_groups_callback: typing.Callable,
+            get_channel_groups_callback: typing.Callable
     ) -> None:
         super().__init__(name=name)
+        self.set_channel_groups_callback = set_channel_groups_callback
 
-        self.add_channel_group = AddChannelGroup(
-            add_pattern_callback=self.add_channels
-        )
-        self.add(group=self.add_channel_group)
+        self.channel_groups: list[timetagger.ChannelGroup] = get_channel_groups_callback()
+        self.channel_groups_buffer = self.channel_groups
 
-    def add_channels(self, title: str) -> None:
-        self.remove(group=self.add_channel_group)
-        self.add(group=ChannelGroup(title=title))
-        self.add_channel_group = AddChannelGroup(
-            add_pattern_callback=self.add_channels
+        for channel_group in self.channel_groups:
+            self.add(
+                group=ChannelGroup(channel_group=channel_group)
+            )
+
+        self.settings_group = SettingsGroup(
+            add_channel_group_callback=self.add_channel_group,
+            set_channel_groups_callback=self.set_channel_groups,
+            get_channel_groups_callback=self.get_channel_groups,
         )
-        self.add(group=self.add_channel_group)
+        self.add(group=self.settings_group)
+
+    def add_channel_group(
+            self,
+            channel_group: timetagger.ChannelGroup
+    ) -> None:
+        self.remove(group=self.settings_group)
+        self.channel_groups.append(channel_group)
+        self.add(
+            group=ChannelGroup(channel_group=channel_group)
+        )
+        self.add(group=self.settings_group)
+
+    def remove_channel_group(
+            self,
+            channel_group: timetagger.ChannelGroup
+    ) -> None:
+        self.channel_groups.remove(channel_group)
+
+    def set_channel_groups(self) -> None:
+        self.channel_groups = self.channel_groups_buffer
+        self.set_channel_groups_callback(self.channel_groups)
+
+    def get_channel_groups(self) -> list[timetagger.ChannelGroup]:
+        return self.channel_groups

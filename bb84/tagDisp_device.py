@@ -99,7 +99,7 @@ class Sidebar(Gtk.Revealer):
     #     menu.append(label='Help', detailed_action='app.help')
     #     menu.append(label='About tagDisp', detailed_action='app.about')
     #     menu.append(label='Quit', detailed_action='app.quit')
-    
+
     #     popover_menu = Gtk.PopoverMenu()
     #     popover_menu.set_menu_model(model=menu)
     #     menu_button.set_popover(popover=popover_menu)
@@ -120,19 +120,21 @@ class DeviceBox(Gtk.Box):
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
         self.timetagger = tt
-        self._data = timetagger.Data()
-        self._measurement_rate = 0.1
+        self.dc_calibration_file: pathlib.Path | None = None
+
         self._event = threading.Event()
+
+        self._measurement_rate = 0.1
         self._raw_data_container = [timetagger.RawData()]
         self._measurement_thread = threading.Thread(
-            target=self._measure,
-            args=(self,)
+            target=self._measure
         )
-        self._measurement_thread.start()
 
-        self.refresh_rate = 1
-
-        self.dc_calibration_file = pathlib.Path()
+        self._data_rate = 0.1
+        self._data_container = [timetagger.Data()]
+        self._data_thread = threading.Thread(
+            target=self._calc_data
+        )
 
         sidebar = Sidebar()
         self.append(child=sidebar)
@@ -147,9 +149,9 @@ class DeviceBox(Gtk.Box):
         )
         if Gtk.HeaderBar().find_property(property_name='use_native_controls'):
             content_header_bar.set_use_native_controls(True)
-        
+
         content_box.append(child=content_header_bar)
-        
+
         toggle_sidebar_button = Gtk.Button(
             icon_name='sidebar-show-symbolic',
             tooltip_text='Toggle sidebar'
@@ -173,6 +175,7 @@ class DeviceBox(Gtk.Box):
         sidebar.set_stack(stack=self.stack)
         content_box.append(child=self.stack)
 
+        # pages
         settings_name = 'Settings'
         self.stack.add_titled(
             child=page_settings.UQDSettings(name=settings_name),
@@ -205,7 +208,11 @@ class DeviceBox(Gtk.Box):
         )
 
         channels_name = 'Channels'
-        self.channels_page = page_channels.ChannelsPage(name=channels_name)
+        self.channels_page = page_channels.ChannelsPage(
+            name=channels_name,
+            set_channel_groups_callback=self.set_channel_groups,
+            get_channel_groups_callback=self.get_pattern
+        )
         self.stack.add_titled(
             child=self.channels_page,
             name=channels_name,
@@ -221,18 +228,26 @@ class DeviceBox(Gtk.Box):
             title='Plot'
         )
 
-        self._timeout_id = GLib.timeout_add(
-            self.refresh_rate,
-            self.set_data
-        )
+        self._measurement_thread.start()
+        self._data_thread.start()
 
-    def _measure(self, _) -> None:
+    def _measure(self) -> None:
         while True:
             for i in range(len(self._raw_data_container)):
                 self._raw_data_container[i] = self.timetagger.measure()
             if self._event.is_set():
                 break
             time.sleep(self._measurement_rate)
+
+    def _calc_data(self) -> None:
+        while True:
+            self._data_container = [timetagger.Data.from_raw_data(
+                raw_data=self.get_raw_data(),
+                channel_groups=self.get_pattern()
+            )]
+            if self._event.is_set():
+                break
+            time.sleep(self._data_rate)
 
     def on_toggle_sidebar(
             self,
@@ -251,21 +266,20 @@ class DeviceBox(Gtk.Box):
     ) -> None:
         window_title.set_title(title=stack.get_visible_child_name() or '')
 
-    def set_data(self) -> bool:
-        self._data = timetagger.Data().from_raw_data(
-            raw_data=self._raw_data_container[0],
-            pattern=self.get_pattern()
-        )
-        return True
+    def get_raw_data(self) -> timetagger.RawData:
+        return self._raw_data_container[0]
 
     def get_data(self) -> timetagger.Data:
-        return self._data
+        return self._data_container[0]
     
-    def set_pattern(self, pattern: dict) -> None:
-        self.timetagger.pattern = pattern
+    def set_channel_groups(
+            self,
+            channel_groups: list[timetagger.ChannelGroup]
+    ) -> None:
+        self.timetagger.channel_groups = channel_groups
 
-    def get_pattern(self) -> dict:
-        return self.timetagger.pattern
+    def get_pattern(self) -> list[timetagger.ChannelGroup]:
+        return self.timetagger.channel_groups
     
     def get_device_info(self) -> timetagger.DeviceInfo:
         return self.timetagger.device_info
@@ -273,8 +287,19 @@ class DeviceBox(Gtk.Box):
     def set_dc_calibration_file(self, path: pathlib.Path) -> None:
         self.dc_calibration_file = path
 
-    def get_dc_calibration_file(self) -> pathlib.Path:
+    def get_dc_calibration_file(self) -> pathlib.Path | None:
         return self.dc_calibration_file
     
-    def get_page(self):
+    def get_page(self) -> str | None:
         return self.stack.get_visible_child_name()
+    
+if __name__ == '__main__':
+    from . import remote_timetagger
+    db = DeviceBox(
+        tt=remote_timetagger.RemoteTimetagger(
+            model='Logic-16',
+            host='137.195.63.6',
+            port=5001
+        )
+    )
+    print(db._raw_data_container)

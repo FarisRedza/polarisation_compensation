@@ -1,5 +1,6 @@
 import socket
 import struct
+import time
 
 from . import timetagger
 from . import remote_server
@@ -107,11 +108,10 @@ class RemoteTimetagger(timetagger.TimeTagger):
         else:
             raise NameError('Must provide either a socket or host and port')
         self._get_device_info(model=model)
-        self.pattern = timetagger.default_pattern
-
+        self.channel_groups = timetagger.default_channel_groups
     
     def disconnect(self) -> None:
-        pass
+        self._sock.close()
 
     def measure(self) -> timetagger.RawData:
         send_command(
@@ -129,7 +129,7 @@ class RemoteTimetagger(timetagger.TimeTagger):
     def _handle_response(
             self,
             expected_response_id: remote_server.Response
-    ):
+    ) -> bytes:
         response, payload = receive_response(self._sock)
 
         match response:
@@ -158,3 +158,20 @@ class RemoteTimetagger(timetagger.TimeTagger):
         self.device_info = timetagger.DeviceInfo.deserialise(
             payload=payload
         )
+
+if __name__ == '__main__':
+    tt = RemoteTimetagger(
+        model='Logic-16',
+        host='137.195.63.6',
+        port=5001
+    )
+    try:
+        while True:
+            data = timetagger.Data.from_raw_data(
+                raw_data=tt.measure(),
+                channel_groups=timetagger.default_channel_groups
+            )
+            print(data.qber, data.qx)
+
+    except KeyboardInterrupt:
+        tt.disconnect()

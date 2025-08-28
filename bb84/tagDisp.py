@@ -17,7 +17,7 @@ from . import tagDisp_device
 class DeviceListGroup(Adw.PreferencesGroup):
     def __init__(
             self,
-            title,
+            title: str,
             devices_infos: list[timetagger.DeviceInfo],
             set_device_callback: typing.Callable,
             remote: bool = False
@@ -121,6 +121,9 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
             'clicked',
             self.on_server_connect
         )
+        connect_button.add_css_class(
+            css_class='flat'
+        )
         self.connect_row.set_child(
             child=connect_button
         )
@@ -140,7 +143,7 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
         self.server_connect_callback()
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.set_title(title='tagDisp')
         self.set_default_size(width=650, height=575)
@@ -234,17 +237,16 @@ class MainWindow(Adw.ApplicationWindow):
                     sock=self._sock
                 )
             )
-            pass
         self.main_stack.add_child(child=self.timetagger_box)
         self.main_stack.set_visible_child(child=self.timetagger_box)
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         os.kill(os.getpid(), signal.SIGINT)
         return False
-    
+
     def get_host(self) -> str:
         return self.host
-    
+
     def set_host(self, host: str) -> None:
         self.host = host
 
@@ -258,7 +260,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._sock = sock
 
 class App(Adw.Application):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.connect('activate', self.on_activate)
 
@@ -280,7 +282,7 @@ class App(Adw.Application):
 
     def on_help(
             self,
-            simple_action,
+            simple_action:  Gio.SimpleAction,
             parameter_type = None
     ) -> None:
         help_dialog = Gtk.MessageDialog(

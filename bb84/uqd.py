@@ -36,7 +36,7 @@ class UQD(timetagger.TimeTagger):
             serial_number = 'N/A',
             firmware_version = 'N/A'
         )
-        self.pattern = timetagger.default_pattern
+        self.pattern = timetagger.default_channel_groups
 
     def measure(self) -> timetagger.RawData:
         channels, timetags = self._uqd(1)

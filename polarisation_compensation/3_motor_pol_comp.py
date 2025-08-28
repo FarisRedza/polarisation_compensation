@@ -37,7 +37,7 @@ def measure_error(tt: timetagger.TimeTagger, repeats: int = 5) -> tuple[float, f
     for _ in range(repeats):
         data = timetagger.Data().from_raw_data(
             raw_data=tt.measure(),
-            pattern=tt.pattern
+            channel_groups=tt.pattern
         )
         qbers.append(data.qber)
         qxs.append(data.qx)
