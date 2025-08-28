@@ -262,7 +262,6 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
     ) -> None:
         self.grid = switch.get_active()
 
-
     def update_plot(
             self,
             get_data_callback: typing.Callable
@@ -284,7 +283,6 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                 )
 
                 info['line'].set_data(
-                    # range(len(info['value_history'])),
                     x_values,
                     info['value_history']
                 )
@@ -298,8 +296,6 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
         self.axes.set_xlim(-dt * self.plot_length, 0)
         self.axes.grid(visible=self.grid)
 
-        # self.axes.relim()
-        # self.axes.autoscale_view(scalex=False, scaley=True)
         self.canvas.draw()
         return True
     

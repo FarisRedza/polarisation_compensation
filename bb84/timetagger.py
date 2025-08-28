@@ -178,15 +178,15 @@ class RawData:
         offset_timetags = header_size
         offset_channels = offset_timetags + timetags_bytes
 
-        timetags = np.frombuffer(payload[offset_timetags:offset_channels], dtype='>i8').astype(np.int64)
-        channels = np.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype='>u1').astype(np.uint8)
+        timetags = np.frombuffer(payload[offset_timetags:offset_channels], dtype=np.int64)
+        channels = np.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype=np.uint8)
 
         return RawData(timetags=timetags, channels=channels)
 
 @dataclasses.dataclass
 class Data:
     singles: np.typing.NDArray[np.int64] = dataclasses.field(
-        default_factory=lambda: np.array([])
+        default_factory=lambda: np.array([], dtype=np.int64)
     )
     azimuth: float = 0.0
     ellipticity: float = 0.0
@@ -200,7 +200,6 @@ class Data:
     def from_raw_data(
             cls,
             raw_data: RawData,
-            # pattern: dict[str, dict[str, int | None]] | None = None
             channel_groups: list[ChannelGroup] | None = None
     ) -> 'Data':
         singles = np.bincount(raw_data.channels, minlength=8)
