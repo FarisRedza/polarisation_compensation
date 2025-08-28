@@ -71,7 +71,7 @@ def get_qber(
         channel_group_2: ChannelGroup,
         delay: float = 0,
         tcc: float = 50,
-        verbose: bool = True
+        verbose: bool = False
 ) -> tuple[float, float, float]:
     tags_H_1550 = timetags[channels == channel_group_2.H]
     tags_V_1550 = timetags[channels == channel_group_2.V]
@@ -178,6 +178,7 @@ class RawData:
         offset_timetags = header_size
         offset_channels = offset_timetags + timetags_bytes
 
+        # prev '>i64' > for endian, check this later with numpy
         timetags = np.frombuffer(payload[offset_timetags:offset_channels], dtype=np.int64)
         channels = np.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype=np.uint8)
 
