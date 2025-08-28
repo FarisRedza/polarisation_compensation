@@ -1,6 +1,7 @@
 import typing
 import collections
 import dataclasses
+import platform
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -32,7 +33,7 @@ class Colours:
     DARK: tuple[float, float, float, float]
 
     def __init__(self) -> None:
-        if Adw.get_minor_version() >= 6:
+        if Adw.get_minor_version() >= 6 and platform.system() == 'Linux':
             colours = {}
             for colour in Adw.AccentColor:
                 colours[colour.name] = rgba_to_tuple(colour.to_rgba())
