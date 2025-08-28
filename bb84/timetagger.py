@@ -196,6 +196,7 @@ class Data:
     normalised_s3: float = 0.0
     qber: float = 0.0
     qx: float = 0.0
+    rate: int = 0
 
     @classmethod
     def from_raw_data(
@@ -247,12 +248,15 @@ class Data:
                 elif len(channel_groups) == 1:
                     qber = 1 - s1**2
                     qx = 1 - s2**2
+                    rate = 0
                 else:
                     qber = 0
                     qx = 0
+                    rate = 0
             except:
                 qber = 0
                 qx = 0
+                rate = 0
             try:
                 eta = np.asin(s3)/2
             except:
@@ -271,6 +275,7 @@ class Data:
             s3 = 0.0
             qber = 0.0
             qx = 0.0
+            rate = 0
 
         return cls(
             singles=singles,
@@ -280,7 +285,8 @@ class Data:
             normalised_s2=s2,
             normalised_s3=s3,
             qber=qber,
-            qx=qx
+            qx=qx,
+            rate=rate
         )
 
 class TimeTagger:

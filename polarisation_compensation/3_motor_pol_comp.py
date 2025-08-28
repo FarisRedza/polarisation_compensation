@@ -37,7 +37,7 @@ def measure_error(tt: timetagger.TimeTagger, repeats: int = 5) -> tuple[float, f
     for _ in range(repeats):
         data = timetagger.Data().from_raw_data(
             raw_data=tt.measure(),
-            channel_groups=tt.pattern
+            channel_groups=tt.channel_groups
         )
         qbers.append(data.qber)
         qxs.append(data.qx)
@@ -93,10 +93,10 @@ class PolarisationCompensator:
 
 
 if __name__ == '__main__':
-    motor_qwp_1 = thorlabs_motor.ThorlabsMotor(serial_number=QWP1)
-    motor_hwp = thorlabs_motor.ThorlabsMotor(serial_number=HWP)
-    motor_qwp_2 = elliptec_motor.ElliptecMotor(serial_number=QWP2)    
-    motors: list[base_motor.Motor] = [motor_qwp_1, motor_hwp, motor_qwp_2]
+    motors: list[base_motor.Motor] = []
+    motors.append(thorlabs_motor.ThorlabsMotor(serial_number=QWP1))
+    motors.append(thorlabs_motor.ThorlabsMotor(serial_number=HWP))
+    # motors.append(elliptec_motor.ElliptecMotor(serial_number=QWP2))
 
     tt=remote_timetagger.RemoteTimetagger(
             host=MEASUREMENT_SERVER_HOST,
@@ -108,7 +108,7 @@ if __name__ == '__main__':
         tt=tt
     )
     try:
-        pol_comp.optimise(target=0.5)
+        pol_comp.optimise()
     except KeyboardInterrupt:
         for motor in motors:
             motor.stop()

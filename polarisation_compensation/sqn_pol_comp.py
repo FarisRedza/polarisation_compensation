@@ -3,25 +3,29 @@ import math
 import random
 from collections import deque
 
+import numpy as np
+
 import bb84.timetagger as timetagger
 import bb84.remote_timetagger as remote_timetagger
 import motor.thorlabs_motor as thorlabs_motor
+import motor.elliptec_motor as elliptec_motor
 import motor.base_motor as base_motor
 
-MOTOR_SERVER_HOST = '137.195.89.222'
-MOTOR_SERVER_PORT = 5002
-MEASUREMENT_SERVER_HOST = '137.195.89.222'
 MEASUREMENT_SERVER_HOST = '137.195.63.6'
 MEASUREMENT_SERVER_PORT = 5001
 
-QWP = '55353314'
+QWP1 = '55353314'
 HWP = '55356974'
+QWP2 = '11400887'
 
 def averaged_measure(n_samples=12, sample_interval=0.008):
     qbers = []
     qxs = []
     for _ in range(n_samples):
-        data = timetagger.Data().from_raw_data(raw_data=measurement_device.measure())
+        data = timetagger.Data().from_raw_data(
+            raw_data=measurement_device.measure(),
+            channel_groups=measurement_device.channel_groups
+        )
         qbers.append(data.qber)
         qxs.append(data.qx)
         time.sleep(sample_interval)
@@ -36,7 +40,7 @@ def clamp(x, lo, hi):
 
 def spsa_update(
         motors: list[base_motor.Motor],
-        thetas,
+        motor_positions,
         a_k,
         c_k,
         momentum_v,
@@ -46,13 +50,13 @@ def spsa_update(
         sample_interval
 ):
     # 1. generate perturbation ±1 for each parameter
-    d = [random.choice([1.0, -1.0]) for _ in thetas]
+    d = [random.choice([1.0, -1.0]) for _ in motor_positions]
     # 2. apply +c perturbation
-    theta_plus = [t + c_k * di for t, di in zip(thetas, d)]
-    theta_minus = [t - c_k * di for t, di in zip(thetas, d)]
+    theta_plus = [t + c_k * di for t, di in zip(motor_positions, d)]
+    theta_minus = [t - c_k * di for t, di in zip(motor_positions, d)]
 
     # move motors to theta_plus relative from current: compute deltas
-    for motor, t_target, t_curr in zip(motors, theta_plus, thetas):
+    for motor, t_target, t_curr in zip(motors, theta_plus, motor_positions):
         delta = t_target - t_curr
         # wrap/clamp if you want to enforce physical ranges here
         motor.move_by(angle=delta, acceleration=20.0, max_velocity=25.0)
@@ -95,21 +99,19 @@ def spsa_update(
     L_new = loss_from_measurements(qber_new, qx_new)
 
     # compute new theta values (or read from motors if your API gives them)
-    new_thetas = [ t + dt for t, dt in zip(thetas, delta_theta) ]
+    new_thetas = [ t + dt for t, dt in zip(motor_positions, delta_theta) ]
 
     return new_thetas, momentum_v, L_new, (qber_new, qx_new)
 
 # ---------- High-level control loop ----------
 def run_compensation_loop(
-        motor_hwp: base_motor.Motor,
-        motor_qwp: base_motor.Motor, 
+        motors: list[base_motor.Motor],
         max_iters=1000,
         meas_samples=20, 
         sample_interval=0.01
 ):
-    motors = [motor_hwp, motor_qwp]
-    thetas = [motor_hwp.position, motor_qwp.position]  # deg
-    v = [0.0, 0.0]  # momentum
+    motor_positions = [m.position for m in motors]
+    v = [0.0] * len(motors)
     beta = 0.8
     # a0 = 2.0      # initial step gain (deg-scale)
     a0 = 2.5
@@ -125,11 +127,11 @@ def run_compensation_loop(
         a_k = a0 / (1.0 + 0.0005 * k)   # slowly decaying step size
         c_k = c0 / (1.0 + 0.0002 * k)   # slowly decaying perturbation
 
-        thetas, v, L, (qber, qx) = spsa_update(
-            motors, thetas, a_k, c_k, v, beta, max_step, meas_samples, sample_interval
+        motor_positions, v, L, (qber, qx) = spsa_update(
+            motors, motor_positions, a_k, c_k, v, beta, max_step, meas_samples, sample_interval
         )
 
-        print(f"iter {k:03d}: loss={L:.4f} qber={qber:.4f} qx={qx:.4f} thetas={[round(t,2) for t in thetas]}")
+        print(f"iter {k:03d}: loss={L:.4f} qber={qber:.4f} qx={qx:.4f} thetas={[round(t,2) for t in motor_positions]}")
         # stability check: both below target for N consecutive iters
         if qber < target and qx < target:
             stable_count += 1
@@ -150,11 +152,14 @@ def run_compensation_loop(
             print("Stable for 5 iterations. Holding and switching to periodic probe mode.")
             break
 
-    return thetas, (qber, qx)
+    return motor_positions, (qber, qx)
 
 if __name__ == '__main__':
-    motor_qwp = thorlabs_motor.ThorlabsMotor(serial_number=QWP)
-    motor_hwp = thorlabs_motor.ThorlabsMotor(serial_number=HWP)
+    motors: list[base_motor.Motor] = []
+    motors.append(thorlabs_motor.ThorlabsMotor(serial_number=QWP1))
+    motors.append(thorlabs_motor.ThorlabsMotor(serial_number=HWP))
+    # motors.append(elliptec_motor.ElliptecMotor(serial_number=QWP2))
+
     measurement_device = remote_timetagger.RemoteTimetagger(
         host=MEASUREMENT_SERVER_HOST,
         port=MEASUREMENT_SERVER_PORT,
@@ -162,8 +167,7 @@ if __name__ == '__main__':
     )
 
     run_compensation_loop(
-        motor_hwp,
-        motor_qwp, 
+        motors=motors,
         max_iters=1000,
         meas_samples=20,
         sample_interval=0.01

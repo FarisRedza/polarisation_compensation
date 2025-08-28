@@ -173,8 +173,8 @@ if __name__ == '__main__':
                 raw_data=raw_data,
                 channel_groups=timetagger.default_channel_groups
             )
-            print(data.qber, data.qx)
-            print(raw_data.timetags[:10])
+            print(data.qber, data.qx, data.rate)
+
 
     except KeyboardInterrupt:
         tt.disconnect()
