@@ -77,6 +77,8 @@ def get_qber(
     tags_V_1550 = timetags[channels == channel_group_2.V]
     tags_D_1550 = timetags[channels == channel_group_2.D]
     tags_A_1550 = timetags[channels == channel_group_2.A]
+    tags_H_780 = timetags[channels == channel_group_1.H]
+    delay=find_delay(tags_H_1550, tags_H_780)
     tags_H_780 = timetags[channels == channel_group_1.H] + delay
     tags_V_780 = timetags[channels == channel_group_1.V] + delay
     tags_D_780 = timetags[channels == channel_group_1.D] + delay
@@ -88,7 +90,7 @@ def get_qber(
     VV: int = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
 
     qber: float =  (VH + HV) / (HH + HV + VH + VV)
-    if verbose == True and qber > 1:
+    if verbose == True:
         print('qber =',qber)
         print(HH, HV, VH, VV)
 
