@@ -14,36 +14,6 @@ Watts = typing.NewType('Watts', float)
 Metres = typing.NewType('Metres', float)
 DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
-C_1550_H = 0
-C_1550_V = 1
-C_1550_D = 2
-C_1550_A = 3
-C_1550_R = None
-C_1550_L = None
-
-C_780_H = 4
-C_780_V = 5
-C_780_D = 6
-C_780_A = 7
-C_780_R = None
-C_780_L = None
-
-# default_pattern = {
-#     '1H': 4,
-#     '1V': 5,
-#     '1D': 6,
-#     '1A': 7,
-#     '1R': None,
-#     '1L': None,
-#     '2H': 0,
-#     '2V': 1,
-#     '2D': 2,
-#     '2A': 3,
-#     '2R': None,
-#     '2L': None,
-# }
-
-# will replace dict system
 @dataclasses.dataclass
 class ChannelGroup:
     name: str
@@ -233,21 +203,6 @@ class Data:
     ) -> 'Data':
         singles = np.bincount(raw_data.channels, minlength=8)
 
-        # if not pattern:
-        #     with np.errstate(invalid='ignore'):
-        #         try:
-        #             s1 = float((singles[pattern['780']['1H']] - singles[pattern['780']['1V']])/(singles[pattern['780']['1H']] + singles[pattern['780']['1V']]))
-        #         except:
-        #             s1 = None
-        #         try:
-        #             s2 = float((singles[pattern['780']['1D']] - singles[pattern['780']['1A']])/(singles[pattern['780']['1D']] + singles[pattern['780']['1A']]))
-        #         except:
-        #             s2 = None
-        #         try:
-        #             s3 = float((singles[pattern['780']['1R']] - singles[pattern['780']['1L']])/(singles[pattern['780']['1R']] + singles[pattern['780']['1L']]))
-        #         except:
-        #             s3 = None
-
         if channel_groups:
             with np.errstate(invalid='ignore'):
                 try:
@@ -277,20 +232,22 @@ class Data:
                     raise TypeError(f'Error: Unsupported basis setup {(type(s1), type(s2), type(s3))}')
 
             try:
-                # for entangment case
                 if len(channel_groups) > 1:
+                    cg_780_inx = next((i for i, cg in enumerate(channel_groups) if cg.name == '780'))
+                    cg_1550_inx = next((i for i, cg in enumerate(channel_groups) if cg.name == '1550'))
+
                     qber, qx, rate = get_qber(
                         channels=raw_data.channels,
                         timetags=raw_data.timetags,
-                        # pattern_group_1=pattern['780'],
-                        # pattern_group_2=pattern['1550']
-                        channel_group_1=channel_groups[1],
-                        channel_group_2=channel_groups[0]
+                        channel_group_1=channel_groups[cg_780_inx],
+                        channel_group_2=channel_groups[cg_1550_inx]
                     )
-                ## for singles with one bb84 case
-                else:
+                elif len(channel_groups) == 1:
                     qber = 1 - s1**2
                     qx = 1 - s2**2
+                else:
+                    qber = 0
+                    qx = 0
             except:
                 qber = 0
                 qx = 0
@@ -338,15 +295,6 @@ class TimeTagger:
                 A=3,
                 R=None,
                 L=None
-            ),
-            ChannelGroup(
-                name='1550',
-                H=4,
-                V=5,
-                D=6,
-                A=7,
-                R=None,
-                L=None
             )
         ]
 
@@ -386,12 +334,6 @@ class TimeTagger:
     
     def disconnect(self) -> None:
         pass
-
-    # def _set_pattern(self, pattern: dict[str, int | None]) -> None:
-    #     self.pattern = pattern
-
-    # def _get_pattern(self) -> dict[str, int | None] | None:
-    #     return self.pattern
 
 if __name__ == '__main__':
     tt = TimeTagger()
