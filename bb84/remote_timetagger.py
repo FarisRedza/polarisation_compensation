@@ -167,13 +167,14 @@ if __name__ == '__main__':
         port=5001
     )
     try:
-        while True:
+        for _ in range(5):
             raw_data=tt.measure()
             data = timetagger.Data.from_raw_data(
                 raw_data=raw_data,
                 channel_groups=timetagger.default_channel_groups
             )
-            print(data.qber, data.qx, data.rate)
+            print(raw_data.timetags.dtype)
+            time.sleep(1)
 
 
     except KeyboardInterrupt:

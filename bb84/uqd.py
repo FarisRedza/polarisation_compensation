@@ -2,6 +2,8 @@ import sys
 import os
 import pathlib
 
+import numpy as np
+
 os.environ['TTAG'] = str(pathlib.Path(
     os.environ['HOME'],
     'Projects',
@@ -39,9 +41,11 @@ class UQD(timetagger.TimeTagger):
         self.channel_groups = timetagger.default_channel_groups
 
     def measure(self) -> timetagger.RawData:
+        channels: np.typing.NDArray[np.uint8]
+        timetags: np.typing.NDArray[np.uint64]
         channels, timetags = self._uqd(1)
         raw_data = timetagger.RawData(
-            timetags=timetags,
+            timetags=timetags.astype(np.int64),
             channels=channels
         )
         return raw_data
