@@ -78,7 +78,6 @@ def get_qber(
     tags_D_1550 = timetags[channels == channel_group_2.D]
     tags_A_1550 = timetags[channels == channel_group_2.A]
     tags_H_780 = timetags[channels == channel_group_1.H]
-    print(len(tags_H_1550))
     delay=find_delay(tags_H_1550, tags_H_780)
     tags_H_780 = timetags[channels == channel_group_1.H] + delay
     tags_V_780 = timetags[channels == channel_group_1.V] + delay
