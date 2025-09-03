@@ -6,6 +6,8 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Adw
 
+from bb84 import timetagger
+
 class SettingsGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:
         super().__init__(title='UQD Settings')
@@ -136,26 +138,12 @@ class SettingsGroup(Adw.PreferencesGroup):
             self.dc_calibration_entry.set_text(text=path.name)
         dialog.destroy()
 
-    def on_clear_buffers(self, button) -> None:
+    def on_clear_buffers(self, button: Gtk.Button) -> None:
         # for i in range(ttag.getfreebuffer()-1):
         #     ttag.deletebuffer(i)
         # print('CLEARING ALL BUFFERS')
         # print(f'FIRST FREE BUFFER IS {ttag.getfreebuffer()}')
         pass
-
-class UQDSettings(Adw.PreferencesPage):
-    def __init__(
-            self,
-            name: str
-    ) -> None:
-        super().__init__(name=name)
-
-        settings_group = SettingsGroup()
-        self.add(group=settings_group)
-
-        uqd_interface_group = UQDInterface()
-        self.add(group=uqd_interface_group)
-
 
 class UQDInterface(Adw.PreferencesGroup):
     def __init__(self) -> None:
@@ -214,10 +202,8 @@ class UQDInterface(Adw.PreferencesGroup):
         pass
         uqd_interface_path = pathlib.Path().cwd().joinpath('UQDinterface/UQDinterface')
         subprocess.Popen(['gnome-terminal', '--', uqd_interface_path])
-        
-        
 
-    def on_uqd_stop(self, button) -> None:
+    def on_uqd_stop(self, button: Gtk.Button) -> None:
         # if self.uqdinterface is not None:
         #     try:
         #         self.uqdinterface.wait(timeout=1)
@@ -227,3 +213,48 @@ class UQDInterface(Adw.PreferencesGroup):
         #     finally:
         #         self.uqdinterface = None
         pass
+
+class DeviceInfoGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            get_device_info_callback: typing.Callable
+    ) -> None:
+        super().__init__(title='Device Info')
+        device_info: timetagger.DeviceInfo = get_device_info_callback()
+
+        # serial number
+        serial_no_row = Adw.ActionRow(title='Serial number')
+        self.add(child=serial_no_row)
+        serial_no_label = Gtk.Label(label=device_info.serial_number)
+        serial_no_row.add_suffix(widget=serial_no_label)
+
+        # model number
+        model_no_row = Adw.ActionRow(title='Model number')
+        self.add(child=model_no_row)
+        model_no_label = Gtk.Label(label=device_info.model)
+        model_no_row.add_suffix(widget=model_no_label)
+
+        # firmware
+        fw_ver_row = Adw.ActionRow(title='Firmware version')
+        self.add(child=fw_ver_row)
+        fw_ver_label = Gtk.Label(label=device_info.firmware_version)
+        fw_ver_row.add_suffix(widget=fw_ver_label)
+
+class UQDSettings(Adw.PreferencesPage):
+    def __init__(
+            self,
+            name: str,
+            get_device_info_callback: typing.Callable
+    ) -> None:
+        super().__init__(name=name)
+
+        settings_group = SettingsGroup()
+        self.add(group=settings_group)
+
+        uqd_interface_group = UQDInterface()
+        self.add(group=uqd_interface_group)
+
+        device_info_group = DeviceInfoGroup(
+            get_device_info_callback=get_device_info_callback
+        )
+        self.add(group=device_info_group)

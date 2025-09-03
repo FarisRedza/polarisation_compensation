@@ -178,7 +178,10 @@ class DeviceBox(Gtk.Box):
         # pages
         settings_name = 'Settings'
         self.stack.add_titled(
-            child=page_settings.UQDSettings(name=settings_name),
+            child=page_settings.UQDSettings(
+                name=settings_name,
+                get_device_info_callback=self.get_device_info
+            ),
             name=settings_name,
             title=settings_name
         )
@@ -292,14 +295,3 @@ class DeviceBox(Gtk.Box):
     
     def get_page(self) -> str | None:
         return self.stack.get_visible_child_name()
-    
-if __name__ == '__main__':
-    from . import remote_timetagger
-    db = DeviceBox(
-        tt=remote_timetagger.RemoteTimetagger(
-            model='Logic-16',
-            host='137.195.63.6',
-            port=5001
-        )
-    )
-    print(db._raw_data_container)
