@@ -4,7 +4,7 @@ import subprocess
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Adw, GLib, Gio
+from gi.repository import Gtk, Adw
 
 class SettingsGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:

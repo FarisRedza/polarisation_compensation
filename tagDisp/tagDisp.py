@@ -9,9 +9,9 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gio
 
-from . import timetagger
-# from . import uqd
-from . import remote_timetagger
+from bb84 import timetagger
+# from bb84 import uqd
+from bb84 import remote_timetagger
 from . import tagDisp_device
 
 class DeviceListGroup(Adw.PreferencesGroup):

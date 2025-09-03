@@ -7,7 +7,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GObject
 
-from . import timetagger
+from bb84 import timetagger
 from . import page_settings
 from . import page_simple_display
 from . import page_display

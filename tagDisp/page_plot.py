@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.backends.backend_gtk4agg
 import matplotlib.pyplot
 
-from . import timetagger
+from bb84 import timetagger
 
 def rgba_to_tuple(rgba: Gdk.RGBA) -> tuple[float, float, float, float]:
     return (rgba.red, rgba.green, rgba.blue, rgba.alpha)

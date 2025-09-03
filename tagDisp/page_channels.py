@@ -4,7 +4,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Adw
 
-from . import timetagger
+from bb84 import timetagger
 
 class ChannelRow(Adw.ActionRow):
     def __init__(

@@ -7,7 +7,7 @@ from gi.repository import Gtk, Adw, GLib
 
 import numpy as np
 
-from . import timetagger
+from bb84 import timetagger
 
 class Counter(Gtk.Box):
     def __init__(self, label: str, counter_size: int = 40) -> None:
