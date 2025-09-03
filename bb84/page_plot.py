@@ -122,7 +122,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
         self.canvas = matplotlib.backends.backend_gtk4agg.FigureCanvasGTK4Agg(
             figure=self.figure
         )
-        self.canvas.set_size_request(width=0, height=300)
+        self.canvas.set_size_request(width=0, height=500)
 
         margin = 2
         box = Gtk.Box(

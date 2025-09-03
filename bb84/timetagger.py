@@ -58,8 +58,8 @@ def find_delay(
     for delay in np.arange(-3000, 3000,10):
         cc.append(
             tomt.count_twofolds(
-                tags_1550, tags_780 + delay,
-                len(tags_1550), len(tags_780), 15
+                tags_1550[:10000], tags_780[:10000] + delay,
+                len(tags_1550[:10000]), len(tags_780[:10000]), 15
             )
         )
     return np.arange(-3000, 3000,10)[np.argmax(cc)]

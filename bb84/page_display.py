@@ -197,6 +197,12 @@ class MeasurementInfoGroup(Adw.PreferencesGroup):
         )
         box.append(child=self.qx_counter)
 
+        self.rate_counter = Counter(
+            label='Rate',
+            counter_size=16
+        )
+        box.append(child=self.rate_counter)
+
     def update_data(self, data: timetagger.Data) -> None:
         self.s1_counter.update_counts(value=data.normalised_s1)
         self.s2_counter.update_counts(value=data.normalised_s2)
@@ -204,6 +210,7 @@ class MeasurementInfoGroup(Adw.PreferencesGroup):
 
         self.qber_counter.update_counts(value=data.qber)
         self.qx_counter.update_counts(value=data.qx)
+        self.rate_counter.update_counts(value=data.rate)
 
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:

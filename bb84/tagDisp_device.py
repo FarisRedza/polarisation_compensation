@@ -5,7 +5,7 @@ import pathlib
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Gio, Adw, GObject, GLib
+from gi.repository import Gtk, Adw, GObject
 
 from . import timetagger
 from . import page_settings
@@ -211,7 +211,7 @@ class DeviceBox(Gtk.Box):
         self.channels_page = page_channels.ChannelsPage(
             name=channels_name,
             set_channel_groups_callback=self.set_channel_groups,
-            get_channel_groups_callback=self.get_pattern
+            get_channel_groups_callback=self.get_channel_groups
         )
         self.stack.add_titled(
             child=self.channels_page,
@@ -243,7 +243,7 @@ class DeviceBox(Gtk.Box):
         while True:
             self._data_container = [timetagger.Data.from_raw_data(
                 raw_data=self.get_raw_data(),
-                channel_groups=self.get_pattern()
+                channel_groups=self.get_channel_groups()
             )]
             if self._event.is_set():
                 break
@@ -278,7 +278,7 @@ class DeviceBox(Gtk.Box):
     ) -> None:
         self.timetagger.channel_groups = channel_groups
 
-    def get_pattern(self) -> list[timetagger.ChannelGroup]:
+    def get_channel_groups(self) -> list[timetagger.ChannelGroup]:
         return self.timetagger.channel_groups
     
     def get_device_info(self) -> timetagger.DeviceInfo:
