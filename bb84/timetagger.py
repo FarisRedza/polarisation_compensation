@@ -24,6 +24,28 @@ class ChannelGroup:
     R: int | None = None
     L: int | None = None
 
+@dataclasses.dataclass
+class TimetagsGroup:
+    name: str
+    H: np.typing.NDArray[np.int64] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.int64)
+    )
+    V: np.typing.NDArray[np.int64] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.int64)
+    )
+    A: np.typing.NDArray[np.int64] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.int64)
+    )
+    D: np.typing.NDArray[np.int64] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.int64)
+    )
+    R: np.typing.NDArray[np.int64] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.int64)
+    )
+    L: np.typing.NDArray[np.int64] = dataclasses.field(
+        default_factory=lambda: np.array([], dtype=np.int64)
+    )
+
 default_channel_groups = [
     ChannelGroup(
         name='780',
@@ -77,43 +99,48 @@ def get_qber(
         tcc: float = 50,
         verbose: bool = False
 ) -> tuple[float, float, float]:
-    tags_H_1550 = timetags[channels == channel_group_2.H]
-    tags_V_1550 = timetags[channels == channel_group_2.V]
-    tags_D_1550 = timetags[channels == channel_group_2.D]
-    tags_A_1550 = timetags[channels == channel_group_2.A]
-    tags_H_780 = timetags[channels == channel_group_1.H]
-    
-    try:
-        delay=find_delay(tags_H_1550, tags_H_780)
-    except:
-        tags_V_780 = timetags[channels == channel_group_1.V]
+    tags_1550 = TimetagsGroup(
+        name='1550',
+        H=timetags[channels == channel_group_2.H],
+        V=timetags[channels == channel_group_2.V],
+        D=timetags[channels == channel_group_2.D],
+        A=timetags[channels == channel_group_2.A]
+    )
+    tags_780 = TimetagsGroup(
+        name='780',
+        H=timetags[channels == channel_group_1.H],
+        V=timetags[channels == channel_group_1.V],
+        D=timetags[channels == channel_group_1.D],
+        A=timetags[channels == channel_group_1.A]
+    )
+    for pair in [('H','H'), ('V','V'), ('H','V'), ('V','H')]:
         try:
-            delay=find_delay(tags_V_1550, tags_V_780)
-        except:
-            try:
-                delay=find_delay(tags_H_1550, tags_V_780)
-            except:
-                pass
+            find_delay(
+                tags_1550=getattr(tags_1550, pair[0]),
+                tags_780=getattr(tags_780, pair[1])
+            )
+            break
+        except Exception:
+            continue
+            
+    for field in dataclasses.fields(tags_780):
+        if field.name != "name":
+            setattr(tags_780, field.name, getattr(tags_780, field.name) + delay)
 
-    tags_H_780 = timetags[channels == channel_group_1.H] + delay
-    tags_V_780 = timetags[channels == channel_group_1.V] + delay
-    tags_D_780 = timetags[channels == channel_group_1.D] + delay
-    tags_A_780 = timetags[channels == channel_group_1.A] + delay
-
-    HH: int = tomt.count_twofolds(tags_H_1550, tags_H_780, len(tags_H_1550), len(tags_H_780),tcc)
-    HV: int = tomt.count_twofolds(tags_H_1550, tags_V_780, len(tags_H_1550), len(tags_V_780),tcc)
-    VH: int = tomt.count_twofolds(tags_V_1550, tags_H_780, len(tags_V_1550), len(tags_H_780),tcc)
-    VV: int = tomt.count_twofolds(tags_V_1550, tags_V_780, len(tags_V_1550), len(tags_V_780),tcc)
+    HH: int = tomt.count_twofolds(tags_1550.H, tags_780.H, len(tags_1550.H), len(tags_780.H),tcc)
+    HV: int = tomt.count_twofolds(tags_1550.H, tags_780.V, len(tags_1550.H), len(tags_780.V),tcc)
+    VH: int = tomt.count_twofolds(tags_1550.V, tags_780.H, len(tags_1550.V), len(tags_780.H),tcc)
+    VV: int = tomt.count_twofolds(tags_1550.V, tags_780.V, len(tags_1550.V), len(tags_780.V),tcc)
 
     qber: float =  (VH + HV) / (HH + HV + VH + VV)
     if verbose == True:
         print('qber =',qber)
         print(HH, HV, VH, VV)
 
-    DD: int = tomt.count_twofolds(tags_D_1550, tags_D_780, len(tags_D_1550), len(tags_D_780),tcc)
-    DA: int = tomt.count_twofolds(tags_D_1550, tags_A_780, len(tags_D_1550), len(tags_A_780),tcc)
-    AD: int = tomt.count_twofolds(tags_A_1550, tags_D_780, len(tags_A_1550), len(tags_D_780),tcc)
-    AA: int = tomt.count_twofolds(tags_A_1550, tags_V_780, len(tags_A_1550), len(tags_A_780),tcc)
+    DD: int = tomt.count_twofolds(tags_1550.D, tags_780.D, len(tags_1550.D), len(tags_780.D),tcc)
+    DA: int = tomt.count_twofolds(tags_1550.D, tags_780.A, len(tags_1550.D), len(tags_780.A),tcc)
+    AD: int = tomt.count_twofolds(tags_1550.A, tags_780.D, len(tags_1550.A), len(tags_780.D),tcc)
+    AA: int = tomt.count_twofolds(tags_1550.A, tags_780.A, len(tags_1550.A), len(tags_780.A),tcc)
 
     qx: float =  (DA + AD) / (DD + AD + DA + AA)
     if verbose == True and qx > 1:
