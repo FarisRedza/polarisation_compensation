@@ -62,7 +62,11 @@ def find_delay(
                 len(tags_1550[:10000]), len(tags_780[:10000]), 15
             )
         )
-    return np.arange(-3000, 3000,10)[np.argmax(cc)]
+    delay = np.arange(-3000, 3000,10)[np.argmax(cc)]
+    if max(cc) < 10* np.average(cc):
+        raise RuntimeError('Delay not found')
+    else:
+        return delay
 
 def get_qber(
         channels: np.typing.NDArray[np.uint8],
@@ -78,7 +82,21 @@ def get_qber(
     tags_D_1550 = timetags[channels == channel_group_2.D]
     tags_A_1550 = timetags[channels == channel_group_2.A]
     tags_H_780 = timetags[channels == channel_group_1.H]
-    delay=find_delay(tags_H_1550, tags_H_780)
+    
+    try:
+        delay=find_delay(tags_H_1550, tags_H_780)
+    except:
+        tags_V_780 = timetags[channels == channel_group_1.V]
+        try:
+            delay=find_delay(tags_V_1550, tags_V_780)
+        except:
+            try:
+                delay=find_delay(tags_H_1550, tags_V_780)
+            except:
+                pass
+            
+
+    print(delay)
     tags_H_780 = timetags[channels == channel_group_1.H] + delay
     tags_V_780 = timetags[channels == channel_group_1.V] + delay
     tags_D_780 = timetags[channels == channel_group_1.D] + delay
@@ -254,6 +272,7 @@ class Data:
                     qx = 0
                     rate = 0
             except:
+                print('get_qber failed')
                 qber = 0
                 qx = 0
                 rate = 0
