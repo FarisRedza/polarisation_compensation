@@ -99,6 +99,7 @@ class SwitchRow(Adw.ActionRow):
 class PlotDisplayGroup(Adw.PreferencesGroup):
     def __init__(self, get_data_callback: typing.Callable) -> None:
         super().__init__()
+        self._colours = Colours()
         row = Adw.PreferencesRow(can_target=False)
         self.add(child=row)
 
@@ -290,7 +291,7 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
                 for text in self.axes.get_legend().get_texts():
                     if text.get_text().startswith(name):
                         text.set_text(f'{name} - {avg:.3f}')
-                        text.set_color(color=Colours().LIGHT) if self.dark_mode else text.set_color(color=Colours().DARK)
+                        text.set_color(color=self._colours.LIGHT) if self.dark_mode else text.set_color(color=self._colours.DARK)
 
         self.axes.set_ylim(self.ylim_min, self.ylim_max)
         self.axes.set_xlim(-dt * self.plot_length, 0)
@@ -312,28 +313,28 @@ class PlotDisplayGroup(Adw.PreferencesGroup):
             self._last_dark_mode = self.dark_mode
 
             if self.dark_mode:
-                self.figure.set_facecolor(color=Colours().DARK)
-                self.axes.set_facecolor(color=Colours().DARK)
-                self.axes.tick_params(colors=Colours().LIGHT)
-                self.axes.spines[:].set_color(c=Colours().LIGHT)
-                self.axes.xaxis.label.set_color(color=Colours().LIGHT)
-                self.axes.yaxis.label.set_color(color=Colours().LIGHT)
-                self.axes.title.set_color(color=Colours().LIGHT)
+                self.figure.set_facecolor(color=self._colours.DARK)
+                self.axes.set_facecolor(color=self._colours.DARK)
+                self.axes.tick_params(colors=self._colours.LIGHT)
+                self.axes.spines[:].set_color(c=self._colours.LIGHT)
+                self.axes.xaxis.label.set_color(color=self._colours.LIGHT)
+                self.axes.yaxis.label.set_color(color=self._colours.LIGHT)
+                self.axes.title.set_color(color=self._colours.LIGHT)
                 if self.axes.get_legend():
                     for text in self.axes.get_legend().get_texts():
-                        text.set_color(color=Colours().LIGHT)
+                        text.set_color(color=self._colours.LIGHT)
 
             else:
-                self.figure.set_facecolor(color=Colours().LIGHT)
-                self.axes.set_facecolor(color=Colours().LIGHT)
-                self.axes.tick_params(colors=Colours().DARK)
-                self.axes.spines[:].set_color(c=Colours().DARK)
-                self.axes.xaxis.label.set_color(color=Colours().DARK)
-                self.axes.yaxis.label.set_color(color=Colours().DARK)
-                self.axes.title.set_color(color=Colours().DARK)
+                self.figure.set_facecolor(color=self._colours.LIGHT)
+                self.axes.set_facecolor(color=self._colours.LIGHT)
+                self.axes.tick_params(colors=self._colours.DARK)
+                self.axes.spines[:].set_color(c=self._colours.DARK)
+                self.axes.xaxis.label.set_color(color=self._colours.DARK)
+                self.axes.yaxis.label.set_color(color=self._colours.DARK)
+                self.axes.title.set_color(color=self._colours.DARK)
                 if self.axes.get_legend():
                     for text in self.axes.get_legend().get_texts():
-                        text.set_color(color=Colours().DARK)
+                        text.set_color(color=self._colours.DARK)
 
 class PlotsGroup(Adw.PreferencesGroup):
     def __init__(
@@ -343,18 +344,19 @@ class PlotsGroup(Adw.PreferencesGroup):
             get_plots_callback: typing.Callable
     ) -> None:
         super().__init__(title='Plots')
+        self._colours = Colours()
         self.plot_strings = Gtk.StringList()
 
         self.add_plot(
             name='qber',
-            colour=Colours().BLUE,
+            colour=self._colours.BLUE,
             add_line_to_plot_callback=add_line_to_plot_callback,
             remove_line_from_plot_callback=remove_line_from_plot_callback,
             get_plots_callback=get_plots_callback
         )
         self.add_plot(
             name='qx',
-            colour=Colours().ORANGE,
+            colour=self._colours.ORANGE,
             add_line_to_plot_callback=add_line_to_plot_callback,
             remove_line_from_plot_callback=remove_line_from_plot_callback,
             get_plots_callback=get_plots_callback
@@ -463,7 +465,7 @@ class PlotsGroup(Adw.PreferencesGroup):
     ) -> None:
         name: str = dropown.props.selected_item.props.string
         colour: tuple[float, float, float, float] = getattr(
-            Colours(),
+            self._colours,
             colour_dropown.props.selected_item.props.string
         )
 
@@ -500,6 +502,7 @@ class PlotPage(Gtk.ScrolledWindow):
             hscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
             vscrollbar_policy=Gtk.PolicyType.AUTOMATIC
         )
+
         main_box = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
             margin_top=12,

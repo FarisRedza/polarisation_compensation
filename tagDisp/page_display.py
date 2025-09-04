@@ -215,6 +215,7 @@ class MeasurementInfoGroup(Adw.PreferencesGroup):
 class PolEllipseGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:
         super().__init__(title='Polarisation Ellipse')
+        self._colours = Colours()
 
         row = Adw.PreferencesRow(can_target=False)
         self.add(child=row)
@@ -333,7 +334,7 @@ class PolEllipseGroup(Adw.PreferencesGroup):
             )[1]
         )
         if any(e > 1 for e in accent_colour):
-            accent_colour = Colours().BLUE
+            accent_colour = self._colours.BLUE
 
         if self.ellipse.get_color() != accent_colour:
             self.ellipse.set_color(color=accent_colour)
@@ -355,32 +356,33 @@ class PolEllipseGroup(Adw.PreferencesGroup):
             self._last_dark_mode = self.dark_mode
 
             if self.dark_mode:
-                self.figure.set_facecolor(color=Colours().DARK)
-                self.axes.set_facecolor(color=Colours().DARK)
-                self.axes.tick_params(colors=Colours().LIGHT)
-                self.axes.spines[:].set_color(c=Colours().LIGHT)
-                self.axes.xaxis.label.set_color(color=Colours().LIGHT)
-                self.axes.yaxis.label.set_color(color=Colours().LIGHT)
-                self.axes.title.set_color(color=Colours().LIGHT)
-                self.circle.set_color(c=Colours().LIGHT)
-                self.circle_h_line.set_color(color=Colours().LIGHT)
-                self.circle_v_line.set_color(color=Colours().LIGHT)
+                self.figure.set_facecolor(color=self._colours.DARK)
+                self.axes.set_facecolor(color=self._colours.DARK)
+                self.axes.tick_params(colors=self._colours.LIGHT)
+                self.axes.spines[:].set_color(c=self._colours.LIGHT)
+                self.axes.xaxis.label.set_color(color=self._colours.LIGHT)
+                self.axes.yaxis.label.set_color(color=self._colours.LIGHT)
+                self.axes.title.set_color(color=self._colours.LIGHT)
+                self.circle.set_color(c=self._colours.LIGHT)
+                self.circle_h_line.set_color(color=self._colours.LIGHT)
+                self.circle_v_line.set_color(color=self._colours.LIGHT)
 
             else:
-                self.figure.set_facecolor(color=Colours().LIGHT)
-                self.axes.set_facecolor(color=Colours().LIGHT)
-                self.axes.tick_params(colors=Colours().DARK)
-                self.axes.spines[:].set_color(c=Colours().DARK)
-                self.axes.xaxis.label.set_color(color=Colours().DARK)
-                self.axes.yaxis.label.set_color(color=Colours().DARK)
-                self.axes.title.set_color(color=Colours().DARK)
-                self.circle.set_color(c=Colours().DARK)
-                self.circle_h_line.set_color(color=Colours().DARK)
-                self.circle_v_line.set_color(color=Colours().DARK)
+                self.figure.set_facecolor(color=self._colours.LIGHT)
+                self.axes.set_facecolor(color=self._colours.LIGHT)
+                self.axes.tick_params(colors=self._colours.DARK)
+                self.axes.spines[:].set_color(c=self._colours.DARK)
+                self.axes.xaxis.label.set_color(color=self._colours.DARK)
+                self.axes.yaxis.label.set_color(color=self._colours.DARK)
+                self.axes.title.set_color(color=self._colours.DARK)
+                self.circle.set_color(c=self._colours.DARK)
+                self.circle_h_line.set_color(color=self._colours.DARK)
+                self.circle_v_line.set_color(color=self._colours.DARK)
 
 class BlochSphereGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:
         super().__init__(title='Bloch Sphere')
+        self._colours = Colours()
         row = Adw.PreferencesRow(activatable=False)
         self.add(child=row)
 
@@ -564,7 +566,7 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             )[1]
         )
         if any(e > 1 for e in accent_colour):
-            accent_colour = Colours().BLUE
+            accent_colour = self._colours.BLUE
 
         if self.point.get_color() != accent_colour:
             self.point.set_color(color=accent_colour)
@@ -583,42 +585,42 @@ class BlochSphereGroup(Adw.PreferencesGroup):
             self._last_dark_mode = self.dark_mode
 
             if self.dark_mode:
-                self.figure.set_facecolor(color=Colours().DARK)
-                self.axes.set_facecolor(color=Colours().DARK)
-                self.axes.tick_params(colors=Colours().LIGHT)
-                self.axes.spines[:].set_color(Colours().LIGHT)
-                self.axes.xaxis.label.set_color(color=Colours().LIGHT)
-                self.axes.yaxis.label.set_color(color=Colours().LIGHT)
-                self.axes.title.set_color(color=Colours().LIGHT)
-                self._h_label.set_color(color=Colours().LIGHT)
-                self._v_label.set_color(color=Colours().LIGHT)
-                self._d_label.set_color(color=Colours().LIGHT)
-                self._a_label.set_color(color=Colours().LIGHT)
-                self._r_label.set_color(color=Colours().LIGHT)
-                self._l_label.set_color(color=Colours().LIGHT)
-                self.sphere_wireframe.set_color(c=Colours().LIGHT)
-                self.sphere_hv_line.set_color(color=Colours().LIGHT)
-                self.sphere_da_line.set_color(color=Colours().LIGHT)
-                self.sphere_rl_line.set_color(color=Colours().LIGHT)
+                self.figure.set_facecolor(color=self._colours.DARK)
+                self.axes.set_facecolor(color=self._colours.DARK)
+                self.axes.tick_params(colors=self._colours.LIGHT)
+                self.axes.spines[:].set_color(self._colours.LIGHT)
+                self.axes.xaxis.label.set_color(color=self._colours.LIGHT)
+                self.axes.yaxis.label.set_color(color=self._colours.LIGHT)
+                self.axes.title.set_color(color=self._colours.LIGHT)
+                self._h_label.set_color(color=self._colours.LIGHT)
+                self._v_label.set_color(color=self._colours.LIGHT)
+                self._d_label.set_color(color=self._colours.LIGHT)
+                self._a_label.set_color(color=self._colours.LIGHT)
+                self._r_label.set_color(color=self._colours.LIGHT)
+                self._l_label.set_color(color=self._colours.LIGHT)
+                self.sphere_wireframe.set_color(c=self._colours.LIGHT)
+                self.sphere_hv_line.set_color(color=self._colours.LIGHT)
+                self.sphere_da_line.set_color(color=self._colours.LIGHT)
+                self.sphere_rl_line.set_color(color=self._colours.LIGHT)
 
             else:
-                self.figure.set_facecolor(color=Colours().LIGHT)
-                self.axes.set_facecolor(color=Colours().LIGHT)
-                self.axes.tick_params(colors=Colours().DARK)
-                self.axes.spines[:].set_color(Colours().DARK)
-                self.axes.xaxis.label.set_color(color=Colours().DARK)
-                self.axes.yaxis.label.set_color(color=Colours().DARK)
-                self.axes.title.set_color(color=Colours().DARK)
-                self._h_label.set_color(color=Colours().DARK)
-                self._v_label.set_color(color=Colours().DARK)
-                self._d_label.set_color(color=Colours().DARK)
-                self._a_label.set_color(color=Colours().DARK)
-                self._r_label.set_color(color=Colours().DARK)
-                self._l_label.set_color(color=Colours().DARK)
-                self.sphere_wireframe.set_color(c=Colours().DARK)
-                self.sphere_hv_line.set_color(color=Colours().DARK)
-                self.sphere_da_line.set_color(color=Colours().DARK)
-                self.sphere_rl_line.set_color(color=Colours().DARK)
+                self.figure.set_facecolor(color=self._colours.LIGHT)
+                self.axes.set_facecolor(color=self._colours.LIGHT)
+                self.axes.tick_params(colors=self._colours.DARK)
+                self.axes.spines[:].set_color(self._colours.DARK)
+                self.axes.xaxis.label.set_color(color=self._colours.DARK)
+                self.axes.yaxis.label.set_color(color=self._colours.DARK)
+                self.axes.title.set_color(color=self._colours.DARK)
+                self._h_label.set_color(color=self._colours.DARK)
+                self._v_label.set_color(color=self._colours.DARK)
+                self._d_label.set_color(color=self._colours.DARK)
+                self._a_label.set_color(color=self._colours.DARK)
+                self._r_label.set_color(color=self._colours.DARK)
+                self._l_label.set_color(color=self._colours.DARK)
+                self.sphere_wireframe.set_color(c=self._colours.DARK)
+                self.sphere_hv_line.set_color(color=self._colours.DARK)
+                self.sphere_da_line.set_color(color=self._colours.DARK)
+                self.sphere_rl_line.set_color(color=self._colours.DARK)
 
 class MeasurementBox(Gtk.Box):
     def __init__(self, channels: int, spacing: int = 20) -> None:
