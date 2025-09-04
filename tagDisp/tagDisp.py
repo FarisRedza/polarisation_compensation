@@ -3,6 +3,8 @@ import os
 import signal
 import typing
 import socket
+import configparser
+import pathlib
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -73,13 +75,32 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
             set_host_callback: typing.Callable,
             set_port_callback: typing.Callable,
             set_sock_callback: typing.Callable,
-            server_connect_callback: typing.Callable
+            server_connect_callback: typing.Callable,
+            remote_devices: list[tuple[str, int]]
         ) -> None:
         super().__init__(title='Remote Connection')
         self.set_host_callback = set_host_callback
         self.set_port_callback = set_port_callback
         self.set_sock_callback = set_sock_callback
         self.server_connect_callback = server_connect_callback
+
+        for device in remote_devices:
+            device_row = Adw.ActionRow(
+                title=device[0],
+                subtitle=str(device[1])
+            )
+            self.add(child=device_row)
+            device_connect_button = Gtk.Button(
+                label='Connect',
+                valign=Gtk.Align.CENTER
+            )
+            device_row.add_suffix(widget=device_connect_button)
+            device_connect_button.connect(
+                'clicked',
+                self.on_connect,
+                device[0],
+                device[1]
+            )
 
         # host
         self.host_row = Adw.ActionRow(title='Host')
@@ -113,19 +134,19 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
         # connect
         self.connect_row = Adw.ActionRow()
         self.add(child=self.connect_row)
-        connect_button = Gtk.Button(
+        device_connect_button = Gtk.Button(
             label='Connect',
             valign=Gtk.Align.CENTER
         )
-        connect_button.connect(
+        device_connect_button.connect(
             'clicked',
             self.on_server_connect
         )
-        connect_button.add_css_class(
+        device_connect_button.add_css_class(
             css_class='flat'
         )
         self.connect_row.set_child(
-            child=connect_button
+            child=device_connect_button
         )
 
     def on_set_host(self, entry: Gtk.Entry) -> None:
@@ -142,6 +163,13 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
     def on_server_connect(self, button: Gtk.Button) -> None:
         self.server_connect_callback()
 
+    def on_connect(self, button: Gtk.Button, host: str, port: int) -> None:
+        self.host = host
+        self.port = port
+        self.set_host_callback(host=self.host)
+        self.set_port_callback(port=self.port)
+        self.server_connect_callback()
+
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -149,6 +177,25 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_default_size(width=650, height=575)
         self.set_size_request(width=350, height=125)
         self.connect('close-request', self.on_close_request)
+
+        config = configparser.ConfigParser()
+        config_file = 'tagDisp.cfg'
+        config_path = pathlib.Path('tagDisp', config_file)
+
+        remote_devices: list[tuple[str, int]] = []
+        if config_path.exists():
+            config.read(config_path)
+            for section in config.sections():
+                if section.startswith('Remote Device '):
+                    host = config.get(
+                        section=f'{section}',
+                        option='host'
+                    )
+                    port = config.get(
+                        section=f'{section}',
+                        option='port'
+                    )
+                    remote_devices.append((host, int(port)))
 
         self.host = '127.0.0.1'
         self.port = 5001
@@ -175,7 +222,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         local_device_infos = []
         try:
-            from . import uqd
+            from bb84 import uqd
         except:
             pass
         else:
@@ -198,7 +245,8 @@ class MainWindow(Adw.ApplicationWindow):
             set_host_callback=self.set_host,
             set_port_callback=self.set_port,
             set_sock_callback=self.set_sock,
-            server_connect_callback=self.server_connect
+            server_connect_callback=self.server_connect,
+            remote_devices=remote_devices
         )
         self.device_select_page.add(group=self.remote_connection_group)
 
@@ -231,7 +279,7 @@ class MainWindow(Adw.ApplicationWindow):
             match model:
                 case 'Logic-16':
                     try:
-                        from . import uqd
+                        from bb84 import uqd
                     except:
                         pass
                     else:
