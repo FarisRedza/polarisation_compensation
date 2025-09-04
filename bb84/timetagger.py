@@ -94,9 +94,7 @@ def get_qber(
                 delay=find_delay(tags_H_1550, tags_V_780)
             except:
                 pass
-            
 
-    print(delay)
     tags_H_780 = timetags[channels == channel_group_1.H] + delay
     tags_V_780 = timetags[channels == channel_group_1.V] + delay
     tags_D_780 = timetags[channels == channel_group_1.D] + delay
