@@ -161,6 +161,9 @@ class PolarisationCompensator:
 
         print('Starting compensation')
         no_progress_iters = 0
+        
+        for motor in self.motors:
+            self._motor_state[motor.device_info.serial_number]['step'] = rotation_time
 
         try:
             for i in range(max_iterations):
@@ -342,7 +345,7 @@ if __name__ == '__main__':
         motors: list[base_motor.Motor] = []
         motors.append(thorlabs_motor.ThorlabsMotor(serial_number=QWP1))
         motors.append(thorlabs_motor.ThorlabsMotor(serial_number=HWP))
-        motors.append(elliptec_motor.ElliptecMotor(serial_number=QWP2))
+        # motors.append(elliptec_motor.ElliptecMotor(serial_number=QWP2))
 
     tt = remote_timetagger.RemoteTimetagger(
         host=MEASUREMENT_SERVER_HOST,
@@ -356,9 +359,13 @@ if __name__ == '__main__':
     )
 
     pol_comp.optimise(
-        rotation_time=0.05,
+        target=0.3,
+        rotation_time=0.5,
         max_iterations=100,
         plateau_patience=5,
+        # adaptive=False,
+        step_shrink=0.75,
+        max_step=0.5,
         # start_at_0=True,
         # scramble_motors=True
     )
