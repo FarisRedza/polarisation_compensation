@@ -98,7 +98,7 @@ def get_qber(
         delay: float = 0,
         tcc: float = 50,
         verbose: bool = False
-) -> tuple[float, float, float]:
+) -> tuple[float, float, int]:
     tags_1550 = TimetagsGroup(
         name='1550',
         H=timetags[channels == channel_group_2.H],
