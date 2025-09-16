@@ -297,7 +297,6 @@ class Data:
                     qx = 0
                     rate = 0
             except:
-                print('get_qber failed')
                 qber = 0
                 qx = 0
                 rate = 0

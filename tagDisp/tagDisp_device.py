@@ -5,7 +5,7 @@ import pathlib
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GObject
+from gi.repository import Gtk, Adw, GObject, Gdk
 
 from bb84 import timetagger
 from . import page_settings
@@ -27,6 +27,20 @@ class Sidebar(Gtk.Revealer):
         main_box.append(child=header_bar)
 
         self.stack_sidebar = Gtk.StackSidebar(vexpand=True)
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-sidebar-headerbar {
+                background-color: @headerbar_bg_color;
+                border-bottom: none;
+                box-shadow: inset 0 -1px 0 transparent;
+            }
+        ''')
+        header_bar.add_css_class('custom-sidebar-headerbar')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
         main_box.append(child=self.stack_sidebar)
 
         menu_button = Gtk.MenuButton(
@@ -77,6 +91,19 @@ class Sidebar(Gtk.Revealer):
             self.on_increase_counter_size
         )
         counter_size_box.append(child=counter_size_increase_button)
+
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-sidebar {
+                background-color: @headerbar_bg_color;
+            }
+        ''')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        self.add_css_class('custom-sidebar')
 
         def add_menu_button(label: str, detailed_action: str) -> None:
             button = Gtk.Button(
@@ -149,7 +176,18 @@ class DeviceBox(Gtk.Box):
         )
         if Gtk.HeaderBar().find_property(property_name='use_native_controls'):
             content_header_bar.set_use_native_controls(True)
-
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-headerbar {
+                background-color: @window_bg_color;
+            }
+        ''')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        content_header_bar.add_css_class('custom-headerbar')
         content_box.append(child=content_header_bar)
 
         toggle_sidebar_button = Gtk.Button(
@@ -190,7 +228,8 @@ class DeviceBox(Gtk.Box):
         self.simple_display = page_simple_display.SimpleDisplay(
             name=simple_display_name,
             get_page_callback=self.get_page,
-            get_data_callback=self.get_data
+            get_data_callback=self.get_data,
+            get_raw_data_callback=self.get_raw_data
         )
         self.stack.add_titled(
             child=self.simple_display,

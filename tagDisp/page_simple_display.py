@@ -6,6 +6,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 
 import numpy as np
+import tomtag
 
 from bb84 import timetagger
 
@@ -248,7 +249,12 @@ class CountsGroup(Adw.PreferencesGroup):
         channel_b_row.set_child(child=self.channel_b_scale)
         self.add(child=channel_b_row)
 
-    def update_data(self, data: timetagger.Data) -> None:
+    def update_data(
+            self,
+            data: timetagger.Data,
+            raw_data: timetagger.RawData,
+            get_window_callback: typing.Callable
+    ) -> None:
         channel_a_counts = int(self.channel_a_scale.scale.get_value() - 1)
         channel_b_counts = int(self.channel_b_scale.scale.get_value() - 1)
 
@@ -259,6 +265,14 @@ class CountsGroup(Adw.PreferencesGroup):
             self.channel_b_counter.update_counts(
                 value=data.singles[channel_b_counts]
             )
+
+            # cc = tomtag.count_twofolds(
+            #     tags_1550.H,
+            #     tags_780.H,
+            #     len(tags_1550.H),
+            #     len(tags_780.H),
+            #     self.get_window()
+            # )
 
 class SettingsGroup(Adw.PreferencesGroup):
     def __init__(
@@ -309,7 +323,8 @@ class SimpleDisplay(Gtk.ScrolledWindow):
             self,
             name: str,
             get_page_callback: typing.Callable,
-            get_data_callback: typing.Callable
+            get_data_callback: typing.Callable,
+            get_raw_data_callback: typing.Callable
     ) -> None:
         super().__init__(
             name=name,
@@ -317,6 +332,7 @@ class SimpleDisplay(Gtk.ScrolledWindow):
         )
         self.get_page_callback = get_page_callback
         self.get_data_callback = get_data_callback
+        self.get_raw_data_callback = get_raw_data_callback
 
         self.set_policy(
             hscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
@@ -356,10 +372,13 @@ class SimpleDisplay(Gtk.ScrolledWindow):
             self.update_counts
         )
 
-    def update_counts(self) -> bool:
+    def update_counts(self, get_window_callback: typing.Callable) -> bool:
         if self.get_page_callback() == self.get_name():
-            data: timetagger.Data = self.get_data_callback()
-            self.counts_group.update_data(data=data)
+            self.counts_group.update_data(
+                data=self.get_data_callback(),
+                raw_data=self.get_raw_data_callback(),
+                get_window_callback=get_window_callback
+            )
         return True
 
     def set_window(self, value: int) -> None:
