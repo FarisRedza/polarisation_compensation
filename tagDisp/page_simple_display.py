@@ -369,7 +369,8 @@ class SimpleDisplay(Gtk.ScrolledWindow):
 
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_counts
+            self.update_counts,
+            self.get_window
         )
 
     def update_counts(self, get_window_callback: typing.Callable) -> bool:
