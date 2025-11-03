@@ -1,25 +1,28 @@
+import sys
+import pathlib
 import time
 import random
 import io
-import sys
 import threading
 from contextlib import contextmanager
 
 import numpy as np
 
-import bb84.timetagger as timetagger
-import bb84.remote_timetagger as remote_timetagger
-import motor.thorlabs_motor as thorlabs_motor
-import motor.elliptec_motor as elliptec_motor
-import motor.base_motor as base_motor
+sys.path.append(str(pathlib.Path.cwd()))
+from bb84 import timetagger
+from bb84 import remote_timetagger
+from motor import thorlabs_motor
+# from motor import elliptec_motor
+from motor import k10cr2_motor
+from motor import base_motor
 
 MEASUREMENT_SERVER_HOST = '137.195.63.6'
 MEASUREMENT_SERVER_PORT = 5001
 
 QWP1 = '55353314'
 HWP = '55356974'
-QWP2 = '11400887'
-
+# QWP2 = '11400887'
+QWP2 = '55536714'
 
 @contextmanager
 def suppress_stdout():
@@ -346,6 +349,7 @@ if __name__ == '__main__':
         motors.append(thorlabs_motor.ThorlabsMotor(serial_number=QWP1))
         motors.append(thorlabs_motor.ThorlabsMotor(serial_number=HWP))
         # motors.append(elliptec_motor.ElliptecMotor(serial_number=QWP2))
+        motors.append(k10cr2_motor.ThorlabsMotor(serial_number=QWP2))
 
     tt = remote_timetagger.RemoteTimetagger(
         host=MEASUREMENT_SERVER_HOST,

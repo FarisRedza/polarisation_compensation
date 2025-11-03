@@ -1,4 +1,5 @@
 import sys
+import pathlib
 import os
 import signal
 import typing
@@ -11,10 +12,11 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gio
 
+sys.path.append(str(pathlib.Path.cwd()))
 from bb84 import timetagger
 # from bb84 import uqd
 from bb84 import remote_timetagger
-from . import tagDisp_device
+from tagDisp import tagdisp_device
 
 class DeviceListGroup(Adw.PreferencesGroup):
     def __init__(
@@ -283,15 +285,15 @@ class MainWindow(Adw.ApplicationWindow):
                     except:
                         pass
                     else:
-                        self.timetagger_box = tagDisp_device.DeviceBox(
+                        self.timetagger_box = tagdisp_device.DeviceBox(
                             tt=uqd.UQD()
                         )
                 case _:
-                    self.timetagger_box = tagDisp_device.DeviceBox(
+                    self.timetagger_box = tagdisp_device.DeviceBox(
                         tt=timetagger.TimeTagger()
                     )
         else:
-            self.timetagger_box = tagDisp_device.DeviceBox(
+            self.timetagger_box = tagdisp_device.DeviceBox(
                 tt=remote_timetagger.RemoteTimetagger(
                     model=model,
                     sock=self._sock
