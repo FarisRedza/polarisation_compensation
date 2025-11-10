@@ -1,10 +1,13 @@
 import time
 import sys
 import os
+import sys
+import pathlib
 
 import numpy
 
-from . import timetagger
+sys.path.append(str(pathlib.Path.cwd()))
+from bb84 import timetagger
 
 sys.path.append(
     os.path.abspath(os.path.join(

@@ -4,6 +4,9 @@ import pathlib
 
 import numpy as np
 
+sys.path.append(str(pathlib.Path.cwd()))
+from bb84 import timetagger
+
 os.environ['TTAG'] = str(pathlib.Path(
     os.environ['HOME'],
     'Projects',
