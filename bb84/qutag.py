@@ -1,26 +1,18 @@
-import time
-import sys
-import os
 import sys
 import pathlib
+import time
 
 import numpy
 
-sys.path.append(str(pathlib.Path.cwd()))
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
-
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
 from quTAG import QuTAG_HR
 
 class Qutag(timetagger.TimeTagger):
     def __init__(self) -> None:
         qutag = QuTAG_HR.QuTAG()
         if qutag.dev_nr == -1:
+            self._qutag = None
             raise RuntimeError('Qutag not found')
         else:
             self._qutag = qutag
@@ -45,7 +37,8 @@ class Qutag(timetagger.TimeTagger):
         self.resolution = 78.125
 
     def __del__(self) -> None:
-        self._qutag.deInitialize()
+        if self._qutag:
+            self._qutag.deInitialize()
 
     def measure(self, seconds: int = 1) -> timetagger.RawData:        
         self._qutag.getLastTimestamps(reset=True)
@@ -83,5 +76,5 @@ if __name__ == '__main__':
     #     ))
 
     # qutag._qutag.deInitialize()
-    dev = list_devices()
-    print(dev)
+    devs = list_devices()
+    print(devs)

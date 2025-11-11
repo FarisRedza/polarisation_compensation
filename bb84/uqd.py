@@ -4,9 +4,6 @@ import pathlib
 
 import numpy as np
 
-sys.path.append(str(pathlib.Path.cwd()))
-from bb84 import timetagger
-
 os.environ['TTAG'] = str(pathlib.Path(
     os.environ['HOME'],
     'Projects',
@@ -22,14 +19,9 @@ os.environ['TIMETAG'] = str(pathlib.Path(
     'python'
 ))
 
-sys.path.append(
-    os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.path.pardir
-    ))
-)
-import bb84.timetagger as timetagger
-import ttag.python.ttag as ttag
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
+from bb84 import timetagger
+from ttag.python import ttag 
 
 class UQD(timetagger.TimeTagger):
     def __init__(self, tagsAsTime: bool = False) -> None:
@@ -64,4 +56,5 @@ def list_devices() -> list[UQD]:
 
 if __name__ == '__main__':
     devs = list_devices()
-    print(devs[0].measure())
+    for d in devs:
+        print(d.measure())

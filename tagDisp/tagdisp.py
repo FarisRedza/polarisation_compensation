@@ -12,7 +12,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gio
 
-sys.path.append(str(pathlib.Path.cwd()))
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
 # from bb84 import uqd
 from bb84 import remote_timetagger

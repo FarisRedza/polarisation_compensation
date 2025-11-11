@@ -1,18 +1,20 @@
+import sys
+import pathlib
 import time
 import threading
-import pathlib
 
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GObject, Gdk
 
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
-from . import page_settings
-from . import page_simple_display
-from . import page_display
-from . import page_channels
-from . import page_plot
+import page_settings
+import page_simple_display
+import page_display
+import page_channels
+import page_plot
 
 class Sidebar(Gtk.Revealer):
     def __init__(self) -> None:
