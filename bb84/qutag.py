@@ -37,7 +37,7 @@ class Qutag(timetagger.TimeTagger):
 
         self.resolution = 78.125
 
-        self.flush()
+        # self.flush()
 
     def __del__(self) -> None:
         if hasattr(self, '_qutag'):
@@ -45,18 +45,20 @@ class Qutag(timetagger.TimeTagger):
 
 
     def flush(self):
-        self._qutag.getLastTimestamps(reset=True)
+        time.sleep(0.001)
+        timetags, _, _ = self._qutag.getLastTimestamps(reset=True)
+        self.clock_offset = numpy.max(timetags)
         
     def measure(self, seconds: int = 1) -> timetagger.RawData:    
         time.sleep(seconds)
         timetags, channels, valid = self._qutag.getLastTimestamps(
-            reset=False
+            reset=True
         )
         t_var = seconds * 1e12
         channels = channels[(numpy.max(timetags) - t_var) < timetags]
         timetags = timetags[(numpy.max(timetags) - t_var) < timetags]
 
-        timetags = (timetags//self.resolution).astype(numpy.int64)
+        timetags = ((timetags-self.clock_offset)//self.resolution).astype(numpy.int64)
         raw_data = timetagger.RawData(
             timetags=timetags,
             channels=channels
@@ -74,16 +76,23 @@ def list_devices() -> list[Qutag]:
 
 if __name__ == '__main__':
     qutag = Qutag()
-
+    time.sleep(0.01)
     tt_reset, *_ = qutag._qutag.getLastTimestamps(
             reset=True
         )
-    print(tt_reset)
+    import numpy as np
+    print(tt_reset,np.nonzero(tt_reset))
+    time.sleep(0.01)
 
     tt, *_ = qutag._qutag.getLastTimestamps(
             reset=False
         )
-    print(tt)
+    print(tt,np.nonzero(tt))
+    time.sleep(0.01)
+    tt, *_ = qutag._qutag.getLastTimestamps(
+            reset=False
+        )
+    print(tt,np.nonzero(tt))
 
     # for _ in range(10):
     #     time.sleep(0.1)

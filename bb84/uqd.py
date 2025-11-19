@@ -28,9 +28,18 @@ from ttag.python import ttag
 from timetag.python import timetag
 
 class UQD(timetagger.TimeTagger):
-    def __init__(self) -> None:
+    def __init__(self,headless=False) -> None:
         self._buffer_number: typing.Optional[int] = None
         self._uqdinterface_proc: typing.Optional[subprocess.Popen] = None
+        if not headless:
+            self._uqd = ttag.TTBuffer(buffernumber=0)
+            self._uqd.tagsAsTime = False
+
+            if self._uqd.getrunners() == 0:
+                self._uqd.start()
+        else:
+            self.start_uqdinterface()
+            
             
         if self._uqdinterface_proc:
             if self._uqd.getrunners() == 0:
@@ -127,13 +136,17 @@ class UQD(timetagger.TimeTagger):
     def __del__(self) -> None:
         self.stop_uqdinterface()
 
-    def measure(self) -> timetagger.RawData:
-        seconds = 1
+    def flush(self) -> None:
+        _, timetags = self._uqd(t=0.01)
+        self.clock_offset = np.max(timetags)
+
+    
+    def measure(self,seconds=1) -> timetagger.RawData:
         channels: np.typing.NDArray[np.uint8]
         timetags: np.typing.NDArray[np.uint64]
         channels, timetags = self._uqd(t=seconds)
         raw_data = timetagger.RawData(
-            timetags=timetags.astype(np.int64),
+            timetags=(timetags - self.clock_offset).astype(np.int64),
             channels=channels
         )
         return raw_data
