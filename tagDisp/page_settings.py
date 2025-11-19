@@ -7,6 +7,7 @@ gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Adw
 
 from bb84 import timetagger
+from ttag.python import ttag
 
 class SettingsGroup(Adw.PreferencesGroup):
     def __init__(self) -> None:
@@ -146,8 +147,15 @@ class SettingsGroup(Adw.PreferencesGroup):
         pass
 
 class UQDInterface(Adw.PreferencesGroup):
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            start_timetagger_callback: typing.Callable,
+            stop_timetagger_callback: typing.Callable,
+    ) -> None:
         super().__init__(title='UQD Interface')
+        self.start_timetagger = start_timetagger_callback
+        self.stop_timetagger = stop_timetagger_callback
+        self._uqdinterface_proc: typing.Optional[subprocess.Popen] = None
 
         ## uqdinterface control box
         uqdinterface_control_box = Gtk.Box(
@@ -176,8 +184,7 @@ class UQDInterface(Adw.PreferencesGroup):
         uqdinterface_control_box.append(uqd_start_button)
 
     def on_uqd_start(self, button: Gtk.Button) -> None:
-        # if self.uqdinterface:
-        #     return
+        self.start_timetagger()
 
         # self.uqd_textbuffer.set_text(text='')
 
@@ -204,6 +211,7 @@ class UQDInterface(Adw.PreferencesGroup):
         subprocess.Popen(['gnome-terminal', '--', uqd_interface_path])
 
     def on_uqd_stop(self, button: Gtk.Button) -> None:
+        self.stop_timetagger()
         # if self.uqdinterface is not None:
         #     try:
         #         self.uqdinterface.wait(timeout=1)
@@ -244,14 +252,19 @@ class UQDSettings(Adw.PreferencesPage):
     def __init__(
             self,
             name: str,
-            get_device_info_callback: typing.Callable
+            get_device_info_callback: typing.Callable,
+            start_timetagger_callback: typing.Callable,
+            stop_timetagger_callback: typing.Callable,
     ) -> None:
         super().__init__(name=name)
 
         settings_group = SettingsGroup()
         self.add(group=settings_group)
 
-        uqd_interface_group = UQDInterface()
+        uqd_interface_group = UQDInterface(
+            start_timetagger_callback=start_timetagger_callback,
+            stop_timetagger_callback=stop_timetagger_callback
+        )
         self.add(group=uqd_interface_group)
 
         device_info_group = DeviceInfoGroup(

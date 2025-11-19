@@ -11,11 +11,12 @@ from quTAG import QuTAG_HR
 class Qutag(timetagger.TimeTagger):
     def __init__(self) -> None:
         qutag = QuTAG_HR.QuTAG()
-        if qutag.dev_nr == -1:
-            self._qutag = None
-            raise RuntimeError('Qutag not found')
-        else:
-            self._qutag = qutag
+        # dev_nr seems to always be -1 now, problem with new firmware?
+        # if qutag.dev_nr == -1:
+        #     raise RuntimeError('Qutag not found')
+        # else:
+        #     self._qutag = qutag
+        self._qutag = qutag
 
         for channel in range(0, 8):
             self._qutag.setSignalConditioning(
@@ -36,13 +37,18 @@ class Qutag(timetagger.TimeTagger):
 
         self.resolution = 78.125
 
+        self.flush()
+
     def __del__(self) -> None:
-        if self._qutag:
+        if hasattr(self, '_qutag'):
             self._qutag.deInitialize()
 
-    def measure(self, seconds: int = 1) -> timetagger.RawData:        
+
+    def flush(self):
         self._qutag.getLastTimestamps(reset=True)
-        time.sleep(1)
+        
+    def measure(self, seconds: int = 1) -> timetagger.RawData:    
+        time.sleep(seconds)
         timetags, channels, valid = self._qutag.getLastTimestamps(
             reset=False
         )
@@ -67,14 +73,20 @@ def list_devices() -> list[Qutag]:
         return [qt]
 
 if __name__ == '__main__':
-    # qutag = Qutag()
+    qutag = Qutag()
+
+    tt_reset, *_ = qutag._qutag.getLastTimestamps(
+            reset=True
+        )
+    print(tt_reset)
+
+    tt, *_ = qutag._qutag.getLastTimestamps(
+            reset=False
+        )
+    print(tt)
 
     # for _ in range(10):
     #     time.sleep(0.1)
-    #     print(timetagger.Data().from_raw_data(
+    #     pprint.pprint(timetagger.Data().from_raw_data(
     #         raw_data=qutag.measure()
     #     ))
-
-    # qutag._qutag.deInitialize()
-    devs = list_devices()
-    print(devs)

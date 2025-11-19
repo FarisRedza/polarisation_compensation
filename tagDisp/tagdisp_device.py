@@ -9,7 +9,7 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GObject, Gdk
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
-from bb84 import timetagger
+from bb84 import timetagger, uqd
 import page_settings
 import page_simple_display
 import page_display
@@ -220,7 +220,9 @@ class DeviceBox(Gtk.Box):
         self.stack.add_titled(
             child=page_settings.UQDSettings(
                 name=settings_name,
-                get_device_info_callback=self.get_device_info
+                get_device_info_callback=self.get_device_info,
+                start_timetagger_callback=self.start_timetagger,
+                stop_timetagger_callback=self.stop_timetagger
             ),
             name=settings_name,
             title=settings_name
@@ -277,10 +279,11 @@ class DeviceBox(Gtk.Box):
 
     def _measure(self) -> None:
         while True:
-            for i in range(len(self._raw_data_container)):
-                self._raw_data_container[i] = self.timetagger.measure()
-            if self._event.is_set():
-                break
+            if hasattr(self.timetagger, '_uqd'):
+                for i in range(len(self._raw_data_container)):
+                    self._raw_data_container[i] = self.timetagger.measure()
+                if self._event.is_set():
+                    break
             time.sleep(self._measurement_rate)
 
     def _calc_data(self) -> None:
@@ -336,3 +339,11 @@ class DeviceBox(Gtk.Box):
     
     def get_page(self) -> str | None:
         return self.stack.get_visible_child_name()
+
+    def start_timetagger(self) -> None:
+        if isinstance(self.timetagger, uqd.UQD):
+            self.timetagger.start_uqdinterface()
+    
+    def stop_timetagger(self) -> None:
+        if isinstance(self.timetagger, uqd.UQD):
+            self.timetagger.stop_uqdinterface()
