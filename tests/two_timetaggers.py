@@ -49,7 +49,7 @@ def find_delay(
 
     )
     plt.xlabel("delay (ns)")
-    plt.show()
+    
     return array[np.argmax(cc)]
 
 def get_qber(channels, timetags, delay=0, tcc=15):
@@ -96,36 +96,53 @@ if __name__ == '__main__':
     # zero both internal clocks
     tag_device_QuTAG.flush()
     tag_device_UQD.flush()
+
+    # measure once to get coarse offset
     data_QuTAG = tag_device_QuTAG.measure(0.1)
     data_UQD = tag_device_UQD.measure(0.1)
     print(f'QuTAG time {(data_QuTAG.timetags[-1] - data_QuTAG.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s') 
     print(f'UQD time {(data_UQD.timetags[-1] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s')       
     print(f'raw delay {(data_QuTAG.timetags[0] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.5f}s') 
-    # data_QuTAG.timetags += data_UQD.timetags[0] - data_QuTAG.timetags[0] 
-    # print(data_UQD.timetags)
 
     print(f' tags in QuTAG: {len(np.where(data_QuTAG.channels==0)[0])}')
     print(f' tags in UQD: {len(np.where(data_UQD.channels==0)[0])}')
 
-    delay = find_delay(
+    coarse_delay = find_delay(
         tags_QuTAG=data_QuTAG.timetags[data_QuTAG.channels==0],
         tags_UQD=data_UQD.timetags[data_UQD.channels==0],
         left=-400000000,
         right=-100000000
     )
+    plt.show()
+
+    print(f'found delay {coarse_delay*tag_device_QuTAG.resolution/1e12:.5f}s')
+
+    # fine delay adjustment
     data_QuTAG = tag_device_QuTAG.measure(0.1)
     data_UQD = tag_device_UQD.measure(0.1) 
     print(f'QuTAG time {(data_QuTAG.timetags[-1] - data_QuTAG.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s') 
-    print(f'UQD time {(data_UQD.timetags[-1] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s')       
-    print(f'raw delay {(data_QuTAG.timetags[0] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.5f}s')
-    data_UQD.timetags += delay
-    delay = find_delay(
+    print(f'UQD time {(data_UQD.timetags[-1] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s')     
+    data_UQD.timetags += coarse_delay  
+    print(f'raw fine delay {(data_QuTAG.timetags[0] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.5f}s')
+    fine_delay = find_delay(
         tags_QuTAG=data_QuTAG.timetags[data_QuTAG.channels==0],
         tags_UQD=data_UQD.timetags[data_UQD.channels==0],
-        left=-5000,
-        right=5000,
+        left=-10000,
+        right=10000,
         tcc = 1
     )
 
-
-    print(f'{delay=}')
+    plt.show()
+    print(f'found fine delay {fine_delay*tag_device_QuTAG.resolution/1e3:.5f}ns')
+    # verification
+    data_QuTAG = tag_device_QuTAG.measure(200)
+    data_UQD = tag_device_UQD.measure(200)     
+    data_UQD.timetags += coarse_delay  + fine_delay
+    fine_delay = find_delay(
+        tags_QuTAG=data_QuTAG.timetags[data_QuTAG.channels==0],
+        tags_UQD=data_UQD.timetags[data_UQD.channels==0],
+        left=-25,
+        right=25,
+        tcc = 1
+    )
+    plt.show()
