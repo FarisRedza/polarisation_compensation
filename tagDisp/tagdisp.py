@@ -125,6 +125,8 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
     ) -> None:
         super().__init__(title='Remote Connection')
         self.get_remote_devices = get_remote_devices_callback
+        self.set_host = set_host_callback
+        self.set_port = set_port_callback
 
         host_row = Adw.ActionRow(title='Host')
         self.add(child=host_row)
@@ -134,7 +136,7 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
         )
         host_entry.connect(
             'activate',
-            set_host_callback
+            self.on_set_host
         )
         host_row.add_suffix(
             widget=host_entry
@@ -148,7 +150,7 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
         )
         port_entry.connect(
             'activate',
-            set_port_callback
+            self.on_set_port
         )
         port_row.add_suffix(
             widget=port_entry
@@ -166,6 +168,12 @@ class RemoteConnectionGroup(Adw.PreferencesGroup):
 
     def on_get_remote_devices(self, button: Gtk.Button) -> None:
         self.get_remote_devices()
+
+    def on_set_host(self, entry: Gtk.Entry) -> None:
+        self.set_host(host=entry.get_text())
+
+    def on_set_port(self, entry: Gtk.Entry) -> None:
+        self.set_port(port=int(entry.get_text()))
 
 
 class DeviceListGroup(Adw.PreferencesGroup):
