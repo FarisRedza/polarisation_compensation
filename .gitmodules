@@ -1,8 +1,6 @@
 [submodule "quTAG"]
 	path = quTAG
 	url = https://github.com/FarisRedza/quTAG.git
-	branch = main
 [submodule "UQDinterface"]
 	path = UQDinterface
 	url = https://github.com/edinburgh-mostly-quantum-lab/UQDinterface.git
-	branch = main

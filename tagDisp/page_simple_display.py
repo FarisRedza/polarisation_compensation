@@ -249,11 +249,9 @@ class CountsGroup(Adw.PreferencesGroup):
         channel_b_row.set_child(child=self.channel_b_scale)
         self.add(child=channel_b_row)
 
-    def update_data(
+    def update_tt_data(
             self,
-            data: timetagger.Data,
-            raw_data: timetagger.RawData,
-            get_window_callback: typing.Callable
+            data: timetagger.Data
     ) -> None:
         channel_a_counts = int(self.channel_a_scale.scale.get_value() - 1)
         channel_b_counts = int(self.channel_b_scale.scale.get_value() - 1)
@@ -369,16 +367,13 @@ class SimpleDisplay(Gtk.ScrolledWindow):
 
         self._timeout_id = GLib.timeout_add(
             self.refresh_rate,
-            self.update_counts,
-            self.get_window
+            self.update_counts
         )
 
-    def update_counts(self, get_window_callback: typing.Callable) -> bool:
+    def update_counts(self) -> bool:
         if self.get_page_callback() == self.get_name():
-            self.counts_group.update_data(
-                data=self.get_data_callback(),
-                raw_data=self.get_raw_data_callback(),
-                get_window_callback=get_window_callback
+            self.counts_group.update_tt_data(
+                data=self.get_data_callback()
             )
         return True
 

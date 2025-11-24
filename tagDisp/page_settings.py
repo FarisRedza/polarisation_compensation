@@ -8,9 +8,17 @@ from gi.repository import Gtk, Adw
 
 from bb84 import timetagger
 
-class SettingsGroup(Adw.PreferencesGroup):
-    def __init__(self) -> None:
+class UQDSettingsGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            start_timetagger_callback: typing.Callable,
+            stop_timetagger_callback: typing.Callable,
+            clear_buffers_callback: typing.Callable
+        ) -> None:
         super().__init__(title='UQD Settings')
+        self.start_timetagger = start_timetagger_callback
+        self.stop_timetagger = stop_timetagger_callback
+        self.clear_buffers = clear_buffers_callback
 
         reference_row = Adw.ActionRow(
             title='Reference',
@@ -93,6 +101,39 @@ class SettingsGroup(Adw.PreferencesGroup):
         clear_buffers_button.connect('clicked', self.on_clear_buffers)
         clear_buffers_row.add_suffix(widget=clear_buffers_button)
 
+        ## uqdinterface control box
+        uqdinterface_control_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            margin_top=30,
+            spacing=60,
+            halign=Gtk.Align.CENTER
+        )
+        self.add(child=uqdinterface_control_box)
+
+        ### uqd stop button
+        uqd_stop_button = Gtk.Button(
+            label='Stop',
+            valign=Gtk.Align.CENTER,
+            css_classes=['destructive-action', 'pill']
+        )
+        uqd_stop_button.connect('clicked', self.on_uqd_stop)
+        uqdinterface_control_box.append(uqd_stop_button)
+
+        ### uqd start button
+        uqd_start_button = Gtk.Button(
+            label='Start',
+            valign=Gtk.Align.CENTER,
+            css_classes=['suggested-action', 'pill']
+        )
+        uqd_start_button.connect('clicked', self.on_uqd_start)
+        uqdinterface_control_box.append(uqd_start_button)
+
+    def on_uqd_start(self, button: Gtk.Button) -> None:
+        self.start_timetagger()
+
+    def on_uqd_stop(self, button: Gtk.Button) -> None:
+        self.stop_timetagger()
+
     def on_toggle_reference(self, switch: Gtk.Switch) -> None:
         # self.settings.led = int(self.led_scale.get_value())
         pass
@@ -139,80 +180,8 @@ class SettingsGroup(Adw.PreferencesGroup):
         dialog.destroy()
 
     def on_clear_buffers(self, button: Gtk.Button) -> None:
-        # for i in range(ttag.getfreebuffer()-1):
-        #     ttag.deletebuffer(i)
-        # print('CLEARING ALL BUFFERS')
-        # print(f'FIRST FREE BUFFER IS {ttag.getfreebuffer()}')
-        pass
+        self.clear_buffers()
 
-class UQDInterface(Adw.PreferencesGroup):
-    def __init__(self) -> None:
-        super().__init__(title='UQD Interface')
-
-        ## uqdinterface control box
-        uqdinterface_control_box = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            spacing=60,
-            halign=Gtk.Align.CENTER
-        )
-        self.add(child=uqdinterface_control_box)
-
-        ### uqd stop button
-        uqd_stop_button = Gtk.Button(
-            label='Stop',
-            valign=Gtk.Align.CENTER,
-            css_classes=['destructive-action', 'pill']
-        )
-        uqd_stop_button.connect('clicked', self.on_uqd_stop)
-        uqdinterface_control_box.append(uqd_stop_button)
-
-        ### uqd start button
-        uqd_start_button = Gtk.Button(
-            label='Start',
-            valign=Gtk.Align.CENTER,
-            css_classes=['suggested-action', 'pill']
-        )
-        uqd_start_button.connect('clicked', self.on_uqd_start)
-        uqdinterface_control_box.append(uqd_start_button)
-
-    def on_uqd_start(self, button: Gtk.Button) -> None:
-        # if self.uqdinterface:
-        #     return
-
-        # self.uqd_textbuffer.set_text(text='')
-
-        # command = [
-        #         os.environ['emqTools'] + 'ttag/UQD/UQDinterface',
-        #         f'--reference={self.settings.reference}',
-        #         f'--led={self.settings.led}'
-        #     ]
-        # if self.settings.dc_calibration_file is not None:
-        #     command.append(f'--dcfile={self.settings.dc_calibration_file}')
-
-        # command = ["ping", "google.com"]
-        # self.uqdinterface = subprocess.Popen(
-        #     command,
-        #     stdout=subprocess.PIPE,
-        #     stderr=subprocess.PIPE,
-        #     text=True
-        # )
-        # GLib.io_add_watch(self.uqdinterface.stdout, GLib.IO_IN, self.read_uqd_output)
-        # GLib.io_add_watch(self.uqdinterface.stderr, GLib.IO_IN, self.read_uqd_output)
-        # self.parent.on_toggle_timetagger()
-        pass
-        uqd_interface_path = pathlib.Path().cwd().joinpath('UQDinterface/UQDinterface')
-        subprocess.Popen(['gnome-terminal', '--', uqd_interface_path])
-
-    def on_uqd_stop(self, button: Gtk.Button) -> None:
-        # if self.uqdinterface is not None:
-        #     try:
-        #         self.uqdinterface.wait(timeout=1)
-        #         print("Process killed")
-        #     except subprocess.TimeoutExpired:
-        #         pass
-        #     finally:
-        #         self.uqdinterface = None
-        pass
 
 class DeviceInfoGroup(Adw.PreferencesGroup):
     def __init__(
@@ -240,19 +209,24 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
         fw_ver_label = Gtk.Label(label=device_info.firmware_version)
         fw_ver_row.add_suffix(widget=fw_ver_label)
 
-class UQDSettings(Adw.PreferencesPage):
+
+class SettingsPage(Adw.PreferencesPage):
     def __init__(
             self,
             name: str,
+            start_timetagger_callback: typing.Callable,
+            stop_timetagger_callback: typing.Callable,
+            clear_buffers_callback: typing.Callable,
             get_device_info_callback: typing.Callable
     ) -> None:
         super().__init__(name=name)
 
-        settings_group = SettingsGroup()
+        settings_group = UQDSettingsGroup(
+            start_timetagger_callback=start_timetagger_callback,
+            stop_timetagger_callback=stop_timetagger_callback,
+            clear_buffers_callback=clear_buffers_callback
+        )
         self.add(group=settings_group)
-
-        uqd_interface_group = UQDInterface()
-        self.add(group=uqd_interface_group)
 
         device_info_group = DeviceInfoGroup(
             get_device_info_callback=get_device_info_callback

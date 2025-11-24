@@ -3,6 +3,7 @@ import os
 import pathlib
 import typing
 import subprocess
+import time
 
 import numpy as np
 
@@ -46,9 +47,11 @@ class UQD(timetagger.TimeTagger):
             RuntimeError('No UQD reader')
 
     def clear_buffers(self) -> None:
+        print('Clearing buffers')
         for i in range(ttag.getfreebuffer()-1):
             ttag.deletebuffer(i)
         self.buffer_number = int(ttag.getfreebuffer())
+        print(f'First free buffer: {self.buffer_number}')
 
     def start_reader(self, tagsAsTime: bool = False) -> None:
         self._uqd_reader = ttag.TTBuffer(buffernumber=ttag.getfreebuffer()-1)
@@ -89,6 +92,7 @@ class UQD(timetagger.TimeTagger):
         self._current_dir = pathlib.Path.cwd()
         os.chdir(path=uqdinterface_dir)
         self._uqdinterface_proc = subprocess.Popen(command)
+        time.sleep(0.2)
 
     def stop_uqdinterface(self) -> None:
         if self._uqdinterface_proc:
@@ -113,6 +117,9 @@ def list_devices() -> list[UQD]:
 
 if __name__ == '__main__':
     uqd = UQD()
-    uqd.start_uqdinterface()
+    uqd.start_uqdinterface(clear_buffers=True)
+    # time.sleep(0.2)
+    uqd.start_reader()
     while True:
-        pass
+        print(uqd.measure())
+        time.sleep(1)

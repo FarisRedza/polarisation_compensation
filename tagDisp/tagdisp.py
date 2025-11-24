@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import pathlib
 import os
@@ -5,18 +7,166 @@ import signal
 import typing
 import socket
 import configparser
-import pathlib
+import time
+import threading
 
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, Gio
+from gi.repository import Gtk, Adw, Gio, GObject, Gdk
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
-# from bb84 import uqd
 from bb84 import remote_timetagger
-from tagDisp import tagdisp_device
+
+import page_settings
+import page_simple_display
+import page_display
+import page_channels
+import page_plot
+
+
+class DeviceSelectBox(Gtk.Box):
+    def __init__(
+            self,
+            set_device_callback: typing.Callable,
+            set_host_callback: typing.Callable,
+            get_host_callback: typing.Callable,
+            set_port_callback: typing.Callable,
+            get_port_callback: typing.Callable,
+            set_socket_callback: typing.Callable,
+            get_socket_callback: typing.Callable,
+            server_connect_callback: typing.Callable,
+            server_disconnect_callback: typing.Callable
+    ) -> None:
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        self.set_device = set_device_callback
+        self.get_host = get_host_callback
+        self.get_port = get_port_callback
+        self.set_socket = set_socket_callback
+        self.get_socket = get_socket_callback
+        self.server_connect = server_connect_callback
+        self.server_disconnect = server_disconnect_callback
+
+        header_bar = Gtk.HeaderBar()
+        self.append(child=header_bar)
+
+        self.page = Adw.PreferencesPage()
+        self.append(child=self.page)
+
+        local_device_infos = []
+        try:
+            from bb84 import uqd
+        except:
+            pass
+        else:
+            local_device_infos = [
+                d.device_info for d in uqd.list_devices()
+            ]
+        # try:
+        #     from bb84 import qutag
+        # except:
+        #     pass
+        # else:
+        #     local_device_infos += [
+        #         d.device_info for d in qutag.list_devices()
+        #     ]
+        local_device_infos += [timetagger.TimeTagger().device_info]
+
+        local_device_group = DeviceListGroup(
+            title='Local Devices',
+            devices_infos=local_device_infos,
+            set_device_callback=set_device_callback
+        )
+        self.page.add(group=local_device_group)
+
+        self.remote_connection_group = RemoteConnectionGroup(
+            set_host_callback=set_host_callback,
+            get_host_callback=get_host_callback,
+            set_port_callback=set_port_callback,
+            get_port_callback=get_port_callback,
+            get_remote_devices_callback=self.get_remote_devices
+        )
+        self.page.add(group=self.remote_connection_group)
+    
+    def get_remote_devices(self) -> None:
+        self.server_connect()
+
+        remote_device_infos = remote_timetagger.list_device_info(
+            sock=self.get_socket()
+        )
+
+        self.page.remove(group=self.remote_connection_group)
+        self.remote_device_list_group = DeviceListGroup(
+            title='Remote Devices',
+            devices_infos=remote_device_infos,
+            set_device_callback=self.set_device,
+            remote=True,
+            return_callback=self.return_remote_connect
+        )
+        self.page.add(group=self.remote_device_list_group)
+    
+    def return_remote_connect(self) -> None:
+        if self.get_socket():
+            self.page.remove(self.remote_device_list_group)
+            self.page.add(group=self.remote_connection_group)
+
+            self.server_disconnect()
+
+
+class RemoteConnectionGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            set_host_callback: typing.Callable,
+            get_host_callback: typing.Callable,
+            set_port_callback: typing.Callable,
+            get_port_callback: typing.Callable,
+            get_remote_devices_callback: typing.Callable
+    ) -> None:
+        super().__init__(title='Remote Connection')
+        self.get_remote_devices = get_remote_devices_callback
+
+        host_row = Adw.ActionRow(title='Host')
+        self.add(child=host_row)
+        host_entry = Gtk.Entry(
+            text=get_host_callback(),
+            valign=Gtk.Align.CENTER
+        )
+        host_entry.connect(
+            'activate',
+            set_host_callback
+        )
+        host_row.add_suffix(
+            widget=host_entry
+        )
+
+        port_row = Adw.ActionRow(title='Port')
+        self.add(child=port_row)
+        port_entry = Gtk.Entry(
+            text=str(get_port_callback()),
+            valign=Gtk.Align.CENTER
+        )
+        port_entry.connect(
+            'activate',
+            set_port_callback
+        )
+        port_row.add_suffix(
+            widget=port_entry
+        )
+
+        device_connect_button = Gtk.Button(
+            label='Connect',
+            valign=Gtk.Align.CENTER
+        )
+        device_connect_button.connect(
+            'clicked',
+            self.on_get_remote_devices
+        )
+        self.set_header_suffix(suffix=device_connect_button)
+
+    def on_get_remote_devices(self, button: Gtk.Button) -> None:
+        self.get_remote_devices()
+
 
 class DeviceListGroup(Adw.PreferencesGroup):
     def __init__(
@@ -24,11 +174,27 @@ class DeviceListGroup(Adw.PreferencesGroup):
             title: str,
             devices_infos: list[timetagger.DeviceInfo],
             set_device_callback: typing.Callable,
-            remote: bool = False
+            remote: bool = False,
+            return_callback: typing.Optional[typing.Callable] = None
     ) -> None:
         super().__init__(title=title)
         self.remote = remote
-        
+
+        if self.remote and return_callback is not None:
+            self.retrn = return_callback
+            disconnect_button = Gtk.Button(
+                label='Return',
+                icon_name='carousel-arrow-previous-symbolic',
+                css_classes=['flat']
+            )
+            disconnect_button.connect(
+                'clicked',
+                self.on_return
+            )
+            self.set_header_suffix(
+                suffix=disconnect_button
+            )
+
         if len(devices_infos) == 0:
             no_devices_row = Adw.ActionRow(
                 child=Gtk.Label(
@@ -48,6 +214,8 @@ class DeviceListGroup(Adw.PreferencesGroup):
                 self.add(child=device_row)
                 connect_device_button = Gtk.Button(
                     label='Connect',
+                    icon_name='carousel-arrow-next-symbolic',
+                    css_classes=['flat'],
                     valign=Gtk.Align.CENTER
                 )
                 connect_device_button.connect(
@@ -60,9 +228,13 @@ class DeviceListGroup(Adw.PreferencesGroup):
                     )
                 )
                 device_row.add_suffix(widget=connect_device_button)
+                device_row.set_activatable_widget(
+                    widget=connect_device_button
+                )
 
     def on_connect_device(
-            self, button: Gtk.Button,
+            self,
+            button: Gtk.Button,
             set_device: typing.Callable,
             model: str
     ) -> None:
@@ -70,107 +242,10 @@ class DeviceListGroup(Adw.PreferencesGroup):
             model=model,
             remote=self.remote
         )
+    
+    def on_return(self, button: Gtk.Button) -> None:
+        self.retrn()
 
-class RemoteConnectionGroup(Adw.PreferencesGroup):
-    def __init__(
-            self,
-            set_host_callback: typing.Callable,
-            set_port_callback: typing.Callable,
-            set_sock_callback: typing.Callable,
-            server_connect_callback: typing.Callable,
-            remote_devices: list[tuple[str, int]]
-        ) -> None:
-        super().__init__(title='Remote Connection')
-        self.set_host_callback = set_host_callback
-        self.set_port_callback = set_port_callback
-        self.set_sock_callback = set_sock_callback
-        self.server_connect_callback = server_connect_callback
-
-        for device in remote_devices:
-            device_row = Adw.ActionRow(
-                title=device[0],
-                subtitle=str(device[1])
-            )
-            self.add(child=device_row)
-            device_connect_button = Gtk.Button(
-                label='Connect',
-                valign=Gtk.Align.CENTER
-            )
-            device_row.add_suffix(widget=device_connect_button)
-            device_connect_button.connect(
-                'clicked',
-                self.on_connect,
-                device[0],
-                device[1]
-            )
-
-        # host
-        self.host_row = Adw.ActionRow(title='Host')
-        self.add(child=self.host_row)
-        host_entry = Gtk.Entry(
-            text='127.0.0.1',
-            valign=Gtk.Align.CENTER
-        )
-        host_entry.connect(
-            'activate',
-            self.on_set_host
-        )
-        self.host_row.add_suffix(
-            widget=host_entry
-        )
-        # port
-        self.port_row = Adw.ActionRow(title='Port')
-        self.add(child=self.port_row)
-        port_entry = Gtk.Entry(
-            text='5001',
-            valign=Gtk.Align.CENTER
-        )
-        port_entry.connect(
-            'activate',
-            self.on_set_port
-        )
-        self.port_row.add_suffix(
-            widget=port_entry
-        )
-
-        # connect
-        self.connect_row = Adw.ActionRow()
-        self.add(child=self.connect_row)
-        device_connect_button = Gtk.Button(
-            label='Connect',
-            valign=Gtk.Align.CENTER
-        )
-        device_connect_button.connect(
-            'clicked',
-            self.on_server_connect
-        )
-        device_connect_button.add_css_class(
-            css_class='flat'
-        )
-        self.connect_row.set_child(
-            child=device_connect_button
-        )
-
-    def on_set_host(self, entry: Gtk.Entry) -> None:
-        self.set_host_callback(host=entry.get_text())
-
-    def on_set_port(self, entry: Gtk.Entry) -> None:
-        try:    
-            port = int(entry.get_text())
-        except:
-            print(f'Invalid entry: {entry.get_text()}')
-        else:
-            self.set_port_callback(port=port)
-
-    def on_server_connect(self, button: Gtk.Button) -> None:
-        self.server_connect_callback()
-
-    def on_connect(self, button: Gtk.Button, host: str, port: int) -> None:
-        self.host = host
-        self.port = port
-        self.set_host_callback(host=self.host)
-        self.set_port_callback(port=self.port)
-        self.server_connect_callback()
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:
@@ -184,142 +259,450 @@ class MainWindow(Adw.ApplicationWindow):
         config_file = 'tagDisp.cfg'
         config_path = pathlib.Path('tagDisp', config_file)
 
-        remote_devices: list[tuple[str, int]] = []
-        if config_path.exists():
-            config.read(config_path)
-            for section in config.sections():
-                if section.startswith('Remote Device '):
-                    host = config.get(
-                        section=f'{section}',
-                        option='host'
-                    )
-                    port = config.get(
-                        section=f'{section}',
-                        option='port'
-                    )
-                    remote_devices.append((host, int(port)))
-
-        self.host = '127.0.0.1'
-        self.port = 5001
-        self._sock: socket.socket | None = None
-
-        # main box
-        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.set_content(content=self.main_box)
-
-        ## header_bar
-        self.header_bar = Gtk.HeaderBar()
-        if Gtk.HeaderBar().find_property(property_name='use_native_controls') is not None:
-            self.header_bar.set_use_native_controls(True)
-        self.main_box.append(child=self.header_bar)
+        self._host = '127.0.0.1'
+        self._port = 5001
+        self._socket: typing.Optional[socket.socket] = None
 
         self.main_stack = Gtk.Stack(
-            transition_type=Gtk.StackTransitionType.CROSSFADE
+            transition_type=Gtk.StackTransitionType.SLIDE_RIGHT
         )
-        self.main_box.append(child=self.main_stack)
+        self.set_content(content=self.main_stack)
 
-        self.device_select_page = Adw.PreferencesPage()
-        self.main_stack.add_child(child=self.device_select_page)
-        self.main_stack.set_visible_child(child=self.device_select_page)
+        self.device_select_box = DeviceSelectBox(
+            set_device_callback=self.set_device,
+            set_host_callback=self.set_host,
+            get_host_callback=self.get_host,
+            set_port_callback=self.set_port,
+            get_port_callback=self.get_port,
+            set_socket_callback=self.set_socket,
+            get_socket_callback=self.get_socket,
+            server_connect_callback=self.server_connect,
+            server_disconnect_callback=self.server_disconnect
+        )
+        self.main_stack.add_child(child=self.device_select_box)
+        self.main_stack.set_visible_child(child=self.device_select_box)
 
-        local_device_infos = []
+    def set_device(self, model: str, remote: bool = False) -> None:
+        if not remote:
+            match model:
+                case 'Logic-16':
+                    from bb84 import uqd
+                    self.timetagger_box = DeviceBox(
+                        tt=uqd.UQD()
+                    )
+                
+                case 'quTAG':
+                    from bb84 import qutag
+                    self.timetagger_box = DeviceBox(
+                        tt=qutag.Qutag()
+                    )
+
+                case _:
+                    self.timetagger_box = DeviceBox(
+                        tt=timetagger.TimeTagger()
+                    )
+        else:
+            self.timetagger_box = DeviceBox(
+                tt=remote_timetagger.RemoteTimetagger(
+                    model=model,
+                    sock=self.get_socket()
+                )
+            )
+        self.main_stack.add_child(child=self.timetagger_box)
+        self.main_stack.set_visible_child(child=self.timetagger_box)
+        self.main_stack.remove(child=self.device_select_box)
+
+    def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         try:
             from bb84 import uqd
         except:
             pass
         else:
-            local_device_infos = [
-                d.device_info for d in uqd.list_devices()
-            ]
-        # local_device_infos += [
-        #     d.device_info for d in qutag.list_devices()
-        # ]
-        local_device_infos += [timetagger.TimeTagger().device_info]
+            if isinstance(self.timetagger_box.timetagger, uqd.UQD):
+                self.timetagger_box.timetagger.stop_uqdinterface()
+        os.kill(os.getpid(), signal.SIGINT)
+        return False
 
-        local_device_group = DeviceListGroup(
-            title='Local Devices',
-            devices_infos=local_device_infos,
-            set_device_callback=self.set_device
-        )
-        self.device_select_page.add(group=local_device_group)
+    def get_host(self) -> str:
+        return self._host
 
-        self.remote_connection_group = RemoteConnectionGroup(
-            set_host_callback=self.set_host,
-            set_port_callback=self.set_port,
-            set_sock_callback=self.set_sock,
-            server_connect_callback=self.server_connect,
-            remote_devices=remote_devices
-        )
-        self.device_select_page.add(group=self.remote_connection_group)
+    def set_host(self, host: str) -> None:
+        self._host = host
 
+    def get_port(self) -> int:
+        return self._port
+
+    def set_port(self, port: int) -> None:
+        self._port = port
+
+    def set_socket(self, socket: typing.Optional[socket.socket]) -> None:
+        self._socket = socket
+
+    def get_socket(self) -> typing.Optional[socket.socket]:
+        return self._socket
+    
     def server_connect(self) -> None:
         sock = socket.socket(
             socket.AF_INET,
             socket.SOCK_STREAM
         )
         sock.settimeout(5)
-        sock.connect((self.host, self.port))
-        self._sock = sock
+        sock.connect((self.get_host(), self.get_port()))
+        self.set_socket(socket=sock)
 
-        remote_device_infos = remote_timetagger.list_device_info(
-            sock=self._sock
+    def server_disconnect(self) -> None:
+        if self._socket:
+            self._socket.close()
+            self.set_socket(socket=None)
+
+
+class DeviceBox(Gtk.Box):
+    def __init__(
+            self,
+            tt: timetagger.TimeTagger
+    ) -> None:
+        super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
+        self.timetagger = tt
+        # if isinstance(self.timetagger, uqd.UQD):
+            # self.timetagger.start_uqdinterface(clear_buffers=True)
+            # self.timetagger.start_reader()
+
+        self.dc_calibration_file: pathlib.Path | None = None
+
+        self._event = threading.Event()
+
+        self._measurement_rate = 0.1
+        self._raw_data_container = [timetagger.RawData()]
+        self._measurement_thread = threading.Thread(
+            target=self._measure
         )
 
-        self.device_select_page.remove(group=self.remote_connection_group)
-        self.device_select_page.add(
-            group=DeviceListGroup(
-                title='Remote Devices',
-                devices_infos=remote_device_infos,
-                set_device_callback=self.set_device,
-                remote=True
-            )
+        self._data_rate = 0.1
+        self._data_container = [timetagger.Data()]
+        self._data_thread = threading.Thread(
+            target=self._calc_data
         )
 
-    def set_device(self, model: str, remote: bool = False) -> None:
-        self.main_box.remove(child=self.header_bar)
-        if not remote:
-            match model:
-                case 'Logic-16':
-                    try:
-                        from bb84 import uqd
-                    except:
-                        pass
-                    else:
-                        self.timetagger_box = tagdisp_device.DeviceBox(
-                            tt=uqd.UQD()
-                        )
-                case _:
-                    self.timetagger_box = tagdisp_device.DeviceBox(
-                        tt=timetagger.TimeTagger()
-                    )
-        else:
-            self.timetagger_box = tagdisp_device.DeviceBox(
-                tt=remote_timetagger.RemoteTimetagger(
-                    model=model,
-                    sock=self._sock
-                )
+        sidebar = DeviceSidebar()
+        self.append(child=sidebar)
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.append(child=content_box)
+
+        window_title = Adw.WindowTitle()
+        content_header_bar = Gtk.HeaderBar(
+            title_widget=window_title,
+            hexpand=True
+        )
+        if Gtk.HeaderBar().find_property(property_name='use_native_controls'):
+            content_header_bar.set_use_native_controls(True)
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-headerbar {
+                background-color: @window_bg_color;
+            }
+        ''')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        content_header_bar.add_css_class('custom-headerbar')
+        content_box.append(child=content_header_bar)
+
+        toggle_sidebar_button = Gtk.Button(
+            icon_name='sidebar-show-symbolic',
+            tooltip_text='Toggle sidebar'
+        )
+        toggle_sidebar_button.connect(
+            'clicked',
+            self.on_toggle_sidebar,
+            sidebar
+        )
+        content_header_bar.pack_start(child=toggle_sidebar_button)
+
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(
+            transition=Gtk.StackTransitionType.CROSSFADE
+        )
+        self.stack.connect(
+            'notify::visible-child-name',
+            self.on_page_changed,
+            window_title
+        )
+        sidebar.set_stack(stack=self.stack)
+        content_box.append(child=self.stack)
+
+        # pages
+        settings_name = 'Settings'
+        self.stack.add_titled(
+            child=page_settings.SettingsPage(
+                name=settings_name,
+                start_timetagger_callback=self.start_timetagger,
+                stop_timetagger_callback=self.stop_timetagger,
+                clear_buffers_callback=self.clear_buffers,
+                get_device_info_callback=self.get_device_info
+            ),
+            name=settings_name,
+            title=settings_name
+        )
+
+        simple_display_name = 'Simple Display'
+        self.simple_display = page_simple_display.SimpleDisplay(
+            name=simple_display_name,
+            get_page_callback=self.get_page,
+            get_data_callback=self.get_data,
+            get_raw_data_callback=self.get_raw_data
+        )
+        self.stack.add_titled(
+            child=self.simple_display,
+            name=simple_display_name,
+            title=simple_display_name
+        )
+
+        display_name = 'Display'
+        self.display = page_display.Display(
+            name=display_name,
+            get_page_callback=self.get_page,
+            get_data_callback=self.get_data
+        )
+        self.stack.add_titled(
+            child=self.display,
+            name=display_name,
+            title=display_name
+        )
+
+        channels_name = 'Channels'
+        self.channels_page = page_channels.ChannelsPage(
+            name=channels_name,
+            set_channel_groups_callback=self.set_channel_groups,
+            get_channel_groups_callback=self.get_channel_groups
+        )
+        self.stack.add_titled(
+            child=self.channels_page,
+            name=channels_name,
+            title=channels_name
+        )
+
+        plot_page = page_plot.PlotPage(
+            get_data_callback=self.get_data
+        )
+        self.stack.add_titled(
+            child=plot_page,
+            name='Plot',
+            title='Plot'
+        )
+
+        self._measurement_thread.start()
+        self._data_thread.start()
+    
+    def start_timetagger(self) -> None:
+        from bb84 import uqd
+        if isinstance(self.timetagger, uqd.UQD):
+            self.timetagger.start_uqdinterface(clear_buffers=False)
+            self.timetagger.start_reader()
+    
+    def stop_timetagger(self) -> None:
+        from bb84 import uqd
+        if isinstance(self.timetagger, uqd.UQD):
+            self.timetagger.stop_uqdinterface()
+    
+    def clear_buffers(self) -> None:
+        from bb84 import uqd
+        if isinstance(self.timetagger, uqd.UQD):
+            self.timetagger.clear_buffers()
+
+    def _measure(self) -> None:
+        while True:
+            for i in range(len(self._raw_data_container)):
+                self._raw_data_container[i] = self.timetagger.measure()
+            if self._event.is_set():
+                break
+            time.sleep(self._measurement_rate)
+
+    def _calc_data(self) -> None:
+        while True:
+            raw_data = self.get_raw_data()
+            if raw_data is not None:
+                self._data_container = [timetagger.Data.from_raw_data(
+                    raw_data=raw_data,
+                    channel_groups=self.get_channel_groups()
+                )]
+            if self._event.is_set():
+                break
+            time.sleep(self._data_rate)
+
+    def on_toggle_sidebar(
+            self,
+            button: Gtk.Button,
+            revealer: Gtk.Revealer
+    ) -> None:
+        revealer.set_reveal_child(
+            not revealer.get_reveal_child()
+        )
+
+    def on_page_changed(
+            self,
+            stack: Gtk.Stack,
+            param_spec_string: GObject.ParamSpecString,
+            window_title: Adw.WindowTitle
+    ) -> None:
+        window_title.set_title(title=stack.get_visible_child_name() or '')
+
+    def get_raw_data(self) -> timetagger.RawData:
+        return self._raw_data_container[0]
+
+    def get_data(self) -> timetagger.Data:
+        return self._data_container[0]
+    
+    def set_channel_groups(
+            self,
+            channel_groups: list[timetagger.ChannelGroup]
+    ) -> None:
+        self.timetagger.channel_groups = channel_groups
+
+    def get_channel_groups(self) -> list[timetagger.ChannelGroup]:
+        return self.timetagger.channel_groups
+    
+    def get_device_info(self) -> timetagger.DeviceInfo:
+        return self.timetagger.device_info
+
+    def set_dc_calibration_file(self, path: pathlib.Path) -> None:
+        self.dc_calibration_file = path
+
+    def get_dc_calibration_file(self) -> pathlib.Path | None:
+        return self.dc_calibration_file
+    
+    def get_page(self) -> str | None:
+        return self.stack.get_visible_child_name()
+
+
+class DeviceSidebar(Gtk.Revealer):
+    def __init__(self) -> None:
+        super().__init__(
+            transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT,
+            reveal_child=True
+        )
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_child(child=main_box)
+
+        header_bar = Gtk.HeaderBar(show_title_buttons=False)
+        main_box.append(child=header_bar)
+
+        self.stack_sidebar = Gtk.StackSidebar(vexpand=True)
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-sidebar-headerbar {
+                background-color: @headerbar_bg_color;
+                border-bottom: none;
+                box-shadow: inset 0 -1px 0 transparent;
+            }
+        ''')
+        header_bar.add_css_class('custom-sidebar-headerbar')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        main_box.append(child=self.stack_sidebar)
+
+        menu_button = Gtk.MenuButton(
+            icon_name='open-menu-symbolic',
+            tooltip_text='Main Menu'
+        )
+        header_bar.pack_end(child=menu_button)
+
+        popover = Gtk.Popover(
+            position=Gtk.PositionType.BOTTOM,
+        )
+        menu_button.set_popover(popover=popover)
+
+        popover_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+        )
+        popover.set_child(child=popover_box)
+
+        counter_size_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            margin_start=10
+        )
+        popover_box.append(child=counter_size_box)
+
+        counter_size_label = Gtk.Label(label='Counter Size')
+        counter_size_box.append(child=counter_size_label)
+
+        counter_size_decrease_button = Gtk.Button(
+            icon_name='value-decrease-symbolic',
+            css_classes=['circular', 'flat'],
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.CENTER
+        )
+        counter_size_decrease_button.connect(
+            'clicked',
+            self.on_decrease_counter_size
+        )
+        counter_size_box.append(child=counter_size_decrease_button)
+
+        counter_size_increase_button = Gtk.Button(
+            icon_name='value-increase-symbolic',
+            css_classes=['circular', 'flat'],
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.CENTER
+        )
+        counter_size_increase_button.connect(
+            'clicked',
+            self.on_increase_counter_size
+        )
+        counter_size_box.append(child=counter_size_increase_button)
+
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-sidebar {
+                background-color: @headerbar_bg_color;
+            }
+        ''')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        self.add_css_class('custom-sidebar')
+
+        def add_menu_button(label: str, detailed_action: str) -> None:
+            button = Gtk.Button(
+                label=label,
+                halign=Gtk.Align.START,
+                hexpand=True,
+                css_classes=['flat', 'body']
             )
-        self.main_stack.add_child(child=self.timetagger_box)
-        self.main_stack.set_visible_child(child=self.timetagger_box)
+            button.connect('clicked', lambda b: menu_button.activate_action(name=detailed_action))
+            popover_box.append(child=button)
 
-    def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
-        os.kill(os.getpid(), signal.SIGINT)
-        return False
+        add_menu_button(label='Full Screen', detailed_action='app.full_screen')
+        add_menu_button(label='Help', detailed_action='app.help')
+        add_menu_button(label='About tagDisp', detailed_action='app.about')
+        add_menu_button(label='Quit', detailed_action='app.quit')
 
-    def get_host(self) -> str:
-        return self.host
+    #     menu = Gio.Menu.new()
+    #     menu.append(label='New Window', detailed_action='app.new_window')
+    #     menu.append(label='Full Screen', detailed_action='app.full_screen')
+    #     menu.append(label='Help', detailed_action='app.help')
+    #     menu.append(label='About tagDisp', detailed_action='app.about')
+    #     menu.append(label='Quit', detailed_action='app.quit')
 
-    def set_host(self, host: str) -> None:
-        self.host = host
+    #     popover_menu = Gtk.PopoverMenu()
+    #     popover_menu.set_menu_model(model=menu)
+    #     menu_button.set_popover(popover=popover_menu)
 
-    def get_port(self) -> int:
-        return self.port
+    def set_stack(self, stack: Gtk.Stack) -> None:
+        self.stack_sidebar.set_stack(stack=stack)
 
-    def set_port(self, port: int) -> None:
-        self.port = port
+    def on_increase_counter_size(self, button: Gtk.Button) -> None:
+        print('+')
 
-    def set_sock(self, sock: socket.socket) -> None:
-        self._sock = sock
+    def on_decrease_counter_size(self, button: Gtk.Button) -> None:
+        print('-')
+
 
 class App(Adw.Application):
     def __init__(self, **kwargs) -> None:
@@ -387,7 +770,8 @@ class App(Adw.Application):
         # self.quit()
         os.kill(os.getpid(), signal.SIGINT)
 
-if __name__ == '__main__':
+
+def main() -> None:
     app = App(application_id='com.github.FarisRedza.tagDisp')
     try:
         app.run(sys.argv)
@@ -398,3 +782,6 @@ if __name__ == '__main__':
             app.win.timetagger_box._event.set()
             app.win.timetagger_box._measurement_thread.join()
             app.win.timetagger_box.timetagger.disconnect()
+
+if __name__ == '__main__':
+    main()
