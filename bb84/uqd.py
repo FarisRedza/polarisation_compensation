@@ -31,6 +31,7 @@ class UQD(timetagger.TimeTagger):
     def __init__(self,headless=False) -> None:
         self._buffer_number: typing.Optional[int] = None
         self._uqdinterface_proc: typing.Optional[subprocess.Popen] = None
+        self.clock_offset = 0
         if not headless:
             self._uqd = ttag.TTBuffer(buffernumber=0)
             self._uqd.tagsAsTime = False
