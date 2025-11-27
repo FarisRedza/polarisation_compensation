@@ -144,6 +144,7 @@ def start_server(
         family=socket.AF_INET,
         type=socket.SOCK_STREAM
     )
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((host, port))
     sock.listen()
     print(f'Measurement server listening on {host}:{port}')

@@ -16,6 +16,7 @@ class UQD(timetagger.TimeTagger):
         self._buffer_number: typing.Optional[int] = None
         self._uqdinterface_proc: typing.Optional[subprocess.Popen] = None
         self._uqd_reader: typing.Optional[ttag.TTBuffer] = None
+        self.start_reader()
 
         self.device_info = timetagger.DeviceInfo(
             manufacturer = 'UQDevices',
