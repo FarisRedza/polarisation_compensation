@@ -349,14 +349,14 @@ class PlotsGroup(Adw.PreferencesGroup):
 
         self.add_plot(
             name='qber',
-            colour=self._colours.BLUE,
+            colour=self._colours.ORANGE,
             add_line_to_plot_callback=add_line_to_plot_callback,
             remove_line_from_plot_callback=remove_line_from_plot_callback,
             get_plots_callback=get_plots_callback
         )
         self.add_plot(
             name='qx',
-            colour=self._colours.ORANGE,
+            colour=self._colours.BLUE,
             add_line_to_plot_callback=add_line_to_plot_callback,
             remove_line_from_plot_callback=remove_line_from_plot_callback,
             get_plots_callback=get_plots_callback

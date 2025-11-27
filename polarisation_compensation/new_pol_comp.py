@@ -16,7 +16,7 @@ from motor import thorlabs_motor
 from motor import k10cr2_motor
 from motor import base_motor
 
-MEASUREMENT_SERVER_HOST = '137.195.63.6'
+MEASUREMENT_SERVER_HOST = '137.195.63.45'
 MEASUREMENT_SERVER_PORT = 5001
 
 QWP1 = '55353314'
@@ -363,9 +363,9 @@ if __name__ == '__main__':
     )
 
     pol_comp.optimise(
-        target=0.3,
+        target=0.04,
         rotation_time=0.5,
-        max_iterations=100,
+        max_iterations=500,
         plateau_patience=5,
         # adaptive=False,
         step_shrink=0.75,
