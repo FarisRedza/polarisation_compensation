@@ -43,12 +43,16 @@ def set_motor_to_0(motor: base_motor.Motor) -> None:
         )
         time.sleep(0.1)
 
-def scramble_motor(motor: base_motor.Motor) -> None:
+def scramble_motor(
+        motor: base_motor.Motor,
+        min_time: int,
+        max_time: int
+) -> None:
     direction = random.choice([
         base_motor.MotorDirection.BACKWARD,
         base_motor.MotorDirection.FORWARD
     ])
-    rotation_time = random.randint(10, 20)
+    rotation_time = random.randint(min_time, max_time)
     motor.jog(
         direction=direction,
         acceleration=20.0,
@@ -96,25 +100,27 @@ def objective(
         qx=d_qx
     )
     if kps > 0:
-        print(f'Objective: {kps}')
-        return kps
+        obj = kps
     else:
-        print(f'Objective: {- (d_qber + d_qx)}')
-        return - (d_qber + d_qx)
+        obj = - (d_qber + d_qx)
+
+    return obj
 
 class PolarisationCompensator:
     def __init__(
             self,
             motors: list[base_motor.Motor],
             tt: timetagger.TimeTagger,
-            target_qber: float = 0.1,
+            target_qber: float = 0.05,
             target_qx: float = 0.1,
             samples: int = 3,
             acceleration: float = 20.0,
             max_velocity: float = 25.0,
             max_iterations: int = 3,
             start_at_0: bool = False,
-            scramble_motors: bool = False
+            scramble_motors: bool = False,
+            scramble_min_time: int = 10,
+            scramble_max_time: int = 20
     ) -> None:
         self.motors = motors
         self.tt = tt
@@ -122,6 +128,7 @@ class PolarisationCompensator:
         self._motor_states = {}
         for motor in self.motors:
             self._motor_states[motor.device_info.serial_number] = {
+                'moving': False,
                 'direction': random.choice([
                         base_motor.MotorDirection.BACKWARD,
                         base_motor.MotorDirection.FORWARD
@@ -148,7 +155,7 @@ class PolarisationCompensator:
                 for i, motor in enumerate(self.motors):
                     motor_thread.append(threading.Thread(
                         target=scramble_motor,
-                        args=(motor,)
+                        args=(motor, scramble_min_time, scramble_max_time)
                     ))
                     motor_thread[i].start()
                 for thread in motor_thread:
@@ -194,28 +201,48 @@ class PolarisationCompensator:
                         else:
                             print(f'Target achieved: QBER={motor_baseline_qber:.4f}, Qx={motor_baseline_qx:.4f}, KPS={motor_baseline_kps:.2f}')
 
-                    with suppress_stdout():
-                        motor.jog(
-                            direction=direction,
-                            acceleration=acceleration,
-                            max_velocity=max_velocity
-                        )
-                        (
-                            motor_probe_qber,
-                            motor_probe_qx,
-                            motor_probe_rate,
-                            motor_probe_objective,
-                            motor_probe_kps
-                        ) = self.measure(samples=samples)
-                        if (motor_probe_objective < motor_baseline_objective):
+                    elif (
+                        motor_baseline_qber < 3*target_qber
+                        and motor_baseline_qx < 3*target_qx
+                    ):
+                        print(f'  QBER and Qx below 3x target, performing fine adjustment')
+                        if self._motor_states[motor.device_info.serial_number]['moving'] == False:
+                            motor.jog(
+                                direction=direction,
+                                acceleration=acceleration,
+                                max_velocity=1
+                            )
+                            self._motor_states[motor.device_info.serial_number]['moving'] = True
+                            time.sleep(0.1)
                             motor.stop()
+                            self._motor_states[motor.device_info.serial_number]['moving'] = False
 
-                            # set reverse direction for next iteration
-                            if direction == base_motor.MotorDirection.FORWARD:
-                                self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
-                            else:
-                                self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
-                            break
+                    else:
+                        with suppress_stdout():
+                            if self._motor_states[motor.device_info.serial_number]['moving'] == False:
+                                motor.jog(
+                                    direction=direction,
+                                    acceleration=acceleration,
+                                    max_velocity=max_velocity
+                                )
+                                self._motor_states[motor.device_info.serial_number]['moving'] = True
+                            (
+                                motor_probe_qber,
+                                motor_probe_qx,
+                                motor_probe_rate,
+                                motor_probe_objective,
+                                motor_probe_kps
+                            ) = self.measure(samples=samples)
+                            if (motor_probe_objective < motor_baseline_objective):
+                                motor.stop()
+                                self._motor_states[motor.device_info.serial_number]['moving'] = False
+
+                                # set reverse direction for next iteration
+                                if direction == base_motor.MotorDirection.FORWARD:
+                                    self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
+                                else:
+                                    self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
+                                break
 
     def measure(
             self,
@@ -281,11 +308,13 @@ def main() -> None:
             tt=tt,
             target_qber=0.05,
             target_qx=0.05,
-            samples=1,
-            max_velocity=25.0,
+            samples=2,
+            max_velocity=5.0,
             max_iterations=0,
             # start_at_0=True,
-            # scramble_motors=True
+            # scramble_motors=True,
+            # scramble_min_time=1,
+            # scramble_max_time=2
         )
 
     except KeyboardInterrupt:

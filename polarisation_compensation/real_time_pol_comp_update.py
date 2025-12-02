@@ -96,18 +96,17 @@ def objective(
         qx=d_qx
     )
     if kps > 0:
-        print(f'Objective: {kps}')
         return kps
     else:
-        print(f'Objective: {- (d_qber + d_qx)}')
         return - (d_qber + d_qx)
+
 
 class PolarisationCompensator:
     def __init__(
             self,
             motors: list[base_motor.Motor],
             tt: timetagger.TimeTagger,
-            target_qber: float = 0.1,
+            target_qber: float = 0.05,
             target_qx: float = 0.1,
             samples: int = 3,
             acceleration: float = 20.0,
@@ -122,6 +121,7 @@ class PolarisationCompensator:
         self._motor_states = {}
         for motor in self.motors:
             self._motor_states[motor.device_info.serial_number] = {
+                'moving': False,
                 'direction': random.choice([
                         base_motor.MotorDirection.BACKWARD,
                         base_motor.MotorDirection.FORWARD
@@ -166,56 +166,81 @@ class PolarisationCompensator:
         for i in iterator:
             if max_iterations != 0:
                 print(f'Iteration: {i+1}/{max_iterations}')
-            # for motor in self.motors:
-            for motor in [x for x in self.motors for _ in range(2)]:
+            for motor in self.motors:
                 # direction = random.choice([
                 #     base_motor.MotorDirection.BACKWARD,
                 #     base_motor.MotorDirection.FORWARD
                 # ])
                 direction = self._motor_states[motor.device_info.serial_number]['direction']
                 print(f'  Motor: {motor.device_info.serial_number} probing direction {direction.name}')
-                while True:
-                    (
-                        motor_baseline_qber,
-                        motor_baseline_qx,
-                        motor_baseline_rate,
-                        motor_baseline_objective,
-                        motor_baseline_kps
-                    ) = self.measure(samples=samples)
+                (
+                    motor_baseline_qber,
+                    motor_baseline_qx,
+                    motor_baseline_rate,
+                    motor_baseline_objective,
+                    motor_baseline_kps
+                ) = self.measure(samples=samples)
 
-                    if (
-                        motor_baseline_qber < target_qber
-                        and motor_baseline_qx < target_qx
-                        and motor_baseline_kps > 0
-                    ):
-                        if max_iterations != 0:
-                            print(f'Target achieved in {i+1} iterations, time: {time.time()-start_time}s')
-                            return
-                        else:
-                            print(f'Target achieved: QBER={motor_baseline_qber:.4f}, Qx={motor_baseline_qx:.4f}, KPS={motor_baseline_kps:.2f}')
+                if (
+                    motor_baseline_qber < target_qber
+                    and motor_baseline_qx < target_qx
+                    and motor_baseline_kps > 0
+                ):
+                    if max_iterations != 0:
+                        print(f'Target achieved in {i+1} iterations, time: {time.time()-start_time}s')
+                        return
+                    else:
+                        print(f'Target achieved: QBER={motor_baseline_qber:.4f}, Qx={motor_baseline_qx:.4f}, KPS={motor_baseline_kps:.2f}')
 
-                    with suppress_stdout():
+                with suppress_stdout():
+                    if self._motor_states[motor.device_info.serial_number]['moving'] == False:
                         motor.jog(
                             direction=direction,
                             acceleration=acceleration,
-                            max_velocity=max_velocity
+                            max_velocity=2.5
                         )
-                        (
-                            motor_probe_qber,
-                            motor_probe_qx,
-                            motor_probe_rate,
-                            motor_probe_objective,
-                            motor_probe_kps
-                        ) = self.measure(samples=samples)
-                        if (motor_probe_objective < motor_baseline_objective):
-                            motor.stop()
+                        self._motor_states[motor.device_info.serial_number]['moving'] = True
 
-                            # set reverse direction for next iteration
-                            if direction == base_motor.MotorDirection.FORWARD:
-                                self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
-                            else:
-                                self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
-                            break
+                    (
+                        motor_probe_qber,
+                        motor_probe_qx,
+                        motor_probe_rate,
+                        motor_probe_objective,
+                        motor_probe_kps
+                    ) = self.measure(samples=2)
+                    motor.stop()
+                    if (motor_probe_objective < motor_baseline_objective):
+                        motor.stop()
+                        self._motor_states[motor.device_info.serial_number]['moving'] = False
+
+                        # set reverse direction for next iteration
+                        if direction == base_motor.MotorDirection.FORWARD:
+                            self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
+                        else:
+                            self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
+                    else:
+                        while True:
+                            with suppress_stdout():
+                                if self._motor_states[motor.device_info.serial_number]['moving'] == False:
+                                    motor.jog(
+                                        direction=direction,
+                                        acceleration=acceleration,
+                                        max_velocity=max_velocity
+                                    )
+                                    self._motor_states[motor.device_info.serial_number]['moving'] = True
+
+                                (
+                                    motor_probe_qber,
+                                    motor_probe_qx,
+                                    motor_probe_rate,
+                                    motor_probe_objective,
+                                    motor_probe_kps
+                                ) = self.measure(samples=samples)
+                                if (motor_probe_objective < motor_baseline_objective):
+                                    motor.stop()
+                                    self._motor_states[motor.device_info.serial_number]['moving'] = False
+                                    break
+
 
     def measure(
             self,

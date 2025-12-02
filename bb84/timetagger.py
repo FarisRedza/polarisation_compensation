@@ -250,26 +250,28 @@ class Data:
         singles = np.bincount(raw_data.channels, minlength=8)
 
         if channel_groups:
+            cg_780_idx = next((i for i, cg in enumerate(channel_groups) if cg.name == '780'))
+            cg_idx = cg_780_idx
             with np.errstate(invalid='ignore'):
                 try:
-                    s1 = float((singles[getattr(channel_groups[0], 'H')] - singles[getattr(channel_groups[0], 'V')])/(singles[getattr(channel_groups[0], 'H')] + singles[getattr(channel_groups[0], 'V')]))
+                    s1 = float((singles[channel_groups[cg_idx].H] - singles[channel_groups[cg_idx].V]) / (singles[channel_groups[cg_idx].H] + singles[channel_groups[cg_idx].V]))
                 except:
                     s1 = None
                 try:
-                    s2 = float((singles[getattr(channel_groups[0], 'D')] - singles[getattr(channel_groups[0], 'A')])/(singles[getattr(channel_groups[0], 'D')] + singles[getattr(channel_groups[0], 'A')]))
+                    s2 = float((singles[channel_groups[cg_idx].D] - singles[channel_groups[cg_idx].A]) / (singles[channel_groups[cg_idx].D] + singles[channel_groups[cg_idx].A]))
                 except:
                     s2 = None
                 try:
-                    s3 = float((singles[getattr(channel_groups[0], 'R')] - singles[getattr(channel_groups[0], 'L')])/(singles[getattr(channel_groups[0], 'R')] + singles[getattr(channel_groups[0], 'L')]))
+                    s3 = float((singles[channel_groups[cg_idx].R] - singles[channel_groups[cg_idx].L]) / (singles[channel_groups[cg_idx].R] + singles[channel_groups[cg_idx].L]))
                 except:
                     s3 = None
 
             match (s1, s2, s3):
-                case (float(), None, float()):
-                    s2 = math.sqrt(max(0.0, 1 - s1**2 - s3**2))
-
                 case (None, float(), float()):
                     s1 = math.sqrt(max(0.0, 1 - s2**2 - s3**2))
+
+                case (float(), None, float()):
+                    s2 = math.sqrt(max(0.0, 1 - s1**2 - s3**2))
 
                 case (float(), float(), None):
                     s3 = math.sqrt(max(0.0, 1 - s1**2 - s2**2))
@@ -279,14 +281,14 @@ class Data:
 
             try:
                 if len(channel_groups) > 1:
-                    cg_780_inx = next((i for i, cg in enumerate(channel_groups) if cg.name == '780'))
-                    cg_1550_inx = next((i for i, cg in enumerate(channel_groups) if cg.name == '1550'))
+                    cg_780_idx = next((i for i, cg in enumerate(channel_groups) if cg.name == '780'))
+                    cg_1550_idx = next((i for i, cg in enumerate(channel_groups) if cg.name == '1550'))
 
                     qber, qx, rate = get_qber(
                         channels=raw_data.channels,
                         timetags=raw_data.timetags,
-                        channel_group_1=channel_groups[cg_780_inx],
-                        channel_group_2=channel_groups[cg_1550_inx]
+                        channel_group_1=channel_groups[cg_780_idx],
+                        channel_group_2=channel_groups[cg_1550_idx]
                     )
                 elif len(channel_groups) == 1:
                     qber = 1 - s1**2
