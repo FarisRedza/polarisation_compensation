@@ -141,6 +141,7 @@ class PolarisationCompensator:
             enable_d : bool = True,
             acceleration: float = 20.0,
             max_velocity: float = 25.0,
+            measure_time: float = 1.0,
             random_direction: bool = True,
             start_at_0: bool = False,
             scramble_motors: bool = False
@@ -151,6 +152,7 @@ class PolarisationCompensator:
         self.target_qx = target_qx
         self.max_iterations = max_iterations
         self.samples = samples
+        self.measure_time = measure_time
         self.random_direction = random_direction
         self.acceleration = acceleration
         self.max_velocity = max_velocity
@@ -171,7 +173,6 @@ class PolarisationCompensator:
                     enable_i=enable_i,
                     enable_d=enable_d,
                     output_limit=self.max_velocity
-
                 )
             }
 
@@ -209,7 +210,7 @@ class PolarisationCompensator:
 
         for _ in range(self.samples):
             data = timetagger.Data.from_raw_data(
-                raw_data=self.tt.measure(),
+                raw_data=self.tt.measure(seconds=self.measure_time),
                 channel_groups=self.tt.channel_groups
             )
             qber_samples.append(data.qber)
@@ -390,13 +391,14 @@ def main() -> None:
             target_qber=0.05,
             target_qx=0.05,
             max_iterations=0,
-            samples=2,
-            p_gain=5,
+            samples=5,
+            p_gain=10,
             i_gain=0.1,
-            d_gain=0.05,
+            d_gain=100.0,
             enable_p=True,
             enable_i=True,
             enable_d=True,
+            measure_time=0.1,
             random_direction=True,
             max_velocity=25.0,
             # start_at_0=True,

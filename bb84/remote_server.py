@@ -111,9 +111,10 @@ def handle_client(
                             )
 
                         case remote_protocol.Command.MEASURE:
+                            seconds = float(args[1])
                             send_payload(
                                 sock=sock,
-                                payload=device.measure().serialise(),
+                                payload=device.measure(seconds=seconds).serialise(),
                                 response_id=remote_protocol.Response.RAWDATA
                             )
 

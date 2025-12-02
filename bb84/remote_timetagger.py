@@ -116,11 +116,11 @@ class RemoteTimetagger(timetagger.TimeTagger):
     def disconnect(self) -> None:
         self._sock.close()
 
-    def measure(self) -> timetagger.RawData:
+    def measure(self, seconds: float = 1.0) -> timetagger.RawData:
         send_command(
             sock=self._sock,
             command=remote_protocol.Command.MEASURE,
-            args=(self.device_info.model,)
+            args=(self.device_info.model, seconds)
         )
         payload = self._handle_response(
             expected_response_id=remote_protocol.Response.RAWDATA,
