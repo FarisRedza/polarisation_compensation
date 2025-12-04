@@ -296,29 +296,39 @@ class MainWindow(Adw.ApplicationWindow):
                 case 'Logic-16':
                     from bb84 import uqd
                     self.timetagger_box = DeviceBox(
-                        tt=uqd.UQD()
+                        tt=uqd.UQD(),
+                        unset_device_callback=self.unset_device
                     )
                 
                 case 'quTAG':
                     from bb84 import qutag
                     self.timetagger_box = DeviceBox(
-                        tt=qutag.Qutag()
+                        tt=qutag.Qutag(),
+                        unset_device_callback=self.unset_device
                     )
 
                 case _:
                     self.timetagger_box = DeviceBox(
-                        tt=timetagger.TimeTagger()
+                        tt=timetagger.TimeTagger(),
+                        unset_device_callback=self.unset_device
                     )
         else:
             self.timetagger_box = DeviceBox(
                 tt=remote_timetagger.RemoteTimetagger(
                     model=model,
                     sock=self.get_socket()
-                )
+                ),
+                unset_device_callback=self.unset_device
             )
         self.main_stack.add_child(child=self.timetagger_box)
         self.main_stack.set_visible_child(child=self.timetagger_box)
         self.main_stack.remove(child=self.device_select_box)
+
+    def unset_device(self) -> None:
+        self.timetagger_box.timetagger.disconnect()
+        self.main_stack.add_child(child=self.device_select_box)
+        self.main_stack.set_visible_child(child=self.device_select_box)
+        self.main_stack.remove(child=self.timetagger_box)
 
     def on_close_request(self, window: Adw.ApplicationWindow) -> bool:
         try:
@@ -367,7 +377,8 @@ class MainWindow(Adw.ApplicationWindow):
 class DeviceBox(Gtk.Box):
     def __init__(
             self,
-            tt: timetagger.TimeTagger
+            tt: timetagger.TimeTagger,
+            unset_device_callback: typing.Callable
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
         self.timetagger = tt
@@ -391,7 +402,7 @@ class DeviceBox(Gtk.Box):
             target=self._calc_data
         )
 
-        sidebar = DeviceSidebar()
+        sidebar = DeviceSidebar(unset_device_callback=unset_device_callback)
         self.append(child=sidebar)
 
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -586,16 +597,28 @@ class DeviceBox(Gtk.Box):
 
 
 class DeviceSidebar(Gtk.Revealer):
-    def __init__(self) -> None:
+    def __init__(self, unset_device_callback: typing.Callable) -> None:
         super().__init__(
             transition_type=Gtk.RevealerTransitionType.SLIDE_LEFT,
             reveal_child=True
         )
+        self.unset_device = unset_device_callback
+
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(child=main_box)
 
         header_bar = Gtk.HeaderBar(show_title_buttons=False)
         main_box.append(child=header_bar)
+
+        return_button = Gtk.Button(
+            label='Return',
+            icon_name='carousel-arrow-previous-symbolic'
+        )
+        return_button.connect(
+            'clicked',
+            self.on_return
+        )
+        header_bar.pack_start(child=return_button)
 
         self.stack_sidebar = Gtk.StackSidebar(vexpand=True)
         css_provider = Gtk.CssProvider()
@@ -710,6 +733,9 @@ class DeviceSidebar(Gtk.Revealer):
 
     def on_decrease_counter_size(self, button: Gtk.Button) -> None:
         print('-')
+    
+    def on_return(self, button: Gtk.Button) -> None:
+        self.unset_device()
 
 
 class App(Adw.Application):
