@@ -7,6 +7,7 @@ import io
 import threading
 import contextlib
 import itertools
+import collections
 
 import numpy as np
 
@@ -41,9 +42,13 @@ def set_motor_to_0(motor: base_motor.Motor) -> None:
         time.sleep(0.1)
 
 
-def scramble_motor(motor: base_motor.Motor) -> None:
+def scramble_motor(
+        motor: base_motor.Motor,
+        min_time: int = 10,
+        max_time: int = 20
+) -> None:
     direction = random.choice([base_motor.MotorDirection.BACKWARD, base_motor.MotorDirection.FORWARD])
-    rotation_time = random.randint(10, 20)
+    rotation_time = random.randint(min_time, max_time)
     motor.jog(direction=direction, acceleration=20.0, max_velocity=25.0)
     time.sleep(rotation_time)
     motor.stop()
@@ -79,7 +84,8 @@ class PID:
             kp: float,
             ki: float,
             kd: float,
-            output_limit: float = 25.0,
+            min_limit: float = -25.0,
+            max_limit: float = 25.0,
             enable_p: bool = True,
             enable_i: bool = True,
             enable_d: bool = True,
@@ -87,7 +93,8 @@ class PID:
         self.kp = kp
         self.ki = ki
         self.kd = kd
-        self.output_limit = output_limit
+        self.min_limit = min_limit
+        self.max_limit = max_limit
         self.enable_p = enable_p
         self.enable_i = enable_i
         self.enable_d = enable_d
@@ -120,8 +127,9 @@ class PID:
         self.prev_time = timestamp
 
         output = p + i + d
-        print(f'Velocity: {output:.2f}, P: {p:.2f}, I: {i:.2f}, D: {d:.2f}')
-        return max(-self.output_limit, min(self.output_limit, output))
+        output_lim = max(self.min_limit, min(self.max_limit, output))
+        print(f'Velocity: {output_lim:.2f}, P: {p:.2f}, I: {i:.2f}, D: {d:.2f}')
+        return output_lim
 
 
 class PolarisationCompensator:
@@ -129,6 +137,81 @@ class PolarisationCompensator:
             self,
             motors: list[base_motor.Motor],
             tt: timetagger.TimeTagger,
+    ) -> None:
+        self.motors = motors
+        self.tt = tt
+
+    def set_motor_pos_to_0(self) -> None:
+        """
+        Returns all motor positions to 0
+        """
+        print('Setting motor positions to 0')
+        with suppress_stdout():
+            threads = [
+                threading.Thread(target=set_motor_to_0, args=(motor,))
+                for motor in self.motors
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        time.sleep(0.1)
+
+    def scramble_motor_pos(
+            self,
+            min_time: int = 10,
+            max_time: int = 20
+    ) -> None:
+        """
+        Jogs all motors in a random direction
+        
+        :param min_time: Minimum jog time
+        :type min_time: int
+        :param max_time: Maximum jog time
+        :type max_time: int
+        """
+        print('Scrambling motors')
+        with suppress_stdout():
+            threads = [
+                threading.Thread(
+                    target=scramble_motor,
+                    args=(motor, min_time, max_time)
+                )
+                for motor in self.motors
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join() 
+        time.sleep(0.1)   
+
+    def stop_all_motors(self) -> None:
+        for motor in self.motors:
+            motor.stop()
+
+    def measure(
+            self,
+            samples: int = 0,
+            measure_time: float = 1.0
+    ) -> tuple[float, float]:
+        qber_samples, qx_samples, rate_samples = collections.deque(), collections.deque(), collections.deque()
+
+        for _ in range(samples):
+            data = timetagger.Data.from_raw_data(
+                raw_data=self.tt.measure(seconds=measure_time),
+                channel_groups=self.tt.channel_groups
+            )
+            qber_samples.append(data.qber)
+            qx_samples.append(data.qx)
+            rate_samples.append(data.rate)
+
+        m_qber = float(np.mean(qber_samples))
+        m_qx = float(np.mean(qx_samples))
+
+        return m_qber, m_qx
+
+    def compensate(
+            self,
             target_qber: float = 0.1,
             target_qx: float = 0.1,
             max_iterations: int = 100,
@@ -140,26 +223,54 @@ class PolarisationCompensator:
             enable_i : bool = True,
             enable_d : bool = True,
             acceleration: float = 20.0,
+            min_velocity: float = 1.0,
             max_velocity: float = 25.0,
             measure_time: float = 1.0,
             random_direction: bool = True,
-            start_at_0: bool = False,
-            scramble_motors: bool = False
+            try_reverse_direction: bool = True,
+            allow_mixed_improvement: bool = False,
     ) -> None:
-        self.motors = motors
-        self.tt = tt
-        self.target_qber = target_qber
-        self.target_qx = target_qx
-        self.max_iterations = max_iterations
-        self.samples = samples
-        self.measure_time = measure_time
-        self.random_direction = random_direction
-        self.acceleration = acceleration
-        self.max_velocity = max_velocity
+        """
+        Polarisation compensation method
 
-        self._motor_states = {}
+        :param target_qber: Max QBER allowed
+        :type target_qber: float
+        :param target_qx: Max Qx allowed
+        :type target_qx: float
+        :param max_iterations: Number iterations allowed, set to 0 for continuous mode
+        :type max_iterations: int
+        :param samples: Number of measurement samples
+        :type samples: int
+        :param p_gain: Proportional control gain
+        :type p_gain: float
+        :param i_gain: Integral action gain
+        :type i_gain: float
+        :param d_gain: Derivative action gain
+        :type d_gain: float
+        :param enable_p: Enable proportional control
+        :type enable_p: bool
+        :param enable_i: Enable integral action
+        :type enable_i: bool
+        :param enable_d: Enable derivative action
+        :type enable_d: bool
+        :param acceleration: Motor acceleration
+        :type acceleration: float
+        :param min_velocity: Minimum motor velocity
+        :type min_velocity: float
+        :param max_velocity: Maximum motor velocity
+        :type max_velocity: float
+        :param measure_time: Measurmement time for each measurement sample
+        :type measure_time: float
+        :param random_direction: Description
+        :type random_direction: bool
+        :param try_reverse_direction: Description
+        :type try_reverse_direction: bool
+        :param allow_mixed_improvement: Description
+        :type allow_mixed_improvement: bool
+        """
+        motor_states = {}
         for motor in self.motors:
-            self._motor_states[motor.device_info.serial_number] = {
+            motor_states[motor.device_info.serial_number] = {
                 'direction': random.choice([
                     base_motor.MotorDirection.BACKWARD,
                      base_motor.MotorDirection.FORWARD
@@ -172,178 +283,76 @@ class PolarisationCompensator:
                     enable_p=enable_p,
                     enable_i=enable_i,
                     enable_d=enable_d,
-                    output_limit=self.max_velocity
+                    min_limit=min_velocity,
+                    max_limit=max_velocity
                 )
             }
 
-        if start_at_0:
-            print('Setting motor positions to 0')
-            with suppress_stdout():
-                threads = [
-                    threading.Thread(target=set_motor_to_0, args=(motor,))
-                    for motor in self.motors
-                ]
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
-
-        if scramble_motors:
-            print('Scrambling motors')
-            with suppress_stdout():
-                threads = [
-                    threading.Thread(target=scramble_motor, args=(motor,))
-                    for motor in self.motors
-                ]
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()        
-
-        time.sleep(1)
-        self.start_time = time.time()
         print('Starting compensation')
-        self.compensate()
+        start_time = time.time()
 
-    def measure(self) -> tuple[float, float]:
-        qber_samples, qx_samples, rate_samples = [], [], []
-
-        for _ in range(self.samples):
-            data = timetagger.Data.from_raw_data(
-                raw_data=self.tt.measure(seconds=self.measure_time),
-                channel_groups=self.tt.channel_groups
-            )
-            qber_samples.append(data.qber)
-            qx_samples.append(data.qx)
-            rate_samples.append(data.rate)
-
-        m_qber = float(np.mean(qber_samples))
-        m_qx = float(np.mean(qx_samples))
-
-        return m_qber, m_qx
-
-    def stop_all_motors(self) -> None:
-        for motor in self.motors:
-            motor.stop()
-
-    # def compensate(self) -> None:
-    #     if self.max_iterations == 0:
-    #         iterator = itertools.count()
-    #     else:
-    #         iterator = range(self.max_iterations)
-
-    #     for i in iterator:
-    #         if self.max_iterations != 0:
-    #             print(f'Iteration: {i+1}/{self.max_iterations}')
-
-    #         baseline_qber, baseline_qx = self.measure()
-    #         baseline_objective = objective(
-    #             qber=baseline_qber,
-    #             qx=baseline_qx
-    #         )
-    #         for motor in self.motors:
-    #             print(f'  Motor {motor.device_info.serial_number}')
-    #             if self.random_direction:
-    #                 direction = random.choice([
-    #                     base_motor.MotorDirection.FORWARD,
-    #                     base_motor.MotorDirection.BACKWARD
-    #                 ])
-    #             else:
-    #                 direction = self._motor_states[motor.device_info.serial_number]['direction']
-
-    #             if (
-    #                 baseline_qber < self.target_qber
-    #                 and baseline_qx < self.target_qx
-    #             ):
-    #                 self.stop_all_motors()
-    #             else:
-    #                 velocity = self._motor_states[motor.device_info.serial_number]['pid'].compute(
-    #                     error=baseline_objective - objective(
-    #                         qber=self.target_qber,
-    #                         qx=self.target_qx
-    #                     ),
-    #                     timestamp=time.time()
-    #                 )
-    #                 motor.jog(
-    #                     direction=direction,
-    #                     acceleration=self.acceleration,
-    #                     max_velocity=abs(velocity)
-    #                 )
-    #                 jog_qber, jog_qx = self.measure()
-    #                 jog_objective = objective(
-    #                     qber=jog_qber,
-    #                     qx=jog_qx
-    #                 )
-    #                 if jog_objective > baseline_objective:
-    #                     print('No improvement - stopping all motors')
-    #                     self.stop_all_motors()
-    #                     match direction:
-    #                         case base_motor.MotorDirection.FORWARD:
-    #                             self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
-    #                         case base_motor.MotorDirection.BACKWARD:
-    #                             self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
-
-    #                 if (jog_qber > baseline_qber and jog_qx < baseline_qx) \
-    #                 or (jog_qber < baseline_qber and jog_qx > baseline_qx):
-    #                     print('Mixed improvement - stopping all motors')
-    #                     self.stop_all_motors()
-
-    #                 baseline_qber, baseline_qx = jog_qber, jog_qx
-    #                 baseline_objective = jog_objective
-
-    def compensate(self) -> None:
-        if self.max_iterations == 0:
+        if max_iterations == 0:
             iterator = itertools.count()
         else:
-            iterator = range(self.max_iterations)
+            iterator = range(max_iterations)
 
         for i in iterator:
-            if self.max_iterations != 0:
-                print(f'Iteration: {i+1}/{self.max_iterations}')
+            if max_iterations != 0:
+                print(f'Iteration: {i+1}/{max_iterations}')
 
-            # baseline_qber, baseline_qx = self.measure()
-            # baseline_objective = objective(
-            #     qber=baseline_qber,
-            #     qx=baseline_qx
-            # )
-            for motor in self.motors:
+            if try_reverse_direction:
+                motor_list = [m_i for m in self.motors for m_i in (m,)]
+            else:
+                motor_list = self.motors
+
+            for motor in motor_list:
                 print(f'\n=== Motor {motor.device_info.serial_number} ===')
-                if self.random_direction:
+                if random_direction:
                     direction = random.choice([
                         base_motor.MotorDirection.FORWARD,
                         base_motor.MotorDirection.BACKWARD
                     ])
                 else:
-                    direction = self._motor_states[motor.device_info.serial_number]['direction']
+                    direction = motor_states[motor.device_info.serial_number]['direction']
 
-                baseline_qber, baseline_qx = self.measure()
+                baseline_qber, baseline_qx = self.measure(
+                    samples=samples,
+                    measure_time=measure_time
+                )
                 baseline_objective = objective(
                     qber=baseline_qber,
                     qx=baseline_qx
                 )
                 if (
-                    baseline_qber < self.target_qber
-                    and baseline_qx < self.target_qx
+                    baseline_qber < target_qber
+                    and baseline_qx < target_qx
                 ):
-                    print('  Already at target - skipping motor')
+                    if max_iterations == 0:
+                        print('Already at target - skipping motor')
+                    else:
+                        print(f'Target achieved in {i+1}/{max_iterations} iterations - Time: {(time.time() - start_time):.2f} s')
+                        return
                 else:
                     while True:
-                        velocity = self._motor_states[motor.device_info.serial_number]['pid'].compute(
+                        velocity = motor_states[motor.device_info.serial_number]['pid'].compute(
                             error=baseline_objective - objective(
-                                qber=self.target_qber,
-                                qx=self.target_qx
+                                qber=target_qber,
+                                qx=target_qx
                             ),
                             timestamp=time.time()
                         )
-                        if self._motor_states[motor.device_info.serial_number]['moving'] == False:
+                        if motor_states[motor.device_info.serial_number]['moving'] == False:
                             motor.jog(
                                 direction=direction,
-                                acceleration=self.acceleration,
+                                acceleration=acceleration,
                                 max_velocity=abs(velocity)
                             )
-                            self._motor_states[motor.device_info.serial_number]['moving'] = True
+                            motor_states[motor.device_info.serial_number]['moving'] = True
 
-                        jog_qber, jog_qx = self.measure()
+                        jog_qber, jog_qx = self.measure(
+                            samples=samples,
+                            measure_time=measure_time
+                        )
                         jog_objective = objective(
                             qber=jog_qber,
                             qx=jog_qx
@@ -351,20 +360,21 @@ class PolarisationCompensator:
                         if jog_objective > baseline_objective:
                             print('No improvement - stopping motor')
                             motor.stop()
-                            self._motor_states[motor.device_info.serial_number]['moving'] = False
+                            motor_states[motor.device_info.serial_number]['moving'] = False
                             match direction:
                                 case base_motor.MotorDirection.FORWARD:
-                                    self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
+                                    motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
                                 case base_motor.MotorDirection.BACKWARD:
-                                    self._motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
+                                    motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
                             break
 
-                        # if (jog_qber > baseline_qber and jog_qx < baseline_qx) \
-                        # or (jog_qber < baseline_qber and jog_qx > baseline_qx):
-                        #     print('Mixed improvement - stopping motor')
-                        #     motor.stop()
-                        #     self._motor_states[motor.device_info.serial_number]['moving'] = False
-                        #     break
+                        if allow_mixed_improvement:
+                            if (jog_qber > baseline_qber and jog_qx < baseline_qx) \
+                            or (jog_qber < baseline_qber and jog_qx > baseline_qx):
+                                print('Mixed improvement - stopping motor')
+                                motor.stop()
+                                motor_states[motor.device_info.serial_number]['moving'] = False
+                                break
 
                         baseline_qber, baseline_qx = jog_qber, jog_qx
                         baseline_objective = jog_objective
@@ -385,28 +395,53 @@ def main() -> None:
     )
 
     try:
-        PolarisationCompensator(
+        pol_comp = PolarisationCompensator(
             motors=motors,
             tt=tt,
+        )
+        # pol_comp.set_motor_pos_to_0()
+        # pol_comp.scramble_motor_pos()
+
+        # pol_comp.compensate(
+        #     target_qber=0.05,
+        #     target_qx=0.05,
+        #     max_iterations=0,
+        #     samples=5,
+        #     p_gain=10.0,
+        #     i_gain=0.1,
+        #     d_gain=100.0,
+        #     enable_p=True,
+        #     enable_i=True,
+        #     enable_d=True,
+        #     measure_time=0.05,
+        #     random_direction=False,
+        #     try_reverse_direction=True,
+        #     allow_mixed_improvement=False,
+        #     min_velocity=0.5,
+        #     max_velocity=25.0,
+        # )
+
+        pol_comp.compensate(
             target_qber=0.05,
             target_qx=0.05,
             max_iterations=0,
             samples=5,
-            p_gain=10,
+            p_gain=10.0,
             i_gain=0.1,
-            d_gain=100.0,
+            d_gain=10.0,
             enable_p=True,
             enable_i=True,
             enable_d=True,
-            measure_time=0.1,
-            random_direction=True,
-            max_velocity=25.0,
-            # start_at_0=True,
-            # scramble_motors=True
+            measure_time=0.05,
+            random_direction=False,
+            try_reverse_direction=True,
+            allow_mixed_improvement=False,
+            min_velocity=0.5,
+            max_velocity=5.0,
         )
 
     except KeyboardInterrupt:
-        print('KeyboardInterrupt received — stopping motors.')
+        print('KeyboardInterrupt received - stopping motors.')
         for m in motors:
             try:
                 m.stop()

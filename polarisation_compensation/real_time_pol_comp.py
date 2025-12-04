@@ -285,7 +285,7 @@ def main() -> None:
             max_velocity=25.0,
             max_iterations=0,
             # start_at_0=True,
-            # scramble_motors=True
+            scramble_motors=True
         )
 
     except KeyboardInterrupt:
