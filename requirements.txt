@@ -14,5 +14,5 @@ PyVISA-py==0.8.0
 six==1.17.0
 tomtag==0.13
 typing_extensions==4.14.0
-polarimeter @ git+https://github.com/FarisRedza/polarimeter@main
-motor @ git+https://github.com/FarisRedza/motor@main
+polarimeter @ git+https://github.com/FarisRedza/polarimeter@da750729ef66972153a13456451b3edead3b67f0
+motor @ git+https://github.com/FarisRedza/motor@ef748462ac34e457806052d22c6c875b30c9c2f0
