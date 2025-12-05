@@ -103,6 +103,9 @@ class UQD(timetagger.TimeTagger):
         else:
             RuntimeWarning('UQDinterface already stopped')
 
+    def disconnect(self) -> None:
+        self.__del__() 
+
     def __del__(self) -> None:
         if self._uqdinterface_proc:
             self.stop_uqdinterface()
