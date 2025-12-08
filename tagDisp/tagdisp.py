@@ -13,7 +13,7 @@ import threading
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, Gio, GObject, Gdk
+from gi.repository import Gtk, Adw, Gio, GObject, Gdk, GLib
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
@@ -50,6 +50,9 @@ class DeviceSelectBox(Gtk.Box):
 
         header_bar = Gtk.HeaderBar()
         self.append(child=header_bar)
+
+        menu_button = MenuButton()
+        header_bar.pack_end(child=menu_button)
 
         self.page = Adw.PreferencesPage()
         self.append(child=self.page)
@@ -90,6 +93,9 @@ class DeviceSelectBox(Gtk.Box):
         self.page.add(group=self.remote_connection_group)
     
     def get_remote_devices(self) -> None:
+        """
+        Create AdwPreferencesGroup of devices advertised from the server
+        """
         self.server_connect()
 
         remote_device_infos = remote_timetagger.list_device_info(
@@ -102,11 +108,14 @@ class DeviceSelectBox(Gtk.Box):
             devices_infos=remote_device_infos,
             set_device_callback=self.set_device,
             remote=True,
-            return_callback=self.return_remote_connect
+            remote_disconnect=self.remote_disconnect
         )
         self.page.add(group=self.remote_device_list_group)
     
-    def return_remote_connect(self) -> None:
+    def remote_disconnect(self) -> None:
+        """
+        Disconnect from server and return to remote connection setup
+        """
         if self.get_socket():
             self.page.remove(self.remote_device_list_group)
             self.page.add(group=self.remote_connection_group)
@@ -183,13 +192,13 @@ class DeviceListGroup(Adw.PreferencesGroup):
             devices_infos: list[timetagger.DeviceInfo],
             set_device_callback: typing.Callable,
             remote: bool = False,
-            return_callback: typing.Optional[typing.Callable] = None
+            remote_disconnect: typing.Optional[typing.Callable] = None
     ) -> None:
         super().__init__(title=title)
         self.remote = remote
 
-        if self.remote and return_callback is not None:
-            self.retrn = return_callback
+        if self.remote and remote_disconnect is not None:
+            self.remote_disconnect = remote_disconnect
             disconnect_button = Gtk.Button(
                 label='Return',
                 icon_name='carousel-arrow-previous-symbolic',
@@ -252,7 +261,7 @@ class DeviceListGroup(Adw.PreferencesGroup):
         )
     
     def on_return(self, button: Gtk.Button) -> None:
-        self.retrn()
+        self.remote_disconnect()
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -596,6 +605,79 @@ class DeviceBox(Gtk.Box):
         return self.stack.get_visible_child_name()
 
 
+class MenuButton(Gtk.MenuButton):
+    def __init__(
+            self,
+            # counter_size_decrease_callback: typing.Callable,
+            # counter_size_increase_callback: typing.Callable
+    ) -> None:
+        super().__init__(icon_name='open-menu-symbolic')
+        menu = Gio.Menu()
+        popover = Gtk.PopoverMenu(menu_model=menu)
+        self.set_popover(popover=popover)
+
+        counter_menu = Gio.Menu()
+        counter_size_item = Gio.MenuItem()
+        counter_size_item.set_attribute_value(
+            'custom', GLib.Variant('s','counter_size')
+        )
+        counter_menu.append_item(item=counter_size_item)
+        menu.append_section(label=None, section=counter_menu)
+
+        counter_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL
+        )
+        counter_size_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            margin_start=12,
+            spacing=6
+        )
+        counter_box.append(child=counter_size_box)
+        counter_size_label = Gtk.Label(label='Counter size')
+        counter_size_box.append(child=counter_size_label)
+        counter_size_decrease_button = Gtk.Button(
+            icon_name='value-decrease-symbolic',
+            css_classes=['circular', 'flat'],
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.CENTER
+        )
+        counter_size_decrease_button.connect(
+            'clicked',
+            self.on_decrease_counter_size
+        )
+        counter_size_box.append(child=counter_size_decrease_button)
+
+        counter_size_increase_button = Gtk.Button(
+            icon_name='value-increase-symbolic',
+            css_classes=['circular', 'flat'],
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.CENTER
+        )
+        counter_size_increase_button.connect(
+            'clicked',
+            self.on_increase_counter_size
+        )
+        counter_size_box.append(child=counter_size_increase_button)
+        counter_separator = Gtk.Separator(
+            orientation=Gtk.Orientation.HORIZONTAL
+        )
+        counter_box.append(child=counter_separator)
+
+        popover.add_child(child=counter_box, id='counter_size')
+
+        menu.append(label='New Window', detailed_action='app.new_window')
+        menu.append(label='Full Screen', detailed_action='app.full_screen')
+        menu.append(label='Help', detailed_action='app.help')
+        menu.append(label='About tagDisp', detailed_action='app.about')
+        menu.append(label='Quit', detailed_action='app.quit')
+
+    def on_increase_counter_size(self, button: Gtk.Button) -> None:
+        print('+')
+
+    def on_decrease_counter_size(self, button: Gtk.Button) -> None:
+        print('-')
+
+
 class DeviceSidebar(Gtk.Revealer):
     def __init__(self, unset_device_callback: typing.Callable) -> None:
         super().__init__(
@@ -637,102 +719,11 @@ class DeviceSidebar(Gtk.Revealer):
         )
         main_box.append(child=self.stack_sidebar)
 
-        menu_button = Gtk.MenuButton(
-            icon_name='open-menu-symbolic',
-            tooltip_text='Main Menu'
-        )
+        menu_button = MenuButton()
         header_bar.pack_end(child=menu_button)
-
-        popover = Gtk.Popover(
-            position=Gtk.PositionType.BOTTOM,
-        )
-        menu_button.set_popover(popover=popover)
-
-        popover_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-        )
-        popover.set_child(child=popover_box)
-
-        counter_size_box = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL,
-            margin_start=10
-        )
-        popover_box.append(child=counter_size_box)
-
-        counter_size_label = Gtk.Label(label='Counter Size')
-        counter_size_box.append(child=counter_size_label)
-
-        counter_size_decrease_button = Gtk.Button(
-            icon_name='value-decrease-symbolic',
-            css_classes=['circular', 'flat'],
-            valign=Gtk.Align.CENTER,
-            halign=Gtk.Align.CENTER
-        )
-        counter_size_decrease_button.connect(
-            'clicked',
-            self.on_decrease_counter_size
-        )
-        counter_size_box.append(child=counter_size_decrease_button)
-
-        counter_size_increase_button = Gtk.Button(
-            icon_name='value-increase-symbolic',
-            css_classes=['circular', 'flat'],
-            valign=Gtk.Align.CENTER,
-            halign=Gtk.Align.CENTER
-        )
-        counter_size_increase_button.connect(
-            'clicked',
-            self.on_increase_counter_size
-        )
-        counter_size_box.append(child=counter_size_increase_button)
-
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(b'''
-            .custom-sidebar {
-                background-color: @headerbar_bg_color;
-            }
-        ''')
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-        self.add_css_class('custom-sidebar')
-
-        def add_menu_button(label: str, detailed_action: str) -> None:
-            button = Gtk.Button(
-                label=label,
-                halign=Gtk.Align.START,
-                hexpand=True,
-                css_classes=['flat', 'body']
-            )
-            button.connect('clicked', lambda b: menu_button.activate_action(name=detailed_action))
-            popover_box.append(child=button)
-
-        add_menu_button(label='Full Screen', detailed_action='app.full_screen')
-        add_menu_button(label='Help', detailed_action='app.help')
-        add_menu_button(label='About tagDisp', detailed_action='app.about')
-        add_menu_button(label='Quit', detailed_action='app.quit')
-
-    #     menu = Gio.Menu.new()
-    #     menu.append(label='New Window', detailed_action='app.new_window')
-    #     menu.append(label='Full Screen', detailed_action='app.full_screen')
-    #     menu.append(label='Help', detailed_action='app.help')
-    #     menu.append(label='About tagDisp', detailed_action='app.about')
-    #     menu.append(label='Quit', detailed_action='app.quit')
-
-    #     popover_menu = Gtk.PopoverMenu()
-    #     popover_menu.set_menu_model(model=menu)
-    #     menu_button.set_popover(popover=popover_menu)
 
     def set_stack(self, stack: Gtk.Stack) -> None:
         self.stack_sidebar.set_stack(stack=stack)
-
-    def on_increase_counter_size(self, button: Gtk.Button) -> None:
-        print('+')
-
-    def on_decrease_counter_size(self, button: Gtk.Button) -> None:
-        print('-')
     
     def on_return(self, button: Gtk.Button) -> None:
         self.unset_device()
@@ -764,9 +755,13 @@ class App(Adw.Application):
             simple_action:  Gio.SimpleAction,
             parameter_type = None
     ) -> None:
+        """
+        Show a help dialog
+        """
         help_dialog = Gtk.MessageDialog(
             transient_for=self.get_active_window(),
             modal=True,
+            visible=True,
             buttons=Gtk.ButtonsType.OK,
             text='Help',
             secondary_text='Select a UQD time tagger device, click start, and then click the Simple Display button'
@@ -775,26 +770,26 @@ class App(Adw.Application):
             'response',
             lambda dialog, response: dialog.destroy()
         )
-        help_dialog.present()
 
     def on_about(
             self,
             simple_action: Gio.SimpleAction,
             parameter_type = None
-        ) -> None:
+    ) -> None:
+        """
+        Show an about dialog
+        """
         about_dialog = Gtk.AboutDialog(
-            transient_for=self.win,
+            transient_for=self.get_active_window(),
             modal=True,
-            logo_icon_name='tag-symbolic',
-            name='tagDisp',
+            visible=True,
+            program_name='tagDisp',
             version='0.1',
-            authors=[
-                'Faris Redza',
-                'Peter Barrow'
-            ],
-            website='https://github.com/edinburgh-mostly-quantum-lab/tagDisp'
+            logo_icon_name='tag-symbolic',
+            website='https://github.com/edinburgh-mostly-quantum-lab/tagDisp',
+            website_label='GitHub',
+            authors=['Faris Redza', 'Peter Barrow']
         )
-        about_dialog.present()
 
     def on_quit(
             self,
