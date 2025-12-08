@@ -3,6 +3,7 @@ import pathlib
 import socket
 import struct
 import time
+import typing
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
@@ -92,9 +93,9 @@ class RemoteTimetagger(timetagger.TimeTagger):
     def __init__(
             self,
             model: str,
-            host: str | None = None,
-            port: int | None = None,
-            sock: socket.socket | None = None
+            host: typing.Optional[str] = None,
+            port: typing.Optional[int] = None,
+            sock: typing.Optional[socket.socket] = None
     ) -> None:
         if sock:
             self.host, self.port = sock.getpeername()
@@ -110,6 +111,7 @@ class RemoteTimetagger(timetagger.TimeTagger):
             self._sock.connect((self.host, self.port))
         else:
             raise NameError('Must provide either a socket or host and port')
+
         self._get_device_info(model=model)
         self.channel_groups = timetagger.default_channel_groups
     
@@ -166,7 +168,7 @@ class RemoteTimetagger(timetagger.TimeTagger):
 if __name__ == '__main__':
     tt = RemoteTimetagger(
         model='Logic-16',
-        host='137.195.63.6',
+        host='137.195.63.45',
         port=5001
     )
     try:
@@ -176,7 +178,7 @@ if __name__ == '__main__':
                 raw_data=raw_data,
                 channel_groups=timetagger.default_channel_groups
             )
-            print(raw_data.timetags.dtype)
+            print(raw_data.timetags)
             time.sleep(1)
 
 

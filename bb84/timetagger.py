@@ -337,7 +337,8 @@ class Data:
 class TimeTagger:
     def __init__(self) -> None:
         self.device_info = DeviceInfo(
-            manufacturer='Dummy Device'
+            manufacturer='Dummy Device',
+            model='Dummy'
         )
         self.channel_groups = [
             ChannelGroup(

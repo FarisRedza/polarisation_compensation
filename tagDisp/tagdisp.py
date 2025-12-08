@@ -306,20 +306,26 @@ class MainWindow(Adw.ApplicationWindow):
                     from bb84 import uqd
                     self.timetagger_box = DeviceBox(
                         tt=uqd.UQD(),
-                        unset_device_callback=self.unset_device
+                        unset_device_callback=self.unset_device,
+                        get_host_callback=self.get_host,
+                        get_port_callback=self.get_port
                     )
                 
                 case 'quTAG':
                     from bb84 import qutag
                     self.timetagger_box = DeviceBox(
                         tt=qutag.Qutag(),
-                        unset_device_callback=self.unset_device
+                        unset_device_callback=self.unset_device,
+                        get_host_callback=self.get_host,
+                        get_port_callback=self.get_port
                     )
 
                 case _:
                     self.timetagger_box = DeviceBox(
                         tt=timetagger.TimeTagger(),
-                        unset_device_callback=self.unset_device
+                        unset_device_callback=self.unset_device,
+                        get_host_callback=self.get_host,
+                        get_port_callback=self.get_port
                     )
         else:
             self.timetagger_box = DeviceBox(
@@ -327,7 +333,9 @@ class MainWindow(Adw.ApplicationWindow):
                     model=model,
                     sock=self.get_socket()
                 ),
-                unset_device_callback=self.unset_device
+                unset_device_callback=self.unset_device,
+                get_host_callback=self.get_host,
+                get_port_callback=self.get_port
             )
         self.main_stack.add_child(child=self.timetagger_box)
         self.main_stack.set_visible_child(child=self.timetagger_box)
@@ -387,7 +395,9 @@ class DeviceBox(Gtk.Box):
     def __init__(
             self,
             tt: timetagger.TimeTagger,
-            unset_device_callback: typing.Callable
+            unset_device_callback: typing.Callable,
+            get_host_callback: typing.Callable,
+            get_port_callback: typing.Callable
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL)
         self.timetagger = tt
@@ -469,7 +479,9 @@ class DeviceBox(Gtk.Box):
                 start_timetagger_callback=self.start_timetagger,
                 stop_timetagger_callback=self.stop_timetagger,
                 clear_buffers_callback=self.clear_buffers,
-                get_device_info_callback=self.get_device_info
+                get_device_info_callback=self.get_device_info,
+                get_host_callback=get_host_callback,
+                get_port_callback=get_port_callback
             ),
             name=settings_name,
             title=settings_name
@@ -686,23 +698,23 @@ class DeviceSidebar(Gtk.Revealer):
         )
         self.unset_device = unset_device_callback
 
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-sidebar {
+                background-color: @headerbar_bg_color;
+            }
+        ''')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        self.add_css_class('custom-sidebar')
+
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(child=main_box)
 
         header_bar = Gtk.HeaderBar(show_title_buttons=False)
-        main_box.append(child=header_bar)
-
-        return_button = Gtk.Button(
-            label='Return',
-            icon_name='carousel-arrow-previous-symbolic'
-        )
-        return_button.connect(
-            'clicked',
-            self.on_return
-        )
-        header_bar.pack_start(child=return_button)
-
-        self.stack_sidebar = Gtk.StackSidebar(vexpand=True)
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b'''
             .custom-sidebar-headerbar {
@@ -717,6 +729,19 @@ class DeviceSidebar(Gtk.Revealer):
             css_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
+        main_box.append(child=header_bar)
+
+        return_button = Gtk.Button(
+            label='Return',
+            icon_name='carousel-arrow-previous-symbolic'
+        )
+        return_button.connect(
+            'clicked',
+            self.on_return
+        )
+        header_bar.pack_start(child=return_button)
+
+        self.stack_sidebar = Gtk.StackSidebar(vexpand=True)
         main_box.append(child=self.stack_sidebar)
 
         menu_button = MenuButton()

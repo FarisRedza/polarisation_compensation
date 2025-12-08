@@ -8,6 +8,90 @@ from gi.repository import Gtk, Adw
 
 from bb84 import timetagger
 
+
+class DummyTimetaggerSettingsGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            start_timetagger_callback: typing.Callable,
+            stop_timetagger_callback: typing.Callable,
+    ) -> None:
+        super().__init__(title='Dummy Timetagger Settings')
+        self.start_timetagger = start_timetagger_callback
+        self.stop_timetagger = stop_timetagger_callback
+
+        control_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            margin_top=30,
+            spacing=60,
+            halign=Gtk.Align.CENTER
+        )
+        self.add(child=control_box)
+
+        stop_button = Gtk.Button(
+            label='Stop',
+            valign=Gtk.Align.CENTER,
+            css_classes=['destructive-action', 'pill']
+        )
+        stop_button.connect('clicked', self.on_stop)
+        control_box.append(stop_button)
+
+        start_button = Gtk.Button(
+            label='Start',
+            valign=Gtk.Align.CENTER,
+            css_classes=['suggested-action', 'pill']
+        )
+        start_button.connect('clicked', self.on_start)
+        control_box.append(start_button)
+
+    def on_start(self, button: Gtk.Button) -> None:
+        self.start_timetagger()
+
+    def on_stop(self, button: Gtk.Button) -> None:
+        self.stop_timetagger()
+
+
+class RemoteTimetaggerSettingsGroup(Adw.PreferencesGroup):
+    def __init__(
+            self,
+            start_timetagger_callback: typing.Callable,
+            stop_timetagger_callback: typing.Callable,
+    ) -> None:
+        super().__init__(title='Remote Timetagger Settings')
+        self.start_timetagger = start_timetagger_callback
+        self.stop_timetagger = stop_timetagger_callback
+
+        control_box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            margin_top=30,
+            spacing=60,
+            halign=Gtk.Align.CENTER
+        )
+        self.add(child=control_box)
+
+        stop_button = Gtk.Button(
+            label='Stop',
+            valign=Gtk.Align.CENTER,
+            css_classes=['destructive-action', 'pill']
+        )
+        stop_button.connect('clicked', self.on_stop)
+        control_box.append(stop_button)
+
+        start_button = Gtk.Button(
+            label='Start',
+            valign=Gtk.Align.CENTER,
+            css_classes=['suggested-action', 'pill']
+        )
+        start_button.connect('clicked', self.on_start)
+        control_box.append(start_button)
+
+    def on_start(self, button: Gtk.Button) -> None:
+        self.start_timetagger()
+
+    def on_stop(self, button: Gtk.Button) -> None:
+        self.stop_timetagger()
+
+
+
 class UQDSettingsGroup(Adw.PreferencesGroup):
     def __init__(
             self,
@@ -186,7 +270,9 @@ class UQDSettingsGroup(Adw.PreferencesGroup):
 class DeviceInfoGroup(Adw.PreferencesGroup):
     def __init__(
             self,
-            get_device_info_callback: typing.Callable
+            get_device_info_callback: typing.Callable,
+            get_host_callback: typing.Callable,
+            get_port_callback: typing.Callable
     ) -> None:
         super().__init__(title='Device Info')
         device_info: timetagger.DeviceInfo = get_device_info_callback()
@@ -196,6 +282,12 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
         self.add(child=serial_no_row)
         serial_no_label = Gtk.Label(label=device_info.serial_number)
         serial_no_row.add_suffix(widget=serial_no_label)
+
+        # manufacturer
+        manufacturer_row = Adw.ActionRow(title='Manufacturer')
+        self.add(child=manufacturer_row)
+        manufacturer_label = Gtk.Label(label=device_info.manufacturer)
+        manufacturer_row.add_suffix(widget=manufacturer_label)
 
         # model number
         model_no_row = Adw.ActionRow(title='Model number')
@@ -209,6 +301,18 @@ class DeviceInfoGroup(Adw.PreferencesGroup):
         fw_ver_label = Gtk.Label(label=device_info.firmware_version)
         fw_ver_row.add_suffix(widget=fw_ver_label)
 
+        if get_host_callback() != '127.0.0.1':
+            # host
+            host_row = Adw.ActionRow(title='Host')
+            self.add(child=host_row)
+            host_label = Gtk.Label(label=get_host_callback())
+            host_row.add_suffix(widget=host_label)
+
+            # port
+            port_row = Adw.ActionRow(title='Port')
+            self.add(child=port_row)
+            port_label = Gtk.Label(label=str(get_port_callback()))
+            port_row.add_suffix(widget=port_label)
 
 class SettingsPage(Adw.PreferencesPage):
     def __init__(
@@ -217,18 +321,41 @@ class SettingsPage(Adw.PreferencesPage):
             start_timetagger_callback: typing.Callable,
             stop_timetagger_callback: typing.Callable,
             clear_buffers_callback: typing.Callable,
-            get_device_info_callback: typing.Callable
+            get_device_info_callback: typing.Callable,
+            get_host_callback: typing.Callable,
+            get_port_callback: typing.Callable
     ) -> None:
         super().__init__(name=name)
+        device_info: timetagger.DeviceInfo = get_device_info_callback()
+        match device_info.model:
+            case 'Dummy':
+                    settings_group =DummyTimetaggerSettingsGroup(
+                        start_timetagger_callback=start_timetagger_callback,
+                        stop_timetagger_callback=stop_timetagger_callback
+                    )
 
-        settings_group = UQDSettingsGroup(
-            start_timetagger_callback=start_timetagger_callback,
-            stop_timetagger_callback=stop_timetagger_callback,
-            clear_buffers_callback=clear_buffers_callback
-        )
+            case 'Logic-16':
+                if get_host_callback() == '127.0.0.1':
+                    settings_group = UQDSettingsGroup(
+                        start_timetagger_callback=start_timetagger_callback,
+                        stop_timetagger_callback=stop_timetagger_callback,
+                        clear_buffers_callback=clear_buffers_callback
+                    )
+                else:
+                    settings_group = RemoteTimetaggerSettingsGroup(
+                        start_timetagger_callback=start_timetagger_callback,
+                        stop_timetagger_callback=stop_timetagger_callback
+                    )
+            
+            case _:
+                raise NotImplementedError(
+                    f'Settings page not implemented for device model: {device_info.model}'
+                )
         self.add(group=settings_group)
 
         device_info_group = DeviceInfoGroup(
-            get_device_info_callback=get_device_info_callback
+            get_device_info_callback=get_device_info_callback,
+            get_host_callback=get_host_callback,
+            get_port_callback=get_port_callback
         )
         self.add(group=device_info_group)
