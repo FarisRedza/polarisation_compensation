@@ -351,7 +351,7 @@ class TimeTagger:
             )
         ]
 
-    def measure(self) -> RawData:
+    def measure(self, seconds: float = 1.0) -> RawData:
         total_counts = np.random.randint(low=30000, high=35000)
 
         detector_proportions = {
