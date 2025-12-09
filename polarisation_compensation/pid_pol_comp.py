@@ -129,6 +129,7 @@ class PID:
         output = p + i + d
         output_lim = max(self.min_limit, min(self.max_limit, output))
         print(f'Velocity: {output_lim:.2f}, P: {p:.2f}, I: {i:.2f}, D: {d:.2f}')
+
         return output_lim
 
 
@@ -225,10 +226,11 @@ class PolarisationCompensator:
             acceleration: float = 20.0,
             min_velocity: float = 1.0,
             max_velocity: float = 25.0,
+            wait_before_measure: float = 0.0,
             measure_time: float = 1.0,
             random_direction: bool = True,
             try_reverse_direction: bool = True,
-            allow_mixed_improvement: bool = False,
+            allow_mixed_improvement: bool = True,
     ) -> None:
         """
         Polarisation compensation method
@@ -261,13 +263,14 @@ class PolarisationCompensator:
         :type max_velocity: float
         :param measure_time: Measurmement time for each measurement sample
         :type measure_time: float
-        :param random_direction: Description
+        :param random_direction: Choose a random direction for each motor jog
         :type random_direction: bool
-        :param try_reverse_direction: Description
+        :param try_reverse_direction: If jog direction stops improving, try other direction on
         :type try_reverse_direction: bool
-        :param allow_mixed_improvement: Description
+        :param allow_mixed_improvement: Allow situations where for example QBER drops but Qx increases
         :type allow_mixed_improvement: bool
         """
+        prev_motor = ''
         motor_states = {}
         for motor in self.motors:
             motor_states[motor.device_info.serial_number] = {
@@ -301,19 +304,21 @@ class PolarisationCompensator:
                 print(f'Iteration: {i+1}/{max_iterations}')
 
             if try_reverse_direction:
-                motor_list = [m_i for m in self.motors for m_i in (m,)]
+                motor_list = [m_i for m in self.motors for m_i in (m,m)]
             else:
                 motor_list = self.motors
 
             for motor in motor_list:
                 print(f'\n=== Motor {motor.device_info.serial_number} ===')
-                if random_direction:
+                if random_direction and motor.device_info.serial_number != prev_motor:
                     direction = random.choice([
                         base_motor.MotorDirection.FORWARD,
                         base_motor.MotorDirection.BACKWARD
                     ])
+                    print(f'Jogging direction {direction.name}')
                 else:
-                    direction = motor_states[motor.device_info.serial_number]['direction']
+                    direction: base_motor.MotorDirection = motor_states[motor.device_info.serial_number]['direction']
+                    print(f'Jogging reverse direction {direction.name}')
 
                 baseline_qber, baseline_qx = self.measure(
                     samples=samples,
@@ -334,13 +339,14 @@ class PolarisationCompensator:
                         return
                 else:
                     while True:
-                        velocity = motor_states[motor.device_info.serial_number]['pid'].compute(
+                        velocity = float(motor_states[motor.device_info.serial_number]['pid'].compute(
                             error=baseline_objective - objective(
                                 qber=target_qber,
                                 qx=target_qx
                             ),
                             timestamp=time.time()
-                        )
+                        ))
+                        print(f'QBER: {baseline_qber:.4f} | Qx {baseline_qx:.4f}')
                         if motor_states[motor.device_info.serial_number]['moving'] == False:
                             motor.jog(
                                 direction=direction,
@@ -349,6 +355,7 @@ class PolarisationCompensator:
                             )
                             motor_states[motor.device_info.serial_number]['moving'] = True
 
+                        time.sleep(wait_before_measure)
                         jog_qber, jog_qx = self.measure(
                             samples=samples,
                             measure_time=measure_time
@@ -357,6 +364,9 @@ class PolarisationCompensator:
                             qber=jog_qber,
                             qx=jog_qx
                         )
+
+                        prev_motor = motor.device_info.serial_number
+
                         if jog_objective > baseline_objective:
                             print('No improvement - stopping motor')
                             motor.stop()
@@ -368,12 +378,17 @@ class PolarisationCompensator:
                                     motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
                             break
 
-                        if allow_mixed_improvement:
+                        if not allow_mixed_improvement:
                             if (jog_qber > baseline_qber and jog_qx < baseline_qx) \
                             or (jog_qber < baseline_qber and jog_qx > baseline_qx):
                                 print('Mixed improvement - stopping motor')
                                 motor.stop()
                                 motor_states[motor.device_info.serial_number]['moving'] = False
+                                match direction:
+                                    case base_motor.MotorDirection.FORWARD:
+                                        motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.BACKWARD
+                                    case base_motor.MotorDirection.BACKWARD:
+                                        motor_states[motor.device_info.serial_number]['direction'] = base_motor.MotorDirection.FORWARD
                                 break
 
                         baseline_qber, baseline_qx = jog_qber, jog_qx
@@ -426,18 +441,19 @@ def main() -> None:
             target_qx=0.05,
             max_iterations=0,
             samples=5,
-            p_gain=10.0,
-            i_gain=0.1,
+            p_gain=17.5,
+            i_gain=0.05,
             d_gain=10.0,
             enable_p=True,
             enable_i=True,
             enable_d=True,
             measure_time=0.05,
-            random_direction=False,
+            wait_before_measure=0.0,
+            random_direction=True,
             try_reverse_direction=True,
-            allow_mixed_improvement=False,
-            min_velocity=0.5,
-            max_velocity=5.0,
+            allow_mixed_improvement=True,
+            min_velocity=0.0,
+            max_velocity=15.0,
         )
 
     except KeyboardInterrupt:
@@ -458,7 +474,6 @@ def main() -> None:
             tt.disconnect()
         except Exception:
             pass
-
 
 if __name__ == '__main__':
     main()
