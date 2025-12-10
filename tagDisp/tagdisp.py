@@ -375,7 +375,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def get_socket(self) -> typing.Optional[socket.socket]:
         return self._socket
-    
+
     def server_connect(self) -> None:
         sock = socket.socket(
             socket.AF_INET,
@@ -434,18 +434,7 @@ class DeviceBox(Gtk.Box):
         )
         if Gtk.HeaderBar().find_property(property_name='use_native_controls'):
             content_header_bar.set_use_native_controls(True)
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(b'''
-            .custom-headerbar {
-                background-color: @window_bg_color;
-            }
-        ''')
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-        content_header_bar.add_css_class('custom-headerbar')
+
         content_box.append(child=content_header_bar)
 
         toggle_sidebar_button = Gtk.Button(
@@ -535,7 +524,21 @@ class DeviceBox(Gtk.Box):
 
         self._measurement_thread.start()
         self._data_thread.start()
-    
+
+        # css styling
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-headerbar {
+                background-color: @window_bg_color;
+            }
+        ''')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        content_header_bar.add_css_class('custom-headerbar')
+
     def start_timetagger(self) -> None:
         from bb84 import uqd
         if isinstance(self.timetagger, uqd.UQD):
@@ -698,37 +701,10 @@ class DeviceSidebar(Gtk.Revealer):
         )
         self.unset_device = unset_device_callback
 
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(b'''
-            .custom-sidebar {
-                background-color: @headerbar_bg_color;
-            }
-        ''')
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-        self.add_css_class('custom-sidebar')
-
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(child=main_box)
 
         header_bar = Gtk.HeaderBar(show_title_buttons=False)
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(b'''
-            .custom-sidebar-headerbar {
-                background-color: @headerbar_bg_color;
-                border-bottom: none;
-                box-shadow: inset 0 -1px 0 transparent;
-            }
-        ''')
-        header_bar.add_css_class('custom-sidebar-headerbar')
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
         main_box.append(child=header_bar)
 
         return_button = Gtk.Button(
@@ -746,6 +722,26 @@ class DeviceSidebar(Gtk.Revealer):
 
         menu_button = MenuButton()
         header_bar.pack_end(child=menu_button)
+
+        # css styling
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b'''
+            .custom-sidebar {
+                background-color: @headerbar_bg_color;
+            }
+            .custom-sidebar-headerbar {
+                background-color: @headerbar_bg_color;
+                border-bottom: none;
+                box-shadow: inset 0 -1px 0 transparent;
+            }
+        ''')
+        self.stack_sidebar.add_css_class('custom-sidebar')
+        header_bar.add_css_class('custom-sidebar-headerbar')
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
     def set_stack(self, stack: Gtk.Stack) -> None:
         self.stack_sidebar.set_stack(stack=stack)
