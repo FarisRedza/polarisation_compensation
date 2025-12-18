@@ -69,15 +69,8 @@ def keys_per_second(
     rate = coincidences * (1 - f_ec * binary_entropy(qber) - binary_entropy(qx))
     return rate
 
-
-def objective(
-        qber: float,
-        qx: float,
-        qber_weight: float = 1.0,
-        qx_weight: float = 1.0
-    ) -> float:
-    return qber*qber_weight + qx*qx_weight
-
+def objective(qber: float, qx: float, tq: float = 0.05) -> float:
+    return max(0, qber - tq)**2 + max(0, qx - tq)**2
 
 class PID:
     def __init__(
@@ -271,7 +264,7 @@ class PolarisationCompensator:
         """
         logger = logging.getLogger(__file__.strip('.py'))
         logging.basicConfig(
-            filename=f'{__file__}'.replace('.py','_23.log'),
+            filename=f'{__file__}'.replace('.py','_27.log'),
             encoding='utf-8',
             filemode='a',
             format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s', 
@@ -444,7 +437,7 @@ def main() -> None:
         pol_comp.set_motor_pos_to_0()
         pol_comp.scramble_motor_pos()
 
-        # # 1-5, 10 | new logging - 20, 21
+        # # 24
         # pol_comp.compensate(
         #     target_qber=0.05,
         #     target_qx=0.05,
@@ -467,14 +460,60 @@ def main() -> None:
         #     verbose=False
         # )
 
-        # 6-8, 11 | new logging - 22, 23
+        # # 25
+        # pol_comp.compensate(
+        #     target_qber=0.05,
+        #     target_qx=0.05,
+        #     max_iterations=0,
+        #     samples=5,
+        #     p_gain=30.0,
+        #     i_gain=0.0,
+        #     d_gain=0.0,
+        #     enable_p=True,
+        #     enable_i=True,
+        #     enable_d=True,
+        #     measure_time=0.05,
+        #     wait_before_measure=0.0,
+        #     random_direction=True,
+        #     try_reverse_direction=True,
+        #     allow_mixed_improvement=True,
+        #     min_velocity=0.0,
+        #     max_velocity=25.0,
+        #     enable_logging=True,
+        #     verbose=False
+        # )
+
+        # # 26
+        # pol_comp.compensate(
+        #     target_qber=0.05,
+        #     target_qx=0.05,
+        #     max_iterations=0,
+        #     samples=5,
+        #     p_gain=100.0,
+        #     i_gain=0.0,
+        #     d_gain=0.0,
+        #     enable_p=True,
+        #     enable_i=True,
+        #     enable_d=True,
+        #     measure_time=0.05,
+        #     wait_before_measure=0.0,
+        #     random_direction=True,
+        #     try_reverse_direction=True,
+        #     allow_mixed_improvement=True,
+        #     min_velocity=0.0,
+        #     max_velocity=25.0,
+        #     enable_logging=True,
+        #     verbose=False
+        # )
+
+        # 27
         pol_comp.compensate(
             target_qber=0.05,
             target_qx=0.05,
             max_iterations=0,
             samples=5,
-            p_gain=15.3,
-            i_gain=1.0,
+            p_gain=75.0,
+            i_gain=0.0,
             d_gain=0.0,
             enable_p=True,
             enable_i=True,
@@ -489,144 +528,6 @@ def main() -> None:
             enable_logging=True,
             verbose=False
         )
-
-        # # 9
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=5,
-        #     p_gain=15.3,
-        #     i_gain=0.5,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 12 13 | new logging - 14
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=5,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 15
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=10,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 16
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=6,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 17
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=3,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 18, 19
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=5,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
 
     except KeyboardInterrupt:
         print('KeyboardInterrupt received - stopping motors.')

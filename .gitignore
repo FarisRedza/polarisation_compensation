@@ -1,3 +1,5 @@
+polarisation_compensation/logs/*.png
+
 # Config files
 tagDisp.cfg
 

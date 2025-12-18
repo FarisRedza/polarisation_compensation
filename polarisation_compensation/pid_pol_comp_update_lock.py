@@ -69,15 +69,8 @@ def keys_per_second(
     rate = coincidences * (1 - f_ec * binary_entropy(qber) - binary_entropy(qx))
     return rate
 
-
-def objective(
-        qber: float,
-        qx: float,
-        qber_weight: float = 1.0,
-        qx_weight: float = 1.0
-    ) -> float:
-    return qber*qber_weight + qx*qx_weight
-
+def objective(qber: float, qx: float, tq: float = 0.05) -> float:
+    return max(0, qber - tq)**2 + max(0, qx - tq)**2
 
 class PID:
     def __init__(
@@ -271,7 +264,7 @@ class PolarisationCompensator:
         """
         logger = logging.getLogger(__file__.strip('.py'))
         logging.basicConfig(
-            filename=f'{__file__}'.replace('.py','_23.log'),
+            filename=f'{__file__}'.replace('.py','_29.log'),
             encoding='utf-8',
             filemode='a',
             format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s', 
@@ -288,6 +281,7 @@ class PolarisationCompensator:
                      base_motor.MotorDirection.FORWARD
                 ]),
                 'moving': False,
+                'lock_cycles': 0,
                 'pid': PID(
                     kp=p_gain,
                     ki=i_gain,
@@ -319,6 +313,14 @@ class PolarisationCompensator:
 
             for motor in motor_list:
                 if verbose: print(f'\n=== Motor {motor.device_info.serial_number} ===')
+
+                if motor_states[motor.device_info.serial_number]['lock_cycles'] > 0:
+                    motor_states[motor.device_info.serial_number]['lock_cycles'] -= 1
+                    if verbose:
+                        print(f"Motor {motor.device_info.serial_number} locked "
+                            f"({motor_states[motor.device_info.serial_number]['lock_cycles']} cycles left)")
+                    continue
+
                 if random_direction and motor.device_info.serial_number != prev_motor:
                     direction = random.choice([
                         base_motor.MotorDirection.FORWARD,
@@ -386,6 +388,15 @@ class PolarisationCompensator:
                             qx=jog_qx
                         )
 
+                        if jog_qber < baseline_qber and jog_qx < baseline_qx:
+                            motor_states[motor.device_info.serial_number]['lock_cycles'] = 5
+                            if verbose:
+                                print("Motor improved both parameters — locking for 5 cycles")
+                            logger.debug(
+                                f'{iter=}: Motor {motor.device_info.serial_number} | '
+                                'Improved both parameters — locking'
+                            )
+
                         prev_motor = motor.device_info.serial_number
 
                         logger.info(
@@ -444,13 +455,13 @@ def main() -> None:
         pol_comp.set_motor_pos_to_0()
         pol_comp.scramble_motor_pos()
 
-        # # 1-5, 10 | new logging - 20, 21
+        # # 28
         # pol_comp.compensate(
         #     target_qber=0.05,
         #     target_qx=0.05,
         #     max_iterations=0,
         #     samples=5,
-        #     p_gain=17.0,
+        #     p_gain=75.0,
         #     i_gain=0.0,
         #     d_gain=0.0,
         #     enable_p=True,
@@ -467,14 +478,14 @@ def main() -> None:
         #     verbose=False
         # )
 
-        # 6-8, 11 | new logging - 22, 23
+        # 29
         pol_comp.compensate(
             target_qber=0.05,
             target_qx=0.05,
             max_iterations=0,
             samples=5,
-            p_gain=15.3,
-            i_gain=1.0,
+            p_gain=17.0,
+            i_gain=0.0,
             d_gain=0.0,
             enable_p=True,
             enable_i=True,
@@ -489,144 +500,6 @@ def main() -> None:
             enable_logging=True,
             verbose=False
         )
-
-        # # 9
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=5,
-        #     p_gain=15.3,
-        #     i_gain=0.5,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 12 13 | new logging - 14
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=5,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 15
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=10,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 16
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=6,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 17
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=3,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
-
-        # # 18, 19
-        # pol_comp.compensate(
-        #     target_qber=0.05,
-        #     target_qx=0.05,
-        #     max_iterations=0,
-        #     samples=5,
-        #     p_gain=15.3,
-        #     i_gain=0.1,
-        #     d_gain=0.0,
-        #     enable_p=True,
-        #     enable_i=True,
-        #     enable_d=True,
-        #     measure_time=0.05,
-        #     wait_before_measure=0.0,
-        #     random_direction=True,
-        #     try_reverse_direction=True,
-        #     allow_mixed_improvement=True,
-        #     min_velocity=0.0,
-        #     max_velocity=25.0,
-        #     enable_logging=True,
-        #     verbose=False
-        # )
 
     except KeyboardInterrupt:
         print('KeyboardInterrupt received - stopping motors.')
