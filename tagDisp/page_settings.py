@@ -4,7 +4,7 @@ import subprocess
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Adw
+from gi.repository import Gtk, Adw, Gio
 
 from bb84 import timetagger
 
@@ -227,17 +227,14 @@ class UQDSettingsGroup(Adw.PreferencesGroup):
         pass
 
     def on_open_file(self, button: Gtk.Button) -> None:
-        if hasattr(Gtk, 'FileDialog'):
-            dialog = Gtk.FileDialog()
-            dialog.open(
-                # parent=self.get_root(),
-                cancellable=None,
-                callback=self.on_file_selected
-            )
-        else:
+        if hasattr(Gtk, 'FileDialog'): # new file dialog since GTK 4.10
+            dialog = Gtk.FileDialog(title='Select File')
+            dialog.open(self.get_root(), None, self.on_file_dialog)
+
+        else: # legacy file dialog (deprecated in GTK 4.10 but needed for Ubuntu 22.04 due to older GTK)
             dialog = Gtk.FileChooserDialog(
                 title='Select DC Calibration File',
-                # transient_for=self.get_root(),
+                transient_for=self.get_root(),
                 modal=True,
                 action=Gtk.FileChooserAction.OPEN
             )
@@ -246,8 +243,33 @@ class UQDSettingsGroup(Adw.PreferencesGroup):
                 '_Open', Gtk.ResponseType.ACCEPT
             )
 
-            dialog.connect('response', self.on_file_selected)
+            dialog.connect('response', self.on_file_chooser_dialog)
             dialog.show()
+
+    def on_file_dialog(self, dialog, result: Gio.Task) -> None:
+        # dialog: Gtk.FileDialog
+        try:
+            file = dialog.open_finish(result)
+        except:
+            pass
+        else:
+            file_path = pathlib.Path(file)
+            self.dc_calibration_entry.set_text(text=file_path.name)
+    
+    def on_file_chooser_dialog(self, dialog, response_id: Gtk.ResponseType) -> None:
+        # dialog: Gtk.FileChooserDialog
+        match response_id:
+            case Gtk.ResponseType.ACCEPT:
+                file = dialog.get_file()
+                file_path = pathlib.Path(file)
+                self.dc_calibration_entry.set_text(text=file_path.name)
+                dialog.destroy()
+            
+            case Gtk.ResponseType.CANCEL:
+                dialog.destroy()
+            
+            case _:
+                pass
 
     def on_file_clear(
             self,
@@ -257,11 +279,6 @@ class UQDSettingsGroup(Adw.PreferencesGroup):
     ) -> None:
         set_dc_calibration_file(path=pathlib.Path())
         self.dc_calibration_entry.set_text(text='No file selected')
-
-    def on_file_selected(self, dialog, response, path: pathlib.Path) -> None:
-        if response == Gtk.ResponseType.ACCEPT:
-            self.dc_calibration_entry.set_text(text=path.name)
-        dialog.destroy()
 
     def on_clear_buffers(self, button: Gtk.Button) -> None:
         self.clear_buffers()
