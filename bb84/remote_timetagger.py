@@ -1,113 +1,186 @@
+import sys
+import pathlib
 import socket
 import struct
-import typing
 import time
+import typing
 
-import numpy
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
+from bb84 import timetagger
+from bb84 import remote_protocol
 
-from . import timetagger
-from . import remote_protocol
+def send_command(
+        sock: socket.socket,
+        command: remote_protocol.Command,
+        args : tuple | None = None
+) -> None:
+    encoded_args = [
+        str(arg).encode(encoding='utf-8') for arg in args
+    ] if args else []
+    payload = struct.pack('II', command, len(encoded_args))
 
-server_host = '127.0.0.1'
-server_host = '137.195.63.6'
-server_port = 5003
+    for arg in encoded_args:
+        payload += struct.pack('I', len(arg)) + arg
 
-def parse_status(payload: bytes) -> str:
-    message_len = struct.unpack('I', payload[:4])[0]
-    message = struct.unpack(f'{message_len}s', payload[4:])[0]
-    return bytes(message).decode()
+    sock.sendall(payload)
 
-class Timetagger(timetagger.TimeTagger):
-    def __init__(
-            self,
-            host: str,
-            port: int
-    ) -> None:
-        self.host = host
-        self.port = port
+def recvall(size: int, sock: socket.socket) -> bytes:
+    data = bytearray()
+    while len(data) < size:
+        part = sock.recv(size - len(data))
+        if not part:
+            raise ConnectionError('Socket closed')
+        data.extend(part)
+    return data
 
-        self._sock = socket.socket(
+def receive_response(sock: socket.socket) -> tuple[int, bytes]:
+    header = recvall(size=5, sock=sock)
+    total_len, response_id = struct.unpack('IB', header)
+    try:
+        response = remote_protocol.Response(response_id)
+    except ValueError:
+        raise ValueError(f'Invalid response ID: {response_id}')
+    else:
+        payload = recvall(
+            size=total_len - 1,
+            sock=sock
+        )
+        return response, payload
+
+def list_device_info(
+        host: str | None = None,
+        port: int | None = None,
+        sock: socket.socket | None = None
+) -> list[timetagger.DeviceInfo]:
+    if sock:
+        host, port = sock.getpeername()
+    elif host and port:
+        sock = socket.socket(
             socket.AF_INET,
             socket.SOCK_STREAM
         )
-        self._sock.connect((self.host, self.port))
-        self._get_device_info()
+        sock.settimeout(5)
+        sock.connect((host, port))
+    else:
+        raise ValueError('Must provide either a socket or host and port')
 
-    def __del__(self) -> None:
-        self.disconnect()
-
-    def measure(self, seconds: int = 1) -> timetagger.RawData:
-        self._send_command(
-            command=remote_protocol.Command.MEASURE_ONCE
-        )
-        resp_type, payload = self._receive_response()
-        if resp_type == remote_protocol.Response.RAWDATA:
-            return timetagger.RawData.deserialise(
-                payload=payload
+    send_command(
+        sock=sock,
+        command=remote_protocol.Command.LIST_DEVICES
+    )
+    response, payload = receive_response(sock=sock)
+    
+    device_infos = []
+    if response == remote_protocol.Response.LIST_DEVICES:
+        (num_devices,) = struct.unpack('I', payload[:4])
+        offset = 4
+        for _ in range(num_devices):
+            (length,) = struct.unpack('I', payload[offset: offset + 4])
+            offset += 4
+            info_bytes = payload[offset:offset + length]
+            offset += length
+            dev_info = timetagger.DeviceInfo.deserialise(
+                payload=info_bytes
             )
+            device_infos.append(dev_info)
+
+    else:
+        print(f'Unexpected response: {response}')
+
+    return device_infos
+
+class RemoteTimetagger(timetagger.TimeTagger):
+    def __init__(
+            self,
+            model: str,
+            host: typing.Optional[str] = None,
+            port: typing.Optional[int] = None,
+            sock: typing.Optional[socket.socket] = None
+    ) -> None:
+        if sock:
+            self.host, self.port = sock.getpeername()
+            self._sock = sock
+        elif host and port:
+            self.host = host
+            self.port = port
+            self._sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
+            self._sock.settimeout(5)
+            self._sock.connect((self.host, self.port))
         else:
-            print('Unexpected response:', resp_type)
-            return timetagger.RawData(
-                timetags=numpy.empty(0),
-                channels=numpy.empty(0)
-            )
+            raise NameError('Must provide either a socket or host and port')
 
+        self._get_device_info(model=model)
+        self.channel_groups = timetagger.default_channel_groups
+    
     def disconnect(self) -> None:
         self._sock.close()
 
-    def get_network_delay(self) -> float:
-        connect_request_time = time.time()
-        self._send_command(
-            command=remote_protocol.Command.NETWORK_DELAY
+    def measure(self, seconds: float = 1.0) -> timetagger.RawData:
+        send_command(
+            sock=self._sock,
+            command=remote_protocol.Command.MEASURE,
+            args=(self.device_info.model, seconds)
         )
-        resp_type, payload = self._receive_response()
-        if resp_type == remote_protocol.Response.TIME:
-            remote_time = struct.unpack(payload)
-
-
-    def _get_device_info(self) -> None:
-        self._send_command(
-            command=remote_protocol.Command.LIST_DEVICES
+        payload = self._handle_response(
+            expected_response_id=remote_protocol.Response.RAWDATA,
         )
-        resp_type, payload = self._receive_response()
-        if resp_type == remote_protocol.Response.DEVICE_INFO:
-            self.device_info=timetagger.DeviceInfo.deserialise(
-                payload=payload
-            )
-        else:
-            print('Unexpected response:', resp_type)
+        raw_data = timetagger.RawData.deserialise(
+            payload=payload
+        )
+        return raw_data
 
-    def _send_command(
+    def _handle_response(
             self,
-            command: remote_protocol.Command
-        ) -> None:
-        self._sock.sendall(struct.pack('I', command))
+            expected_response_id: remote_protocol.Response
+    ) -> bytes:
+        response, payload = receive_response(self._sock)
 
-    def _recvall(self, size: int) -> bytes:
-        data = bytearray()
-        while len(data) < size:
-            part = self._sock.recv(size - len(data))
-            if not part:
-                raise ConnectionError('Socket closed')
-            data.extend(part)
-        return data
+        match response:
+            case r if r == expected_response_id:
+                return payload
+            
+            case remote_protocol.Response.ERROR:
+                error_msg = payload.decode(encoding='utf-8')
+                raise RuntimeError(f'Server error: {error_msg}')
+            
+            case _:
+                raise ValueError(f'Unexpected response: {response}')
 
-    def _receive_response(self) -> tuple[typing.Any, bytes]:
-        header = self._recvall(size=5)
-        total_len, resp_type = struct.unpack('IB', header)
-        payload = self._recvall(total_len - 1)
-        return resp_type, payload
+    def _get_device_info(
+            self,
+            model: str
+    ) -> None:
+        send_command(
+            sock=self._sock,
+            command=remote_protocol.Command.DEVICE_INFO,
+            args=(model,)
+        )
+        payload = self._handle_response(
+            expected_response_id=remote_protocol.Response.DEVICE_INFO,
+        )
+        self.device_info = timetagger.DeviceInfo.deserialise(
+            payload=payload
+        )
 
 if __name__ == '__main__':
-    tt = Timetagger(
-        host=server_host,
-        port=server_port
+    tt = RemoteTimetagger(
+        model='Logic-16',
+        host='137.195.63.45',
+        port=5001
     )
-    print(tt.device_info)
-    # for _ in range(10):
-    #     raw_data = tt.measure()
-    #     # print(timetagger.Data.from_raw_data(raw_data=raw_data))
-    #     # singles = numpy.bincount(raw_data.channels, minlength=8)
-    #     # print(singles)
-    #     pprint.pprint(raw_data)
-    #     time.sleep(1)
+    try:
+        for _ in range(5):
+            raw_data=tt.measure()
+            data = timetagger.Data.from_raw_data(
+                raw_data=raw_data,
+                channel_groups=timetagger.default_channel_groups
+            )
+            print(raw_data.timetags)
+            time.sleep(1)
+
+
+    except KeyboardInterrupt:
+        tt.disconnect()

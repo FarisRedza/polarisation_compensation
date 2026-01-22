@@ -1,8 +1,11 @@
+import sys
+import pathlib
 import logging
 import time
 
 import matplotlib.pyplot as plt
 
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 import bb84.uqd as uqd
 import bb84.qutag as qutag
 # import bb84.remote_timetagger as remote_timetagger
@@ -10,40 +13,42 @@ import bb84.timetagger as timetagger
 
 import tomtag as tomt
 import numpy as np
+from tqdm import tqdm
 import matplotlib
 
 def find_delay(
-        tags_1550: np.ndarray,
-        tags_780: np.ndarray,
-        tcc: int = 10000
+        tags_QuTAG: np.ndarray,
+        tags_UQD: np.ndarray,
+        tcc: int = 2000,
+        left: int = -500000,
+        right: int = 500000
     ) -> int:
     """
     Find the delay between the two channels.
     """
     # find delay between 1550 and 780 nm
     cc = []
-    # print(f'1550: {tags_1550.dtype}')
-    # print(f'780: {tags_780.dtype}')
-    tags_780 = tags_780.astype(np.int64)
+    tags_UQD = tags_UQD.astype(np.int64)
     array = np.arange(
-        -300000000,
-        300000000,
+        left,
+        right,
         tcc,
         dtype=np.int64
     )
-    for delay in array:
+    for delay in tqdm(array):
         cc.append(
             tomt.count_twofolds(
-                tags_1550, tags_780 + delay,
-                len(tags_1550), len(tags_780), tcc
+                tags_QuTAG, tags_UQD + delay,
+                len(tags_QuTAG), len(tags_UQD), tcc
             )
         )
     
     plt.plot(
-        array,
+        array*78.125/1e3,
         cc
 
     )
+    plt.xlabel("delay (ns)")
     plt.show()
     return array[np.argmax(cc)]
 
@@ -79,30 +84,48 @@ def get_qber(channels, timetags, delay=0, tcc=15):
     return qber, qx, HH+HV+VH+VV
 
 if __name__ == '__main__':
-    tag_device_780 = uqd.UQD()
-    tag_device_1550 = qutag.Qutag()
-    tag_device_1550._qutag.enableExternalClock(enable=1)
+    tag_device_QuTAG = qutag.Qutag()
+    # tag_device_UQD._uqd_timetag.Use10MHz(use=True)
+    
+    tag_device_UQD = uqd.UQD()
+    tag_device_QuTAG._qutag.enableExternalClock(enable=1)
+    if tag_device_QuTAG._qutag.getClockState()==(1,0):
+        print("clocks locked!")
+    else:
+        print("attention: clocks not locked!")
+    # zero both internal clocks
+    tag_device_QuTAG.flush()
+    tag_device_UQD.flush()
+    data_QuTAG = tag_device_QuTAG.measure(0.1)
+    data_UQD = tag_device_UQD.measure(0.1)
+    print(f'QuTAG time {(data_QuTAG.timetags[-1] - data_QuTAG.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s') 
+    print(f'UQD time {(data_UQD.timetags[-1] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s')       
+    print(f'raw delay {(data_QuTAG.timetags[0] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.5f}s') 
+    # data_QuTAG.timetags += data_UQD.timetags[0] - data_QuTAG.timetags[0] 
+    # print(data_UQD.timetags)
 
-    start_time_1550 = time.time()
-    data_1550 = tag_device_1550.measure()
-    print(f'1580 time {time.time() - start_time_1550}')    
-
-    data_780 = tag_device_780.measure()
-    start_time_780 = time.time()
-    print(f'780 time {time.time() - start_time_780}')
-
-    data_780.timetags -= data_780.timetags[0]
-    data_1550.timetags -= data_1550.timetags[0]
-
-    print(f'{data_780.timetags=}')
-    print(f'{data_1550.timetags=}')
-
-    print(f' 1550: {np.unique(data_1550.channels)}')
-    print(f' 780: {np.unique(data_780.channels)}')
+    print(f' tags in QuTAG: {len(np.where(data_QuTAG.channels==0)[0])}')
+    print(f' tags in UQD: {len(np.where(data_UQD.channels==0)[0])}')
 
     delay = find_delay(
-        tags_1550=data_1550.timetags[data_1550.channels==0],
-        tags_780=data_780.timetags[data_780.channels==4]
+        tags_QuTAG=data_QuTAG.timetags[data_QuTAG.channels==0],
+        tags_UQD=data_UQD.timetags[data_UQD.channels==0],
+        left=-400000000,
+        right=-100000000
     )
+    data_QuTAG = tag_device_QuTAG.measure(0.1)
+    data_UQD = tag_device_UQD.measure(0.1) 
+    print(f'QuTAG time {(data_QuTAG.timetags[-1] - data_QuTAG.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s') 
+    print(f'UQD time {(data_UQD.timetags[-1] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.3f}s')       
+    print(f'raw delay {(data_QuTAG.timetags[0] - data_UQD.timetags[0])*tag_device_QuTAG.resolution/1e12:.5f}s')
+    data_UQD.timetags += delay
+    delay = find_delay(
+        tags_QuTAG=data_QuTAG.timetags[data_QuTAG.channels==0],
+        tags_UQD=data_UQD.timetags[data_UQD.channels==0],
+        left=-5000,
+        right=5000,
+        tcc = 1
+    )
+
 
     print(f'{delay=}')
