@@ -1,9 +1,12 @@
-import matplotlib.pyplot as plt
-import numpy as np
+import pathlib
 import json
 
-file_name = 'logs/pol_comp_2025_08_06_16_43_26.log'
-with open(file_name, 'r') as f:
+import matplotlib.pyplot as plt
+import numpy as np
+
+file_path = pathlib.Path.home().joinpath('logs')
+file_name = 'pol_comp_2025_08_06_16_43_26.log'
+with open(f'{file_path}/{file_name}', 'r') as f:
     qbers  = []
     qxs = []
     times = []
