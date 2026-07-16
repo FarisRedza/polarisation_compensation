@@ -3,9 +3,11 @@ import typing
 import math
 import struct
 import time
+import typing
 
 import numpy as np
 import tomtag as tomt
+
 
 Percent = typing.NewType('Percent', float)
 Degrees = typing.NewType('Degrees', float)
@@ -14,15 +16,17 @@ Watts = typing.NewType('Watts', float)
 Metres = typing.NewType('Metres', float)
 DecibelMilliwatts = typing.NewType('DecibelMilliwatts', float)
 
+
 @dataclasses.dataclass
 class ChannelGroup:
     name: str
-    H: int | None = None
-    V: int | None = None
-    A: int | None = None
-    D: int | None = None
-    R: int | None = None
-    L: int | None = None
+    H: typing.Optional[int] = None
+    V: typing.Optional[int] = None
+    A: typing.Optional[int] = None
+    D: typing.Optional[int] = None
+    R: typing.Optional[int] = None
+    L: typing.Optional[int] = None
+
 
 @dataclasses.dataclass
 class TimetagsGroup:
@@ -149,6 +153,7 @@ def get_qber(
 
     return qber, qx, HH+HV+VH+VV
 
+
 @dataclasses.dataclass
 class DeviceInfo:
     manufacturer: str = 'N/A'
@@ -183,6 +188,7 @@ class DeviceInfo:
             offset += length
             fields.append(value)
         return DeviceInfo(*fields)
+
 
 @dataclasses.dataclass
 class RawData:
@@ -226,6 +232,7 @@ class RawData:
         channels = np.frombuffer(payload[offset_channels:offset_channels + channels_bytes], dtype=np.uint8)
 
         return RawData(timetags=timetags, channels=channels)
+
 
 @dataclasses.dataclass
 class Data:

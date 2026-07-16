@@ -1,13 +1,11 @@
-import sys
-import pathlib
 import time
 import typing
 
 import numpy
 
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
 from quTAG import QuTAG_HR
+
 
 class Qutag(timetagger.TimeTagger):
     def __init__(self) -> None:

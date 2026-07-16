@@ -1,0 +1,6 @@
+# Make devices available to all users
+
+SUBSYSTEM=="usb", ATTR{idVendor}=="16c0", MODE="666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="601f", MODE="666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="04b4", ATTR{idProduct}=="00f1", MODE="666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="04b4", ATTR{idProduct}=="00f3", MODE="666"

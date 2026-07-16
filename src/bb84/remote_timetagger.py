@@ -1,13 +1,11 @@
-import sys
-import pathlib
 import socket
 import struct
 import time
 import typing
 
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
 from bb84 import remote_protocol
+
 
 def send_command(
         sock: socket.socket,

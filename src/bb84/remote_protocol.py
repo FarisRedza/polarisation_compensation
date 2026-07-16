@@ -1,5 +1,6 @@
 import enum
 
+
 class Command(enum.IntEnum):
     LIST_DEVICES = 1
     DEVICE_INFO = 2

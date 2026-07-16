@@ -1,0 +1,32 @@
+[build-system]
+requires = ['setuptools>=69', 'wheel']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'polarisation_compensation'
+version = '0.1'
+requires-python = '>=3.11'
+dependencies = [
+    'numpy>=2.2',
+    'matplotlib>=3.10',
+    'tomtag==0.13',
+    'motor[gui] @ git+https://github.com/FarisRedza/motor.git@v0.1'
+]
+authors = [
+    {name = 'Faris Redza', email = 'faris.redza1999@gmail.com'}
+]
+maintainers = [
+    {name = 'Faris Redza', email = 'faris.redza1999@gmail.com'}
+]
+readme = 'README.md'
+
+[project.urls]
+Homepage = 'https://github.com/FarisRedza/polarisation_compensation'
+Repository = 'https://github.com/FarisRedza/polarisation_compensation.git'
+
+[tool.setuptools]
+packages = [
+    'polarisation_compensation',
+    'bb84',
+    'tagDisp'
+]

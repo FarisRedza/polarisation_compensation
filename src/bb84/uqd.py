@@ -1,4 +1,3 @@
-import sys
 import os
 import pathlib
 import typing
@@ -7,9 +6,9 @@ import time
 
 import numpy as np
 
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
 from UQDinterface.ttag.python import ttag
+
 
 class UQD(timetagger.TimeTagger):
     def __init__(self) -> None:

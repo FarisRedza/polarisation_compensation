@@ -1,13 +1,11 @@
-import sys
-import pathlib
 import socket
 import threading
 import struct
 
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import remote_protocol
 from bb84 import uqd
 from bb84 import qutag
+
 
 def recvall(size: int, sock: socket.socket) -> bytes:
     data = bytearray()
