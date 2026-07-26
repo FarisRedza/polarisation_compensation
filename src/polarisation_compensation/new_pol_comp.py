@@ -1,5 +1,4 @@
 import sys
-import pathlib
 import time
 import random
 import io
@@ -8,7 +7,6 @@ from contextlib import contextmanager
 
 import numpy as np
 
-sys.path.append(str(pathlib.Path.cwd()))
 from bb84 import timetagger
 from bb84 import remote_timetagger
 from motor import thorlabs_motor

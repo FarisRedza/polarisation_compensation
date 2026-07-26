@@ -1,6 +1,4 @@
 import sys
-import pathlib
-import typing
 import time
 import random
 import io
@@ -12,7 +10,6 @@ import logging
 
 import numpy as np
 
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from bb84 import timetagger
 from bb84 import remote_timetagger
 from motor import thorlabs_motor
