@@ -227,3 +227,6 @@ PKG_SOURCE/
 # Binaries
 
 # Exceptions
+
+# Dev container
+devcontainer-lock.json
