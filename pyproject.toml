@@ -1,0 +1,44 @@
+[build-system]
+requires = ['setuptools>=44.0.0', 'wheel']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'polcomp'
+version = '2.0.0'
+requires-python = '>=3.9'
+authors = [
+    {name = 'Faris Redza', email = 'faris.redza1999@gmail.com'}
+]
+maintainers = [
+    {name = 'Faris Redza', email = 'faris.redza1999@gmail.com'}
+]
+readme = 'README.md'
+
+dependencies = [
+    'numpy>=2.0.0',
+    'motor @ git+https://github.com/FarisRedza/motor@9844925b36b2c279a1fe9d4b9270fcad6d06fafb'
+]
+
+[project.optional-dependencies]
+dev = [
+    'pytest>=5.1.0',
+    'pytest-cov>=7.0.0',
+    'vermin>=0.2.2'
+]
+uqd = [
+    'ttag @ https://github.com/edinburgh-mostly-quantum-lab/ttag@python-packaging'
+]
+
+[project.urls]
+Homepage = 'https://github.com/FarisRedza/polarisation_compensation'
+Repository = 'https://github.com/FarisRedza/polarisation_compensation.git'
+
+[tool.pytest.ini_options]
+addopts = [
+    '--cov=polcomp',
+    '--cov-report=term-missing',
+    '--cov-branch'
+]
+testpaths = [
+    'tests',
+]
