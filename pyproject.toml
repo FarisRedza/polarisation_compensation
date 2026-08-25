@@ -16,7 +16,8 @@ readme = 'README.md'
 
 dependencies = [
     'numpy>=2.0.0',
-    'motor @ git+https://github.com/FarisRedza/motor@9844925b36b2c279a1fe9d4b9270fcad6d06fafb'
+    'motor @ git+https://github.com/FarisRedza/motor@9844925b36b2c279a1fe9d4b9270fcad6d06fafb',
+    'qtoolkit @ git+https://github.com/FarisRedza/qtoolkit@main'
 ]
 
 [project.optional-dependencies]
@@ -26,7 +27,10 @@ dev = [
     'vermin>=0.2.2'
 ]
 uqd = [
-    'ttag @ https://github.com/edinburgh-mostly-quantum-lab/ttag@python-packaging'
+    'ttag @ git+https://github.com/edinburgh-mostly-quantum-lab/ttag@python-packaging'
+]
+polarimeter = [
+    'polarimeter @ git+https://github.com/FarisRedza/polarimeter@56722ac31b888b51453234710700c2f3aebfbf07'
 ]
 
 [project.urls]
