@@ -5,7 +5,7 @@ import struct
 import time
 
 import numpy as np
-import tomtag as tomt
+import qtoolkit
 
 Percent = typing.NewType('Percent', float)
 Degrees = typing.NewType('Degrees', float)
@@ -79,9 +79,9 @@ def find_delay(
     cc = []
     for delay in np.arange(-3000, 3000,10):
         cc.append(
-            tomt.count_twofolds(
+            qtoolkit.get_twofold_coincidences(
                 tags_1550[:10000], tags_780[:10000] + delay,
-                len(tags_1550[:10000]), len(tags_780[:10000]), 15
+                15
             )
         )
     delay = np.arange(-3000, 3000,10)[np.argmax(cc)]
@@ -96,7 +96,7 @@ def get_qber(
         channel_group_1: ChannelGroup,
         channel_group_2: ChannelGroup,
         delay: float = 0,
-        tcc: float = 50,
+        tcc: int = 50,
         verbose: bool = False
 ) -> tuple[float, float, int]:
     tags_1550 = TimetagsGroup(
@@ -127,20 +127,20 @@ def get_qber(
         if field.name != "name":
             setattr(tags_780, field.name, getattr(tags_780, field.name) + delay)
 
-    HH: int = tomt.count_twofolds(tags_1550.H, tags_780.H, len(tags_1550.H), len(tags_780.H),tcc)
-    HV: int = tomt.count_twofolds(tags_1550.H, tags_780.V, len(tags_1550.H), len(tags_780.V),tcc)
-    VH: int = tomt.count_twofolds(tags_1550.V, tags_780.H, len(tags_1550.V), len(tags_780.H),tcc)
-    VV: int = tomt.count_twofolds(tags_1550.V, tags_780.V, len(tags_1550.V), len(tags_780.V),tcc)
+    HH: int = qtoolkit.get_twofold_coincidences(tags_1550.H, tags_780.H ,tcc)
+    HV: int = qtoolkit.get_twofold_coincidences(tags_1550.H, tags_780.V ,tcc)
+    VH: int = qtoolkit.get_twofold_coincidences(tags_1550.V, tags_780.H ,tcc)
+    VV: int = qtoolkit.get_twofold_coincidences(tags_1550.V, tags_780.V ,tcc)
 
     qber: float =  (VH + HV) / (HH + HV + VH + VV)
     if verbose == True:
         print('qber =',qber)
         print(HH, HV, VH, VV)
 
-    DD: int = tomt.count_twofolds(tags_1550.D, tags_780.D, len(tags_1550.D), len(tags_780.D),tcc)
-    DA: int = tomt.count_twofolds(tags_1550.D, tags_780.A, len(tags_1550.D), len(tags_780.A),tcc)
-    AD: int = tomt.count_twofolds(tags_1550.A, tags_780.D, len(tags_1550.A), len(tags_780.D),tcc)
-    AA: int = tomt.count_twofolds(tags_1550.A, tags_780.A, len(tags_1550.A), len(tags_780.A),tcc)
+    DD: int = qtoolkit.get_twofold_coincidences(tags_1550.D, tags_780.D, tcc)
+    DA: int = qtoolkit.get_twofold_coincidences(tags_1550.D, tags_780.A, tcc)
+    AD: int = qtoolkit.get_twofold_coincidences(tags_1550.A, tags_780.D, tcc)
+    AA: int = qtoolkit.get_twofold_coincidences(tags_1550.A, tags_780.A, tcc)
 
     qx: float =  (DA + AD) / (DD + AD + DA + AA)
     if verbose == True and qx > 1:
