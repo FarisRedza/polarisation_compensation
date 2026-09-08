@@ -17,7 +17,7 @@ readme = 'README.md'
 dependencies = [
     'numpy>=2.0.0',
     'motor[gui] @ git+https://github.com/FarisRedza/motor@9844925b36b2c279a1fe9d4b9270fcad6d06fafb',
-    'qtoolkit @ git+https://github.com/FarisRedza/qtoolkit@v0.1'
+    'qtoolkit @ git+https://github.com/FarisRedza/qtoolkit@main'
 ]
 
 [project.optional-dependencies]
