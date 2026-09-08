@@ -13,7 +13,7 @@ import motor.gui_widget as motor_gui_widget
 import polarimeter.thorlabs_polarimeter as thorlabs_polarimeter
 import polarimeter.gui_widget as polarimeter_gui_widget
 
-from . import pol_comp
+from .. import pol_comp
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, *args, **kwargs) -> None:
