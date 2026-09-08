@@ -4,10 +4,25 @@
 	"features": {
 		"ghcr.io/devcontainers-extra/features/apt-packages:1": {
 			"packages": [
-				"python3-venv"
+				"python3-venv",
+				"python3-dev",
+				"libadwaita-1-dev",
+				"librsvg2-common"
 			]
 		}
 	},
+    "runArgs": [
+        "--volume=/dev:/dev:rslave",
+        "--mount=type=devpts,destination=/dev/pts",
+        "--annotation=run.oci.keep_original_groups=1",
+		"--publish=5001:5001",
+		"--volume=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY}:/tmp/vscode-host-wayland.sock"
+    ],
+	"containerEnv": {
+		"XDG_RUNTIME_DIR": "/tmp/user/1000",
+		"WAYLAND_DISPLAY": "vscode-wayland.sock"
+	},
+	"postCreateCommand": "sudo mkdir -p /tmp/user/1000 && sudo chown vscode:vscode /tmp/user/1000 && sudo chmod 700 /tmp/user/1000 && ln -sf /tmp/vscode-host-wayland.sock /tmp/user/1000/vscode-wayland.sock",
 	"customizations": {
 		"vscode": {
 			"extensions": [
