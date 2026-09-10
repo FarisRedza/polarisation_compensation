@@ -1,6 +1,9 @@
 import curses
+import typing
 
 from qtoolkit.polarisation import PolarisationChannelMap
+
+from ..polcomp import PolCompStatus
 
 def draw_ui(
     stdscr,
@@ -12,6 +15,7 @@ def draw_ui(
     second_channels: PolarisationChannelMap,
     measurement_time: float,
     result,
+    controller_status: typing.Optional[PolCompStatus] = None
 ) -> None:
     stdscr.erase()
     curses.start_color()
@@ -155,6 +159,52 @@ def draw_ui(
                 f'| {coincidence_rate:9.0f} |'
             )
         )
+
+    if controller_status is not None:
+        status = controller_status
+
+        score = (
+            f'{status.score:.3f}'
+            if status.score is not None
+            else '-'
+        )
+
+        best_score = (
+            f'{status.best_score:.3f}'
+            if status.best_score is not None
+            else '-'
+        )
+
+        best_position = (
+            f'{status.best_position:.2f}°'
+            if status.best_position is not None
+            else '-'
+        )
+
+        search_state = (
+            status.search_state.name
+            if status.search_state is not None
+            else '-'
+        )
+
+        motion = (
+            'MOVING'
+            if status.is_moving
+            else 'STATIONARY'
+        )
+        lines.extend([
+            '',
+            'Controller',
+            '----------',
+            f'State:          {status.state.name}',
+            f'Search state:   {search_state}',
+            f'Motor:          {motion}',
+            f'Step:           {status.search_step_deg:.2f}°',
+            f'Objective:      {score}',
+            f'Best objective: {best_score}',
+            f'Best QWP1:      {best_position}',
+        ])
+
     lines.append('\nX        Quit')
 
     if height < len(lines):

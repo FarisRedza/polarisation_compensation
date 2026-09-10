@@ -25,12 +25,28 @@ class CompensationState(enum.Enum):
     RECOVER = enum.auto()
     COMPLETE = enum.auto()
 
+
 class SearchState(enum.Enum):
     START = enum.auto()
     PROBE_POSITIVE = enum.auto()
     PROBE_NEGATIVE = enum.auto()
     MOVE_POSITIVE = enum.auto()
     MOVE_NEGATIVE = enum.auto()
+
+
+@dataclasses.dataclass(frozen=True)
+class PolCompStatus:
+    state: CompensationState
+    search_state: typing.Optional[SearchState]
+
+    score: typing.Optional[float]
+
+    search_step_deg: float
+
+    best_score: typing.Optional[float]
+    best_position: typing.Optional[float]
+
+    is_moving: bool
 
 
 class PolCompController:
@@ -58,6 +74,8 @@ class PolCompController:
 
         self.active = False
         self.state = CompensationState.IDLE
+
+        self._score: typing.Optional[float] = None
 
         self._search_state = SearchState.START
         self._search_waveplate_index = 0
@@ -93,6 +111,23 @@ class PolCompController:
             for waveplate in self.waveplates
         )
 
+    @property
+    def status(
+        self,
+    ) -> PolCompStatus:
+        return PolCompStatus(
+            state=self.state,
+            search_state=(
+                self._search_state
+                if self.state is CompensationState.SEARCH
+                else None
+            ),
+            score=self._score,
+            search_step_deg=self.search_step_deg,
+            best_score=self._search_best_score,
+            best_position=self._search_best_position,
+            is_moving=self.is_moving,
+        )
 
     def objective(
             self,
@@ -128,6 +163,7 @@ class PolCompController:
             qber=qber,
             qx=qx,
         )
+        self._score = score
 
         match self.state:
             case CompensationState.IDLE:

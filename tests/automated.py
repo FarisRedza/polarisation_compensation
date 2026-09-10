@@ -185,6 +185,7 @@ def main(
             second_channels=second_channels,
             measurement_time=MEASUREMENT_TIME_S,
             result=result,
+            controller_status=pc.status
         )
 
         elapsed = (
