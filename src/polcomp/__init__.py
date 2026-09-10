@@ -1,7 +1,19 @@
 from .polcomp import (
-    PolComp,
+    PolCompController,
+)
+
+from .simulation import (
+    SimulatedMotor,
+    SimulatedEPS,
+    SimulatedPolCompSystem,
+    SimulatedTimetagger
 )
 
 __all__ = [
-    'PolComp',
+    'PolCompController',
+
+    'SimulatedMotor',
+    'SimulatedEPS',
+    'SimulatedPolCompSystem',
+    'SimulatedTimetagger',
 ]
