@@ -4,8 +4,8 @@ import curses
 import numpy as np
 
 from qtoolkit.polarisation import (
-    QuarterWavePlate,
-    HalfWavePlate,
+    QuarterWaveplate,
+    HalfWaveplate,
     compose_waveplates,
     apply_local_jones_matrix,
     PHI_PLUS,
@@ -43,13 +43,13 @@ TARGET_QWP2_DEG = 20
 disturbance = (
     compose_waveplates(
         [
-            QuarterWavePlate(
+            QuarterWaveplate(
                 angle_deg=TARGET_QWP1_DEG,
             ),
-            HalfWavePlate(
+            HalfWaveplate(
                 angle_deg=TARGET_HWP_DEG,
             ),
-            QuarterWavePlate(
+            QuarterWaveplate(
                 angle_deg=TARGET_QWP2_DEG,
             ),
         ]
@@ -74,13 +74,13 @@ source = SimulatedEPS(
 # Motorised compensation waveplates
 # ---------------------------------------------------------------------
 qwp1 = SimulatedMotor(
-    waveplate=QuarterWavePlate(),
+    waveplate=QuarterWaveplate(),
 )
 hwp = SimulatedMotor(
-    waveplate=HalfWavePlate(),
+    waveplate=HalfWaveplate(),
 )
 qwp2 = SimulatedMotor(
-    waveplate=QuarterWavePlate(),
+    waveplate=QuarterWaveplate(),
 )
 waveplates = [
     qwp1,

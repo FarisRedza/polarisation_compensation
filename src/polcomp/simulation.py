@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 
 import qtoolkit
-from qtoolkit.polarisation import WavePlate
+from qtoolkit.polarisation import Waveplate
 
 from .polcomp import (
     BB84DetectionResult,
@@ -16,7 +16,7 @@ from motor.dummy_motor import DummyMotor
 class SimulatedMotor(DummyMotor):
     def __init__(
             self,
-            waveplate: WavePlate
+            waveplate: Waveplate
     ) -> None:
         super().__init__()
         self.waveplate = waveplate
