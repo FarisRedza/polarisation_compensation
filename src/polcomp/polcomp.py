@@ -78,7 +78,7 @@ class PolCompController:
         self.measurements = measurements
 
         # Search resolution
-        self.initial_search_step_deg = 1
+        self.initial_search_step_deg = 4
         self.min_search_step_deg = 0.125
         self.search_step_scale = 0.5
 
