@@ -7,8 +7,8 @@ from qtoolkit.polarisation import (
     PHI_PLUS,
     BB84Measurement,
     BB84MeasurementPair,
-    HalfWavePlate,
-    QuarterWavePlate,
+    HalfWaveplate,
+    QuarterWaveplate,
     PolarisationChannelMap,
     apply_local_jones_matrix,
     compose_waveplates,
@@ -95,13 +95,13 @@ TARGET_QWP2_DEG = 20.0
 
 target_compensation = compose_waveplates(
     [
-        QuarterWavePlate(
+        QuarterWaveplate(
             angle_deg=TARGET_QWP1_DEG,
         ),
-        HalfWavePlate(
+        HalfWaveplate(
             angle_deg=TARGET_HWP_DEG,
         ),
-        QuarterWavePlate(
+        QuarterWaveplate(
             angle_deg=TARGET_QWP2_DEG,
         ),
     ]
@@ -130,13 +130,13 @@ disturbance = (
 
 initial_compensation = compose_waveplates(
     [
-        QuarterWavePlate(
+        QuarterWaveplate(
             angle_deg=0.0,
         ),
-        HalfWavePlate(
+        HalfWaveplate(
             angle_deg=0.0,
         ),
-        QuarterWavePlate(
+        QuarterWaveplate(
             angle_deg=0.0,
         ),
     ]
@@ -274,13 +274,13 @@ for step in range(
 
     compensation = compose_waveplates(
         [
-            QuarterWavePlate(
+            QuarterWaveplate(
                 angle_deg=qwp1_angle,
             ),
-            HalfWavePlate(
+            HalfWaveplate(
                 angle_deg=hwp_angle,
             ),
-            QuarterWavePlate(
+            QuarterWaveplate(
                 angle_deg=qwp2_angle,
             ),
         ]
