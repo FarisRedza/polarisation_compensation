@@ -41,7 +41,9 @@ class PolCompStatus:
 
     score: typing.Optional[float]
 
+    search_waveplate_index: int
     search_step_deg: float
+    search_measurement_count: int
 
     best_score: typing.Optional[float]
     best_position: typing.Optional[float]
@@ -145,7 +147,13 @@ class PolCompController:
                 else None
             ),
             score=self._score,
+            search_waveplate_index=(
+                self._search_waveplate_index
+            ),
             search_step_deg=self.search_step_deg,
+            search_measurement_count=(
+                len(self._search_results)
+            ),
             best_score=self._search_best_score,
             best_position=self._search_best_position,
             is_moving=self.is_moving,
@@ -239,10 +247,10 @@ class PolCompController:
         if self._search_state is SearchState.START:
             self._search_reference_score = score
             self._search_best_score = score
-            self._search_best_position = self.qwp1.position
+            self._search_best_position = self.search_waveplate.position
             self._search_results.clear()
 
-            self.qwp1.move_by(
+            self.search_waveplate.move_by(
                 self.search_step_deg
             )
 
@@ -258,10 +266,10 @@ class PolCompController:
 
             if score < self._search_reference_score:
                 self._search_best_score = score
-                self._search_best_position = self.qwp1.position
+                self._search_best_position = self.search_waveplate.position
                 self._search_results.clear()
 
-                self.qwp1.move_by(
+                self.search_waveplate.move_by(
                     self.search_step_deg
                 )
 
@@ -271,7 +279,7 @@ class PolCompController:
                 # Undo the positive probe and then move the same amount
                 # in the negative direction from the original position.
                 self._search_results.clear()
-                self.qwp1.move_by(
+                self.search_waveplate.move_by(
                     -2 * self.search_step_deg
                 )
 
@@ -288,16 +296,16 @@ class PolCompController:
 
             if score < self._search_best_score:
                 self._search_best_score = score
-                self._search_best_position = self.qwp1.position
+                self._search_best_position = self.search_waveplate.position
                 self._search_results.clear()
 
-                self.qwp1.move_by(
+                self.search_waveplate.move_by(
                     self.search_step_deg
                 )
 
             else:
                 self._search_results.clear()
-                self.qwp1.move_to(
+                self.search_waveplate.move_to(
                     self._search_best_position
                 )
 
@@ -314,10 +322,10 @@ class PolCompController:
 
             if score < self._search_reference_score:
                 self._search_best_score = score
-                self._search_best_position = self.qwp1.position
+                self._search_best_position = self.search_waveplate.position
                 self._search_results.clear()
 
-                self.qwp1.move_by(
+                self.search_waveplate.move_by(
                     -self.search_step_deg
                 )
 
@@ -327,7 +335,7 @@ class PolCompController:
                 # Neither direction helped, return to original position and
                 # search at finer resolution
                 self._search_results.clear()
-                self.qwp1.move_by(
+                self.search_waveplate.move_by(
                     self.search_step_deg
                 )
 
@@ -344,16 +352,16 @@ class PolCompController:
 
             if score < self._search_best_score:
                 self._search_best_score = score
-                self._search_best_position = self.qwp1.position
+                self._search_best_position = self.search_waveplate.position
                 self._search_results.clear()
 
-                self.qwp1.move_by(
+                self.search_waveplate.move_by(
                     -self.search_step_deg
                 )
 
             else:
                 self._search_results.clear()
-                self.qwp1.move_to(
+                self.search_waveplate.move_to(
                     self._search_best_position
                 )
 
@@ -492,8 +500,21 @@ class PolCompController:
             self.search_step_deg = next_step
 
         else:
-            self.search_step_deg = (
-                self.initial_search_step_deg
-            )
+            self._next_search_waveplate()
 
         self._search_state = SearchState.START
+
+    def _next_search_waveplate(
+        self,
+    ) -> None:
+        self._search_waveplate_index = (
+            self._search_waveplate_index + 1
+        ) % len(self.waveplates)
+
+        self.search_step_deg = (
+            self.initial_search_step_deg
+        )
+
+        self._search_reference_score = None
+        self._search_best_score = None
+        self._search_best_position = None

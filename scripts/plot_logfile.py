@@ -25,6 +25,8 @@ def load_log(
         'comp_qwp2_deg',
         'controller_state',
         'search_state',
+        'search_waveplate',
+        'search_measurement_count',
         'objective',
         'search_step_deg',
         'controller_moving',
@@ -281,10 +283,26 @@ def plot_search_step(
         figsize=(11, 5)
     )
 
-    ax.plot(
-        data['time_s'],
-        data['search_step_deg'],
-    )
+    for waveplate in (
+        'QWP1',
+        'HWP',
+        'QWP2',
+    ):
+        search = data[
+            data['search_waveplate']
+            == waveplate
+        ]
+
+        if search.empty:
+            continue
+
+        ax.plot(
+            search['time_s'],
+            search['search_step_deg'],
+            marker='.',
+            linestyle='-',
+            label=waveplate,
+        )
 
     add_event_lines(
         ax,
@@ -306,6 +324,8 @@ def plot_search_step(
     ax.grid(
         alpha=0.3
     )
+
+    ax.legend()
 
     fig.tight_layout()
 
@@ -432,50 +452,70 @@ def plot_singles(
 def plot_search_trajectory(
     data: pd.DataFrame,
 ) -> None:
-    settled = data[
-        ~data['controller_moving'].astype(bool)
-    ]
+    waveplates = {
+        'QWP1': 'comp_qwp1_deg',
+        'HWP': 'comp_hwp_deg',
+        'QWP2': 'comp_qwp2_deg',
+    }
 
-    if settled.empty:
-        return
+    for waveplate, position_column in (
+        waveplates.items()
+    ):
+        search = data[
+            (data['controller_state'] == 'SEARCH')
+            & (
+                data['search_waveplate']
+                == waveplate
+            )
+            & (
+                ~data[
+                    'controller_moving'
+                ].astype(bool)
+            )
+            & data['objective'].notna()
+        ]
 
-    fig, ax = plt.subplots(
-        figsize=(8, 5)
-    )
+        if search.empty:
+            continue
 
-    ax.plot(
-        settled['comp_qwp1_deg'],
-        settled['objective'],
-        marker='.',
-        linestyle='-',
-    )
+        fig, ax = plt.subplots(
+            figsize=(8, 5)
+        )
 
-    ax.axhline(
-        1.0,
-        linestyle='--',
-        alpha=0.6,
-        label='Target',
-    )
+        ax.plot(
+            search[position_column],
+            search['objective'],
+            marker='.',
+            linestyle='-',
+        )
 
-    ax.set_title(
-        'QWP1 Search Trajectory'
-    )
+        ax.axhline(
+            1.0,
+            linestyle='--',
+            alpha=0.6,
+            label='Target',
+        )
 
-    ax.set_xlabel(
-        'Compensation QWP1 angle (deg)'
-    )
+        ax.set_title(
+            f'{waveplate} Search Trajectory'
+        )
 
-    ax.set_ylabel(
-        'Objective'
-    )
+        ax.set_xlabel(
+            f'Compensation {waveplate} '
+            'angle (deg)'
+        )
 
-    ax.grid(
-        alpha=0.3
-    )
+        ax.set_ylabel(
+            'Objective'
+        )
 
-    ax.legend()
+        ax.grid(
+            alpha=0.3
+        )
 
-    fig.tight_layout()
+        ax.legend()
+
+        fig.tight_layout()
 
 def print_events(
     data: pd.DataFrame,

@@ -23,6 +23,12 @@ from polcomp import (
     PolCompController,
 )
 
+SEARCH_WAVEPLATE_NAMES = (
+    'QWP1',
+    'HWP',
+    'QWP2',
+)
+
 # Simulation settings
 INTERVAL_S = 0.1
 PAIR_RATE_HZ = 40_000
@@ -69,6 +75,8 @@ LOG_FIELDS = [
     # Controller
     'controller_state',
     'search_state',
+    'search_waveplate',
+    'search_measurement_count',
     'objective',
     'search_step_deg',
     'best_score',
@@ -263,10 +271,20 @@ def log_result(
 
         # Controller
         'controller_state': status.state.name,
+        'search_waveplate': (
+            SEARCH_WAVEPLATE_NAMES[
+                status.search_waveplate_index
+            ]
+            if status.state.name == 'SEARCH'
+            else ''
+        ),
         'search_state': (
             status.search_state.name
             if status.search_state is not None
             else ''
+        ),
+        'search_measurement_count': (
+            status.search_measurement_count
         ),
         'objective': (
             status.score
@@ -348,6 +366,13 @@ def draw_ui(
         if status.search_state is not None
         else '-'
     )
+    search_waveplate = (
+        SEARCH_WAVEPLATE_NAMES[
+            status.search_waveplate_index
+        ]
+        if status.state.name == 'SEARCH'
+        else '-'
+    )
     motion = (
         'MOVING'
         if status.is_moving
@@ -388,12 +413,13 @@ def draw_ui(
         'Controller',
         '----------',
         f'State:          {status.state.name}',
+        f'Search plate:   {search_waveplate}',
         f'Search state:   {search_state}',
         f'Motor:          {motion}',
         f'Step:           {status.search_step_deg:.2f}°',
         f'Objective:      {score}',
         f'Best objective: {best_score}',
-        f'Best QWP1:      {best_position}',
+        f'Best position:  {best_position}',
         '',
 
         'Manual disturbance controls',
