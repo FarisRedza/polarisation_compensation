@@ -82,6 +82,7 @@ class PolCompController:
 
         self._search_score: typing.Optional[float] = None
         self._search_best_score: typing.Optional[float] = None
+        self._search_best_position: typing.Optional[float] = None
 
     @property
     def search_waveplate(
@@ -150,9 +151,11 @@ class PolCompController:
 
     def update(
             self,
-            qber: float,
-            qx: float
+            result: BB84DetectionResult
     ) -> None:
+        qber = result.qber
+        qx = result.qx
+
         if not self.active:
             return
 
