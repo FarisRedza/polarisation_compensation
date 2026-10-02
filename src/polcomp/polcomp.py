@@ -56,8 +56,10 @@ class PolCompController:
         qwp1: motor.Motor,
         hwp: motor.Motor,
         qwp2: motor.Motor,
+        measurements: qtoolkit.polarisation.BB84MeasurementPair,
         target_qber: float = 0.05,
         target_qx: float = 0.05,
+        lock_measurements: int = 5,
     ) -> None:
         self.qwp1 = qwp1
         self.hwp = hwp
@@ -67,10 +69,14 @@ class PolCompController:
             self.hwp,
             self.qwp2,
         )
+
+        self.measurements = measurements
         self.search_step_deg = 1
 
         self.target_qber = target_qber
         self.target_qx = target_qx
+
+        self.lock_measurements = lock_measurements
 
         self.active = False
         self.state = CompensationState.IDLE
@@ -83,6 +89,8 @@ class PolCompController:
         self._search_score: typing.Optional[float] = None
         self._search_best_score: typing.Optional[float] = None
         self._search_best_position: typing.Optional[float] = None
+
+        self._lock_results: list[BB84DetectionResult] = []
 
     @property
     def search_waveplate(
@@ -100,6 +108,8 @@ class PolCompController:
         self._search_waveplate_index = 0
         self._search_reference_score = None
         self._search_best_score = None
+
+        self._lock_results.clear()
 
     def stop(self) -> None:
         self.active = False
@@ -180,7 +190,9 @@ class PolCompController:
                 )
 
             case CompensationState.LOCK:
-                raise NotImplementedError
+                self._update_lock(
+                    result=result,
+                )
 
             case CompensationState.TRACK:
                 raise NotImplementedError
@@ -208,8 +220,8 @@ class PolCompController:
             qber=qber,
             qx=qx,
         ):
-            # self.state = CompensationState.LOCK
-            self.state = CompensationState.COMPLETE
+            self.state = CompensationState.LOCK
+            # self.state = CompensationState.COMPLETE
             return
 
         # -------------------------------------------------------------
@@ -330,3 +342,78 @@ class PolCompController:
                 self._search_state = SearchState.START
 
             return
+
+    def _update_lock(
+        self,
+        *,
+        result: BB84DetectionResult,
+    ) -> None:
+        self._lock_results.append(
+            result
+        )
+
+        if (
+            len(self._lock_results)
+            < self.lock_measurements
+        ):
+            return
+
+        coincidences: dict[
+            tuple[int, int],
+            int,
+        ] = {}
+
+        for lock_result in self._lock_results:
+            for pair, count in (
+                lock_result.coincidences.items()
+            ):
+                coincidences[pair] = (
+                    coincidences.get(
+                        pair,
+                        0,
+                    )
+                    + count
+                )
+
+        zz = (
+            qtoolkit.qkd.BasisMetrics
+            .from_coincidences(
+                coincidences=coincidences,
+                pairs=self.measurements.z_pairs,
+            )
+        )
+
+        xx = (
+            qtoolkit.qkd.BasisMetrics
+            .from_coincidences(
+                coincidences=coincidences,
+                pairs=self.measurements.x_pairs,
+            )
+        )
+
+        qber = zz.qber
+        qx = xx.qber
+
+        self._score = self.objective(
+            qber=qber,
+            qx=qx,
+        )
+
+        self._lock_results.clear()
+
+        if self.target_reached(
+            qber=qber,
+            qx=qx,
+        ):
+            self.state = (
+                CompensationState.COMPLETE
+            )
+
+        else:
+            self.state = (
+                CompensationState.SEARCH
+            )
+
+            self._search_state = (
+                SearchState.START
+            )

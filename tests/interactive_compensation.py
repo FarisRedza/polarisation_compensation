@@ -186,8 +186,10 @@ controller = PolCompController(
     qwp1=compensation_qwp1,
     hwp=compensation_hwp,
     qwp2=compensation_qwp2,
+    measurements=measurements,
     target_qber=0.05,
     target_qx=0.05,
+    lock_measurements=5
 )
 
 # Coincidence definitions
