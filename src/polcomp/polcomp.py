@@ -110,7 +110,7 @@ class PolCompController:
         self.active = True
         self.state = CompensationState.SEARCH
 
-        self.search = (self.initial_search_step_deg)
+        self.search_step_deg = (self.initial_search_step_deg)
 
         self._search_state = SearchState.START
         self._search_waveplate_index = 0
