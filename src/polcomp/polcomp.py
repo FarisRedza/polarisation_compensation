@@ -71,7 +71,12 @@ class PolCompController:
         )
 
         self.measurements = measurements
-        self.search_step_deg = 1
+        self.initial_search_step_deg = 1
+        self.min_search_step_deg = 0.125
+        self.search_step_scale = 0.5
+
+        self.search_step_deg = (self.initial_search_step_deg)
+        self.search_measurements = 3
 
         self.target_qber = target_qber
         self.target_qx = target_qx
@@ -89,6 +94,7 @@ class PolCompController:
         self._search_score: typing.Optional[float] = None
         self._search_best_score: typing.Optional[float] = None
         self._search_best_position: typing.Optional[float] = None
+        self._search_results: list[BB84DetectionResult] = []
 
         self._lock_results: list[BB84DetectionResult] = []
 
@@ -104,10 +110,15 @@ class PolCompController:
         self.active = True
         self.state = CompensationState.SEARCH
 
+        self.search = (self.initial_search_step_deg)
+
         self._search_state = SearchState.START
         self._search_waveplate_index = 0
         self._search_reference_score = None
         self._search_best_score = None
+        self._search_best_position = None
+
+        self._search_results.clear()
 
         self._lock_results.clear()
 
@@ -160,33 +171,22 @@ class PolCompController:
         return self.objective(qber, qx) <= 1
 
     def update(
-            self,
-            result: BB84DetectionResult
+        self,
+        result: BB84DetectionResult,
     ) -> None:
-        qber = result.qber
-        qx = result.qx
-
         if not self.active:
             return
 
         if self.is_moving:
             return
 
-        score = self.objective(
-            qber=qber,
-            qx=qx,
-        )
-        self._score = score
-
         match self.state:
             case CompensationState.IDLE:
                 return
 
             case CompensationState.SEARCH:
-                 self._update_search(
-                    score=score,
-                    qber=qber,
-                    qx=qx,
+                self._update_search_measurement(
+                    result=result,
                 )
 
             case CompensationState.LOCK:
@@ -204,7 +204,9 @@ class PolCompController:
                 return
 
             case _:
-                raise ValueError(f'Unknown state: {self.state}')
+                raise ValueError(
+                    f'Unknown state: {self.state}'
+                )
 
     def _update_search(
         self,
@@ -220,8 +222,15 @@ class PolCompController:
             qber=qber,
             qx=qx,
         ):
+            self._search_best_score = score
+            self._search_best_position = (
+                self.search_waveplate.position
+            )
+
+            self._lock_results.clear()
+
             self.state = CompensationState.LOCK
-            # self.state = CompensationState.COMPLETE
+
             return
 
         # -------------------------------------------------------------
@@ -231,6 +240,7 @@ class PolCompController:
             self._search_reference_score = score
             self._search_best_score = score
             self._search_best_position = self.qwp1.position
+            self._search_results.clear()
 
             self.qwp1.move_by(
                 self.search_step_deg
@@ -249,6 +259,7 @@ class PolCompController:
             if score < self._search_reference_score:
                 self._search_best_score = score
                 self._search_best_position = self.qwp1.position
+                self._search_results.clear()
 
                 self.qwp1.move_by(
                     self.search_step_deg
@@ -259,6 +270,7 @@ class PolCompController:
             else:
                 # Undo the positive probe and then move the same amount
                 # in the negative direction from the original position.
+                self._search_results.clear()
                 self.qwp1.move_by(
                     -2 * self.search_step_deg
                 )
@@ -277,18 +289,19 @@ class PolCompController:
             if score < self._search_best_score:
                 self._search_best_score = score
                 self._search_best_position = self.qwp1.position
+                self._search_results.clear()
 
                 self.qwp1.move_by(
                     self.search_step_deg
                 )
 
             else:
+                self._search_results.clear()
                 self.qwp1.move_to(
                     self._search_best_position
                 )
 
-                # For the first version, stop searching here.
-                self._search_state = SearchState.START
+                self._refine_search()
 
             return
 
@@ -302,6 +315,7 @@ class PolCompController:
             if score < self._search_reference_score:
                 self._search_best_score = score
                 self._search_best_position = self.qwp1.position
+                self._search_results.clear()
 
                 self.qwp1.move_by(
                     -self.search_step_deg
@@ -310,12 +324,14 @@ class PolCompController:
                 self._search_state = SearchState.MOVE_NEGATIVE
 
             else:
-                # Neither direction helped.
+                # Neither direction helped, return to original position and
+                # search at finer resolution
+                self._search_results.clear()
                 self.qwp1.move_by(
                     self.search_step_deg
                 )
 
-                self._search_state = SearchState.START
+                self._refine_search()
 
             return
 
@@ -329,19 +345,55 @@ class PolCompController:
             if score < self._search_best_score:
                 self._search_best_score = score
                 self._search_best_position = self.qwp1.position
+                self._search_results.clear()
 
                 self.qwp1.move_by(
                     -self.search_step_deg
                 )
 
             else:
+                self._search_results.clear()
                 self.qwp1.move_to(
                     self._search_best_position
                 )
 
-                self._search_state = SearchState.START
+                self._refine_search()
 
             return
+
+    def _update_search_measurement(
+        self,
+        *,
+        result: BB84DetectionResult,
+    ) -> None:
+        self._search_results.append(
+            result
+        )
+
+        if (
+            len(self._search_results)
+            < self.search_measurements
+        ):
+            return
+
+        qber, qx = self._aggregate_results(
+            self._search_results
+        )
+
+        self._search_results.clear()
+
+        score = self.objective(
+            qber=qber,
+            qx=qx,
+        )
+
+        self._score = score
+
+        self._update_search(
+            score=score,
+            qber=qber,
+            qx=qx,
+        )
 
     def _update_lock(
         self,
@@ -358,14 +410,46 @@ class PolCompController:
         ):
             return
 
+        qber, qx = self._aggregate_results(
+            self._lock_results
+        )
+
+        self._lock_results.clear()
+
+        self._score = self.objective(
+            qber=qber,
+            qx=qx,
+        )
+
+        if self.target_reached(
+            qber=qber,
+            qx=qx,
+        ):
+            self.state = (
+                CompensationState.COMPLETE
+            )
+
+        else:
+            self._refine_search()
+
+            self.state = (
+                CompensationState.SEARCH
+            )
+
+    def _aggregate_results(
+        self,
+        results: typing.Sequence[
+            BB84DetectionResult
+        ],
+    ) -> tuple[float, float]:
         coincidences: dict[
             tuple[int, int],
             int,
         ] = {}
 
-        for lock_result in self._lock_results:
+        for result in results:
             for pair, count in (
-                lock_result.coincidences.items()
+                result.coincidences.items()
             ):
                 coincidences[pair] = (
                     coincidences.get(
@@ -391,29 +475,25 @@ class PolCompController:
             )
         )
 
-        qber = zz.qber
-        qx = xx.qber
-
-        self._score = self.objective(
-            qber=qber,
-            qx=qx,
+        return (
+            zz.qber,
+            xx.qber,
         )
 
-        self._lock_results.clear()
+    def _refine_search(
+        self,
+    ) -> None:
+        next_step = (
+            self.search_step_deg
+            * self.search_step_scale
+        )
 
-        if self.target_reached(
-            qber=qber,
-            qx=qx,
-        ):
-            self.state = (
-                CompensationState.COMPLETE
-            )
+        if next_step >= self.min_search_step_deg:
+            self.search_step_deg = next_step
 
         else:
-            self.state = (
-                CompensationState.SEARCH
+            self.search_step_deg = (
+                self.initial_search_step_deg
             )
 
-            self._search_state = (
-                SearchState.START
-            )
+        self._search_state = SearchState.START
