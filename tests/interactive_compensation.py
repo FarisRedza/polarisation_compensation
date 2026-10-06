@@ -87,6 +87,17 @@ LOG_FIELDS = [
     'search_retained_improvement',
     'search_stagnant',
     'search_escape_count',
+
+    # Empirical Jacobian SEARCH
+    'jacobian_iteration',
+    'jacobian_probe_index',
+    'jacobian_condition',
+    'jacobian_predicted_score',
+    'jacobian_step_qwp1_deg',
+    'jacobian_step_hwp_deg',
+    'jacobian_step_qwp2_deg',
+    'jacobian_fallback_count',
+
     'best_score',
     'best_position_deg',
     'controller_moving',
@@ -334,6 +345,34 @@ def log_result(
         'search_escape_count': (
             status.search_escape_count
         ),
+        'jacobian_iteration': status.jacobian_iteration,
+        'jacobian_probe_index': status.jacobian_probe_index,
+        'jacobian_condition': (
+            status.jacobian_condition
+            if status.jacobian_condition is not None
+            else ''
+        ),
+        'jacobian_predicted_score': (
+            status.jacobian_predicted_score
+            if status.jacobian_predicted_score is not None
+            else ''
+        ),
+        'jacobian_step_qwp1_deg': (
+            status.jacobian_step_qwp1
+            if status.jacobian_step_qwp1 is not None
+            else ''
+        ),
+        'jacobian_step_hwp_deg': (
+            status.jacobian_step_hwp
+            if status.jacobian_step_hwp is not None
+            else ''
+        ),
+        'jacobian_step_qwp2_deg': (
+            status.jacobian_step_qwp2
+            if status.jacobian_step_qwp2 is not None
+            else ''
+        ),
+        'jacobian_fallback_count': status.jacobian_fallback_count,
         'best_score': (
             status.best_score
             if status.best_score is not None
@@ -488,8 +527,25 @@ def draw_ui(
         f'Cycle best:     {cycle_best_score}',
         f'Cycle improve:  {cycle_improvement}',
         f'Retained:       {retained_improvement}',
-        f'Stagnant:       {status.search_stagnant}',
-        f'Escapes:        {status.search_escape_count}',
+        f'Jacobian iter:  {status.jacobian_iteration}',
+        f'Jacobian probe: {status.jacobian_probe_index + 1}/3',
+        (
+            'Jacobian cond:  '
+            + (
+                f'{status.jacobian_condition:.2f}'
+                if status.jacobian_condition is not None
+                else '-'
+            )
+        ),
+        (
+            'Predicted RMS:  '
+            + (
+                f'{status.jacobian_predicted_score:.3f}'
+                if status.jacobian_predicted_score is not None
+                else '-'
+            )
+        ),
+        f'Jog fallbacks:  {status.jacobian_fallback_count}',
         f'Objective:      {score}',
         f'Best objective: {best_score}',
         f'Best position:  {best_position}',

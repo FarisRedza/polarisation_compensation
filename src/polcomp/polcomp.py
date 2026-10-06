@@ -26,12 +26,19 @@ class CompensationState(enum.Enum):
 
 class SearchState(enum.Enum):
     START = enum.auto()
+
+    # Empirical Jacobian SEARCH.
+    JACOBIAN_PROBE_MOVE = enum.auto()
+    JACOBIAN_PROBE_MEASURE = enum.auto()
+    JACOBIAN_PROBE_RETURN = enum.auto()
+    JACOBIAN_APPLY = enum.auto()
+
+    # Existing rolling-jog SEARCH, retained as a fallback.
     JOG_POSITIVE = enum.auto()
     RETURN_FROM_POSITIVE = enum.auto()
     JOG_NEGATIVE = enum.auto()
     RETURN_TO_BEST = enum.auto()
     RETURN_TO_LOCK = enum.auto()
-    ESCAPE_MOVE = enum.auto()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -45,17 +52,27 @@ class PolCompStatus:
     search_measurement_count: int
     search_worsening_count: int
 
+    # Rolling-jog fallback diagnostics.
     search_cycle: int
     search_cycle_start_score: typing.Optional[float]
     search_cycle_best_score: typing.Optional[float]
     search_cycle_improvement: typing.Optional[float]
+
+    # Empirical Jacobian diagnostics.
+    jacobian_probe_index: int
+    jacobian_iteration: int
+    jacobian_condition: typing.Optional[float]
+    jacobian_predicted_score: typing.Optional[float]
+    jacobian_step_qwp1: typing.Optional[float]
+    jacobian_step_hwp: typing.Optional[float]
+    jacobian_step_qwp2: typing.Optional[float]
+    jacobian_fallback_count: int
+
+    # Compatibility fields retained for the existing tools.
+    search_step_deg: typing.Optional[float]
     search_retained_improvement: typing.Optional[float]
     search_stagnant: bool
     search_escape_count: int
-
-    # Retained for compatibility with the existing logger. Jog SEARCH
-    # no longer has a discrete angular step or cycle refinement.
-    search_step_deg: typing.Optional[float]
     search_low_improvement_cycles: int
 
     best_score: typing.Optional[float]
@@ -68,33 +85,32 @@ class PolCompStatus:
     is_moving: bool
 
 
+
 class PolCompController:
     """Control a QWP-HWP-QWP stack using BB84 error feedback.
 
-    SEARCH uses cyclic coordinate descent: QWP1, HWP, and QWP2 are
-    searched one at a time and the sequence repeats. Each line search
-    starts with a stationary three-measurement reference, then jogs the
-    selected waveplate continuously. While jogging, a rolling window of
-    three BB84 measurements is combined at the coincidence-count level.
-    SEARCH scores both the stationary reference and moving windows with a
-    smooth RMS objective over the normalised QBER and Qx errors. The score
-    is associated with the centre of the angular interval covered by that
-    window.
+    SEARCH is led by an empirical 2x3 Jacobian.  A stationary baseline is
+    measured, then QWP1, HWP and QWP2 are each displaced by a small known
+    probe angle.  The measured changes in normalised QBER and Qx form the
+    columns of a local Jacobian::
 
-    The max(QBER/target_QBER, Qx/target_Qx) objective remains the
-    authoritative acceptance metric: it is used for candidate detection,
-    LOCK verification, and deciding whether both BB84 error targets are
-    satisfied.
+        [d e_Z / d QWP1   d e_Z / d HWP   d e_Z / d QWP2]
+        [d e_X / d QWP1   d e_X / d HWP   d e_X / d QWP2]
 
-    A jog stops after several consecutive rolling windows fail to improve
-    the best score. Positive direction is tried first; if it does not beat
-    the stationary reference, the negative direction is tested. A moving
-    score comfortably inside the target is only a candidate: the motor is
-    returned to the best sampled position and LOCK verifies the result
-    using fresh stationary measurements. Only LOCK can declare COMPLETE.
+    A damped least-squares pseudoinverse then chooses a combined
+    three-waveplate correction.  This allows SEARCH to move along a useful
+    coupled direction even when no individual coordinate gives a strong
+    scalar-objective improvement.
 
-    TRACK and RECOVER are reserved for later closed-loop tracking and
-    local recovery behaviour.
+    The previous rolling-jog QWP1 -> HWP -> QWP2 line search is retained as
+    a fallback.  It is used when the measured Jacobian is too weak,
+    ill-conditioned, or predicts insufficient improvement.
+
+    SEARCH uses the smooth RMS of the two normalised errors for guidance.
+    The max(QBER/target_QBER, Qx/target_Qx) objective remains authoritative
+    for candidate acceptance, LOCK verification and COMPLETE.
+
+    TRACK and RECOVER remain reserved for later closed-loop behaviour.
     """
 
     def __init__(
@@ -130,17 +146,20 @@ class PolCompController:
         # true target before SEARCH is interrupted for stationary LOCK.
         self.search_candidate_score = 0.90
 
-        # If the stationary cycle-start RMS objective improves by less than
-        # this amount across this many complete QWP1 -> HWP -> QWP2 cycles,
-        # SEARCH is considered stagnant and performs a deterministic escape.
-        self.search_stagnation_cycles = 3
-        self.search_stagnation_threshold = 0.05
-        self.search_escape_angle = 22.5
+        # Empirical Jacobian SEARCH.  Each probe is measured while
+        # stationary, so the derivative estimate is not blurred by motion.
+        self.jacobian_probe_deg = 2.0
+        self.jacobian_measurements = 3
 
-        # A large escape is intended only for bad SEARCH basins far from
-        # the target. Near the target, continue local coordinate descent
-        # instead of throwing away a nearly valid solution.
-        self.search_escape_min_score = 2.0#3.0
+        # Damped least-squares regularisation and correction limits.
+        self.jacobian_damping = 0.05
+        self.jacobian_max_step_deg = 10.0
+        self.jacobian_max_total_step_deg = 15.0
+
+        # Reject a Jacobian if it is effectively singular or if its local
+        # linear model does not predict a useful RMS reduction.
+        self.jacobian_min_determinant = 1e-6
+        self.jacobian_min_predicted_improvement = 0.02
 
         self.target_qber = target_qber
         self.target_qx = target_qx
@@ -173,16 +192,32 @@ class PolCompController:
         ] = []
         self._search_worsening_count = 0
 
-        # Cycle-level SEARCH diagnostics. A cycle is one complete
-        # QWP1 -> HWP -> QWP2 coordinate-descent pass.
+        # Rolling-jog fallback diagnostics.
         self._search_cycle = 0
         self._search_cycle_start_score: typing.Optional[float] = None
         self._search_cycle_best_score: typing.Optional[float] = None
         self._search_cycle_improvement: typing.Optional[float] = None
-        self._search_cycle_start_scores: list[float] = []
-        self._search_retained_improvement: typing.Optional[float] = None
-        self._search_stagnant = False
-        self._search_escape_count = 0
+
+        # Empirical Jacobian state.
+        self._jacobian_iteration = 0
+        self._jacobian_probe_index = 0
+        self._jacobian_baseline_errors: typing.Optional[
+            tuple[float, float]
+        ] = None
+        self._jacobian_baseline_score: typing.Optional[float] = None
+        self._jacobian_baseline_positions: typing.Optional[
+            tuple[float, float, float]
+        ] = None
+        self._jacobian_columns: list[
+            tuple[float, float]
+        ] = []
+        self._jacobian_condition: typing.Optional[float] = None
+        self._jacobian_predicted_score: typing.Optional[float] = None
+        self._jacobian_step: typing.Optional[
+            tuple[float, float, float]
+        ] = None
+        self._jacobian_fallback_count = 0
+        self._using_jog_fallback = False
 
         # Rolling moving-measurement window. Each entry stores the BB84
         # result together with the angular interval traversed while it was
@@ -229,10 +264,18 @@ class PolCompController:
         self._search_cycle_start_score = None
         self._search_cycle_best_score = None
         self._search_cycle_improvement = None
-        self._search_cycle_start_scores.clear()
-        self._search_retained_improvement = None
-        self._search_stagnant = False
-        self._search_escape_count = 0
+
+        self._jacobian_iteration = 0
+        self._jacobian_probe_index = 0
+        self._jacobian_baseline_errors = None
+        self._jacobian_baseline_score = None
+        self._jacobian_baseline_positions = None
+        self._jacobian_columns.clear()
+        self._jacobian_condition = None
+        self._jacobian_predicted_score = None
+        self._jacobian_step = None
+        self._jacobian_fallback_count = 0
+        self._using_jog_fallback = False
 
         self._reset_search_line()
 
@@ -258,6 +301,8 @@ class PolCompController:
     def status(
         self,
     ) -> PolCompStatus:
+        step = self._jacobian_step
+
         return PolCompStatus(
             state=self.state,
             search_state=(
@@ -266,37 +311,29 @@ class PolCompController:
                 else None
             ),
             score=self._score,
-            search_waveplate_index=(
-                self._search_waveplate_index
-            ),
-            search_measurement_count=(
-                len(self._search_results)
-            ),
-            search_worsening_count=(
-                self._search_worsening_count
-            ),
+            search_waveplate_index=self._search_waveplate_index,
+            search_measurement_count=len(self._search_results),
+            search_worsening_count=self._search_worsening_count,
             search_cycle=self._search_cycle,
-            search_cycle_start_score=(
-                self._search_cycle_start_score
-            ),
-            search_cycle_best_score=(
-                self._search_cycle_best_score
-            ),
-            search_cycle_improvement=(
-                self._search_cycle_improvement
-            ),
-            search_retained_improvement=(
-                self._search_retained_improvement
-            ),
-            search_stagnant=self._search_stagnant,
-            search_escape_count=self._search_escape_count,
+            search_cycle_start_score=self._search_cycle_start_score,
+            search_cycle_best_score=self._search_cycle_best_score,
+            search_cycle_improvement=self._search_cycle_improvement,
+            jacobian_probe_index=self._jacobian_probe_index,
+            jacobian_iteration=self._jacobian_iteration,
+            jacobian_condition=self._jacobian_condition,
+            jacobian_predicted_score=self._jacobian_predicted_score,
+            jacobian_step_qwp1=(step[0] if step is not None else None),
+            jacobian_step_hwp=(step[1] if step is not None else None),
+            jacobian_step_qwp2=(step[2] if step is not None else None),
+            jacobian_fallback_count=self._jacobian_fallback_count,
             search_step_deg=None,
+            search_retained_improvement=None,
+            search_stagnant=False,
+            search_escape_count=0,
             search_low_improvement_cycles=0,
             best_score=self._search_best_score,
             best_position=self._search_best_position,
-            measurement_position=(
-                self._search_measurement_position
-            ),
+            measurement_position=self._search_measurement_position,
             measurement_start_position=(
                 self._search_measurement_start_position
             ),
@@ -409,9 +446,7 @@ class PolCompController:
         *,
         result: BB84DetectionResult,
     ) -> None:
-        # During a jog, consume each BB84 result immediately. The motor
-        # position is still available while moving, so associate the
-        # result with the midpoint of the travelled interval.
+        # Existing rolling-jog fallback consumes measurements during motion.
         if self._search_state in (
             SearchState.JOG_POSITIVE,
             SearchState.JOG_NEGATIVE,
@@ -421,48 +456,42 @@ class PolCompController:
             )
             return
 
-        # Ignore measurements while move_to() is returning to a known
-        # position. Once the motor settles, the next result advances the
-        # state machine or becomes the first LOCK result.
+        # Measurements acquired while move_to() is active are discarded.
         if self.is_moving:
             return
 
-        if (
-            self._search_state
-            is SearchState.RETURN_FROM_POSITIVE
-        ):
+        # The first result delivered after a probe move/return/application
+        # may overlap the tail of that motion.  Use it only to advance the
+        # state, then start collecting fresh stationary measurements.
+        if self._search_state is SearchState.JACOBIAN_PROBE_MOVE:
+            self._search_results.clear()
+            self._search_state = SearchState.JACOBIAN_PROBE_MEASURE
+            return
+
+        if self._search_state is SearchState.JACOBIAN_PROBE_RETURN:
+            self._search_results.clear()
+            self._advance_jacobian_probe()
+            return
+
+        if self._search_state is SearchState.JACOBIAN_APPLY:
+            self._search_results.clear()
+            self._search_state = SearchState.START
+            self._reset_search_line()
+            return
+
+        # Rolling-jog fallback return states.
+        if self._search_state is SearchState.RETURN_FROM_POSITIVE:
             self._start_jog(
                 direction=motor.MotorDirection.BACKWARD,
                 state=SearchState.JOG_NEGATIVE,
             )
             return
 
-        if (
-            self._search_state
-            is SearchState.RETURN_TO_BEST
-        ):
+        if self._search_state is SearchState.RETURN_TO_BEST:
             self._next_search_waveplate()
             return
 
-        if (
-            self._search_state
-            is SearchState.ESCAPE_MOVE
-        ):
-            # The escape has finished. Start retained-progress
-            # tracking afresh from the relocated search basin.
-            self._search_cycle_start_scores.clear()
-            self._search_retained_improvement = None
-            self._search_stagnant = False
-
-            self._search_state = SearchState.START
-            self._reset_search_line()
-            self._search_results.clear()
-            return
-
-        if (
-            self._search_state
-            is SearchState.RETURN_TO_LOCK
-        ):
+        if self._search_state is SearchState.RETURN_TO_LOCK:
             self._lock_results.clear()
             self.state = CompensationState.LOCK
             self._update_lock(
@@ -470,109 +499,112 @@ class PolCompController:
             )
             return
 
-        # START uses the same three-result aggregate as the old SEARCH
-        # implementation. This gives each line search a less noisy
-        # stationary reference before continuous motion begins.
-        self._search_results.append(
-            result
-        )
+        if self._search_state is SearchState.JACOBIAN_PROBE_MEASURE:
+            self._search_results.append(result)
 
-        if (
-            len(self._search_results)
-            < self.search_measurements
-        ):
+            if len(self._search_results) < self.jacobian_measurements:
+                return
+
+            qber, qx = self._aggregate_results(self._search_results)
+            self._search_results.clear()
+
+            assert self._jacobian_baseline_errors is not None
+            base_z, base_x = self._jacobian_baseline_errors
+
+            probe_z = qber / self.target_qber
+            probe_x = qx / self.target_qx
+
+            self._jacobian_columns.append(
+                (
+                    (probe_z - base_z) / self.jacobian_probe_deg,
+                    (probe_x - base_x) / self.jacobian_probe_deg,
+                )
+            )
+
+            assert self._jacobian_baseline_positions is not None
+            motor_index = self._jacobian_probe_index
+            self.waveplates[motor_index].move_to(
+                self._jacobian_baseline_positions[motor_index]
+            )
+            self._search_state = SearchState.JACOBIAN_PROBE_RETURN
             return
 
-        qber, qx = self._aggregate_results(
-            self._search_results
-        )
-        self._search_results.clear()
+        # START during the one-cycle rolling-jog fallback uses the old
+        # stationary reference and then launches a line search.
+        if self._using_jog_fallback:
+            self._search_results.append(result)
 
-        score = self.search_objective(
-            qber=qber,
-            qx=qx,
-        )
-        self._score = score
+            if len(self._search_results) < self.search_measurements:
+                return
 
-        if self._search_waveplate_index == 0:
-            self._search_cycle_start_score = score
-            self._search_cycle_best_score = score
-            self._search_cycle_improvement = None
+            qber, qx = self._aggregate_results(self._search_results)
+            self._search_results.clear()
 
-            self._search_cycle_start_scores.append(
-                score
-            )
+            score = self.search_objective(qber=qber, qx=qx)
+            self._score = score
 
-            history_length = (
-                self.search_stagnation_cycles + 1
-            )
-            if (
-                len(self._search_cycle_start_scores)
-                > history_length
+            if self.target_reached(qber=qber, qx=qx):
+                self._lock_results.clear()
+                self.state = CompensationState.LOCK
+                return
+
+            if self._search_waveplate_index == 0:
+                self._search_cycle_start_score = score
+                self._search_cycle_best_score = score
+                self._search_cycle_improvement = None
+            elif (
+                self._search_cycle_best_score is None
+                or score < self._search_cycle_best_score
             ):
-                self._search_cycle_start_scores.pop(0)
+                self._search_cycle_best_score = score
 
-            self._search_retained_improvement = None
-            self._search_stagnant = False
-
-            if (
-                len(self._search_cycle_start_scores)
-                == history_length
-            ):
-                old_score = (
-                    self._search_cycle_start_scores[0]
-                )
-                new_score = (
-                    self._search_cycle_start_scores[-1]
-                )
-
-                if old_score > 0:
-                    self._search_retained_improvement = (
-                        old_score - new_score
-                    ) / old_score
-                else:
-                    self._search_retained_improvement = 0.0
-
-                self._search_stagnant = (
-                    self._search_retained_improvement
-                    < self.search_stagnation_threshold
-                )
-        elif (
-            self._search_cycle_best_score is None
-            or score < self._search_cycle_best_score
-        ):
-            self._search_cycle_best_score = score
-
-        position = self.search_waveplate.position
-
-        if self.target_reached(
-            qber=qber,
-            qx=qx,
-        ):
+            position = self.search_waveplate.position
+            self._search_reference_score = score
+            self._search_reference_position = position
             self._search_best_score = score
             self._search_best_position = position
+            self._search_worsening_count = 0
+
+            self._start_jog(
+                direction=motor.MotorDirection.FORWARD,
+                state=SearchState.JOG_POSITIVE,
+            )
+            return
+
+        # START: collect the stationary baseline for a Jacobian iteration.
+        self._search_results.append(result)
+
+        if len(self._search_results) < self.search_measurements:
+            return
+
+        qber, qx = self._aggregate_results(self._search_results)
+        self._search_results.clear()
+
+        score = self.search_objective(qber=qber, qx=qx)
+        self._score = score
+
+        if self.target_reached(qber=qber, qx=qx):
             self._lock_results.clear()
             self.state = CompensationState.LOCK
             return
 
-        if (
-            self._search_waveplate_index == 0
-            and self._search_stagnant
-            and score >= self.search_escape_min_score
-        ):
-            self._escape_search()
-            return
-
-        self._search_reference_score = score
-        self._search_reference_position = position
-        self._search_best_score = score
-        self._search_best_position = position
-        self._search_worsening_count = 0
-
-        self._start_jog(
-            direction=motor.MotorDirection.FORWARD,
-            state=SearchState.JOG_POSITIVE,
+        self._jacobian_baseline_errors = (
+            qber / self.target_qber,
+            qx / self.target_qx,
         )
+        self._jacobian_baseline_score = score
+        self._jacobian_baseline_positions = tuple(
+            waveplate.position
+            for waveplate in self.waveplates
+        )
+        self._jacobian_columns.clear()
+        self._jacobian_probe_index = 0
+        self._jacobian_condition = None
+        self._jacobian_predicted_score = None
+        self._jacobian_step = None
+
+        self._start_jacobian_probe()
+
 
     def _update_jog_measurement(
         self,
@@ -734,32 +766,171 @@ class PolCompController:
             f'Unexpected jog state: {self._search_state}'
         )
 
-    def _escape_search(
+    def _start_jacobian_probe(
         self,
     ) -> None:
-        # Alternate the direction of successive deterministic QWP1 jumps.
-        # The retained-progress history is cleared so the relocated search
-        # receives a fresh three-cycle opportunity before another escape.
-        direction = (
-            1.0
-            if self._search_escape_count % 2 == 0
-            else -1.0
-        )
-        target_position = (
-            self.qwp1.position
-            + direction * self.search_escape_angle
+        assert self._jacobian_baseline_positions is not None
+
+        index = self._jacobian_probe_index
+        target = (
+            self._jacobian_baseline_positions[index]
+            + self.jacobian_probe_deg
         )
 
-        self._search_escape_count += 1
+        self.waveplates[index].move_to(target)
+        self._search_state = SearchState.JACOBIAN_PROBE_MOVE
 
-        self._search_state = SearchState.ESCAPE_MOVE
+    def _advance_jacobian_probe(
+        self,
+    ) -> None:
+        self._jacobian_probe_index += 1
+
+        if self._jacobian_probe_index < len(self.waveplates):
+            self._start_jacobian_probe()
+            return
+
+        self._finish_jacobian_iteration()
+
+    def _finish_jacobian_iteration(
+        self,
+    ) -> None:
+        assert self._jacobian_baseline_errors is not None
+        assert self._jacobian_baseline_score is not None
+
+        if len(self._jacobian_columns) != 3:
+            self._start_jog_fallback()
+            return
+
+        # J is 2x3.  Compute the damped pseudoinverse as
+        # J^T (J J^T + lambda^2 I)^-1 without adding a NumPy dependency.
+        jz = [column[0] for column in self._jacobian_columns]
+        jx = [column[1] for column in self._jacobian_columns]
+
+        a = sum(value * value for value in jz)
+        b = sum(
+            z_value * x_value
+            for z_value, x_value in zip(jz, jx)
+        )
+        d = sum(value * value for value in jx)
+
+        # Condition estimate is reported for diagnostics using the
+        # eigenvalues of J J^T.  It is not used alone to reject a step;
+        # damping makes near-singular cases numerically safe.
+        trace = a + d
+        determinant = a * d - b * b
+        discriminant = max(
+            trace * trace - 4.0 * determinant,
+            0.0,
+        ) ** 0.5
+        eig_max = (trace + discriminant) / 2.0
+        eig_min = (trace - discriminant) / 2.0
+
+        if eig_min > 0:
+            self._jacobian_condition = (
+                eig_max / eig_min
+            ) ** 0.5
+        else:
+            self._jacobian_condition = float('inf')
+
+        damping2 = self.jacobian_damping ** 2
+        aa = a + damping2
+        dd = d + damping2
+        det = aa * dd - b * b
+
+        if det <= self.jacobian_min_determinant:
+            self._start_jog_fallback()
+            return
+
+        ez, ex = self._jacobian_baseline_errors
+
+        # y = (J J^T + lambda^2 I)^-1 e
+        yz = (dd * ez - b * ex) / det
+        yx = (-b * ez + aa * ex) / det
+
+        step = [
+            -(jz[i] * yz + jx[i] * yx)
+            for i in range(3)
+        ]
+
+        # Limit individual movement and then the Euclidean total movement.
+        step = [
+            max(
+                -self.jacobian_max_step_deg,
+                min(self.jacobian_max_step_deg, value),
+            )
+            for value in step
+        ]
+
+        norm = sum(value * value for value in step) ** 0.5
+        if norm > self.jacobian_max_total_step_deg:
+            scale = self.jacobian_max_total_step_deg / norm
+            step = [value * scale for value in step]
+
+        predicted_z = ez + sum(
+            jz[i] * step[i]
+            for i in range(3)
+        )
+        predicted_x = ex + sum(
+            jx[i] * step[i]
+            for i in range(3)
+        )
+        predicted_score = (
+            (predicted_z ** 2 + predicted_x ** 2) / 2.0
+        ) ** 0.5
+
+        self._jacobian_predicted_score = predicted_score
+        self._jacobian_step = tuple(step)
+
+        predicted_improvement = (
+            self._jacobian_baseline_score - predicted_score
+        ) / self._jacobian_baseline_score
+
+        if (
+            predicted_improvement
+            < self.jacobian_min_predicted_improvement
+        ):
+            self._start_jog_fallback()
+            return
+
+        # All three move_to() calls are issued together.  DummyMotor moves
+        # them concurrently; real backends can do the same if asynchronous.
+        for waveplate, delta in zip(self.waveplates, step):
+            waveplate.move_to(
+                waveplate.position + delta
+            )
+
+        self._jacobian_iteration += 1
+        self._search_state = SearchState.JACOBIAN_APPLY
+
+    def _start_jog_fallback(
+        self,
+    ) -> None:
+        # Run one complete QWP1 -> HWP -> QWP2 rolling-jog cycle, then
+        # return to a fresh empirical Jacobian measurement.
+        self._jacobian_fallback_count += 1
+        self._using_jog_fallback = True
+
+        self._search_waveplate_index = 0
+        self._search_cycle_start_score = None
+        self._search_cycle_best_score = None
+        self._search_cycle_improvement = None
+
+        self._search_state = SearchState.START
+        self._reset_search_line()
         self._search_results.clear()
-        self._search_jog_results.clear()
-        self._search_previous_position = None
 
-        self.qwp1.move_to(
-            target_position
-        )
+        # Mark START as fallback by retaining this flag.  The next
+        # stationary aggregate is handled by the fallback starter below.
+        self._start_fallback_reference()
+
+    def _start_fallback_reference(
+        self,
+    ) -> None:
+        # START itself is shared with Jacobian baseline collection.  Set a
+        # sentinel reference score so the dispatcher can distinguish the
+        # fallback path on subsequent stationary samples.
+        self._search_reference_score = float('nan')
+
 
     def _start_jog(
         self,
@@ -824,6 +995,9 @@ class PolCompController:
 
             self._search_cycle += 1
 
+            if self._using_jog_fallback:
+                self._using_jog_fallback = False
+
         self._search_state = SearchState.START
         self._reset_search_line()
         self._search_results.clear()
@@ -876,6 +1050,7 @@ class PolCompController:
         else:
             # A failed LOCK returns to a fresh line search from the
             # current, stationary position.
+            self._using_jog_fallback = False
             self._search_state = SearchState.START
             self._reset_search_line()
             self._search_results.clear()

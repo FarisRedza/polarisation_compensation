@@ -931,8 +931,110 @@ def main() -> None:
     #     data
     # )
 
+    plot_jacobian_search(data)
+
     plt.show()
 
+
+
+def plot_jacobian_search(
+    data: pd.DataFrame,
+) -> None:
+    required = {
+        'jacobian_iteration',
+        'jacobian_condition',
+        'jacobian_predicted_score',
+        'jacobian_step_qwp1_deg',
+        'jacobian_step_hwp_deg',
+        'jacobian_step_qwp2_deg',
+        'jacobian_fallback_count',
+    }
+
+    if not required.issubset(data.columns):
+        return
+
+    search = data[
+        data['controller_state'] == 'SEARCH'
+    ].copy()
+
+    if search.empty:
+        return
+
+    solved = search[
+        search['jacobian_predicted_score'].notna()
+    ].copy()
+
+    if not solved.empty:
+        solved = solved.drop_duplicates(
+            subset=[
+                'jacobian_iteration',
+                'jacobian_predicted_score',
+            ],
+            keep='first',
+        )
+
+        fig, ax = plt.subplots(figsize=(11, 5))
+        ax.plot(
+            solved['time_s'],
+            solved['jacobian_predicted_score'],
+            marker='o',
+            label='Predicted RMS after step',
+        )
+        ax.plot(
+            solved['time_s'],
+            solved['objective'],
+            marker='.',
+            label='Measured RMS before step',
+        )
+        add_event_lines(ax, data)
+        ax.set_title('Empirical Jacobian SEARCH')
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Normalised RMS objective')
+        ax.grid(alpha=0.3)
+        ax.legend()
+        fig.tight_layout()
+
+        fig, ax = plt.subplots(figsize=(11, 5))
+        ax.plot(
+            solved['time_s'],
+            solved['jacobian_step_qwp1_deg'],
+            marker='o',
+            label='QWP1',
+        )
+        ax.plot(
+            solved['time_s'],
+            solved['jacobian_step_hwp_deg'],
+            marker='o',
+            label='HWP',
+        )
+        ax.plot(
+            solved['time_s'],
+            solved['jacobian_step_qwp2_deg'],
+            marker='o',
+            label='QWP2',
+        )
+        ax.axhline(0.0, linestyle='--', alpha=0.6)
+        add_event_lines(ax, data)
+        ax.set_title('Jacobian Correction Vector')
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Requested movement (deg)')
+        ax.grid(alpha=0.3)
+        ax.legend()
+        fig.tight_layout()
+
+    fallback = search[
+        search['jacobian_fallback_count'].diff().fillna(0) > 0
+    ]
+
+    if not fallback.empty:
+        print()
+        print('Jacobian fallbacks')
+        print('------------------')
+        for _, row in fallback.iterrows():
+            print(
+                f'{row["time_s"]:8.3f} s  '
+                f'fallback {int(row["jacobian_fallback_count"])}'
+            )
 
 if __name__ == '__main__':
     main()
