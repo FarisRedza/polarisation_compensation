@@ -137,6 +137,11 @@ class PolCompController:
         self.search_stagnation_threshold = 0.05
         self.search_escape_angle = 22.5
 
+        # A large escape is intended only for bad SEARCH basins far from
+        # the target. Near the target, continue local coordinate descent
+        # instead of throwing away a nearly valid solution.
+        self.search_escape_min_score = 2.0#3.0
+
         self.target_qber = target_qber
         self.target_qx = target_qx
 
@@ -553,6 +558,7 @@ class PolCompController:
         if (
             self._search_waveplate_index == 0
             and self._search_stagnant
+            and score >= self.search_escape_min_score
         ):
             self._escape_search()
             return
