@@ -31,6 +31,7 @@ class SearchState(enum.Enum):
     JOG_NEGATIVE = enum.auto()
     RETURN_TO_BEST = enum.auto()
     RETURN_TO_LOCK = enum.auto()
+    ESCAPE_MOVE = enum.auto()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -44,10 +45,17 @@ class PolCompStatus:
     search_measurement_count: int
     search_worsening_count: int
 
+    search_cycle: int
+    search_cycle_start_score: typing.Optional[float]
+    search_cycle_best_score: typing.Optional[float]
+    search_cycle_improvement: typing.Optional[float]
+    search_retained_improvement: typing.Optional[float]
+    search_stagnant: bool
+    search_escape_count: int
+
     # Retained for compatibility with the existing logger. Jog SEARCH
     # no longer has a discrete angular step or cycle refinement.
     search_step_deg: typing.Optional[float]
-    search_cycle_improvement: typing.Optional[float]
     search_low_improvement_cycles: int
 
     best_score: typing.Optional[float]
@@ -122,6 +130,13 @@ class PolCompController:
         # true target before SEARCH is interrupted for stationary LOCK.
         self.search_candidate_score = 0.90
 
+        # If the stationary cycle-start RMS objective improves by less than
+        # this amount across this many complete QWP1 -> HWP -> QWP2 cycles,
+        # SEARCH is considered stagnant and performs a deterministic escape.
+        self.search_stagnation_cycles = 3
+        self.search_stagnation_threshold = 0.05
+        self.search_escape_angle = 22.5
+
         self.target_qber = target_qber
         self.target_qx = target_qx
 
@@ -152,6 +167,17 @@ class PolCompController:
             BB84DetectionResult
         ] = []
         self._search_worsening_count = 0
+
+        # Cycle-level SEARCH diagnostics. A cycle is one complete
+        # QWP1 -> HWP -> QWP2 coordinate-descent pass.
+        self._search_cycle = 0
+        self._search_cycle_start_score: typing.Optional[float] = None
+        self._search_cycle_best_score: typing.Optional[float] = None
+        self._search_cycle_improvement: typing.Optional[float] = None
+        self._search_cycle_start_scores: list[float] = []
+        self._search_retained_improvement: typing.Optional[float] = None
+        self._search_stagnant = False
+        self._search_escape_count = 0
 
         # Rolling moving-measurement window. Each entry stores the BB84
         # result together with the angular interval traversed while it was
@@ -194,6 +220,15 @@ class PolCompController:
         self._search_state = SearchState.START
         self._search_waveplate_index = 0
 
+        self._search_cycle = 0
+        self._search_cycle_start_score = None
+        self._search_cycle_best_score = None
+        self._search_cycle_improvement = None
+        self._search_cycle_start_scores.clear()
+        self._search_retained_improvement = None
+        self._search_stagnant = False
+        self._search_escape_count = 0
+
         self._reset_search_line()
 
         self._search_results.clear()
@@ -235,8 +270,22 @@ class PolCompController:
             search_worsening_count=(
                 self._search_worsening_count
             ),
+            search_cycle=self._search_cycle,
+            search_cycle_start_score=(
+                self._search_cycle_start_score
+            ),
+            search_cycle_best_score=(
+                self._search_cycle_best_score
+            ),
+            search_cycle_improvement=(
+                self._search_cycle_improvement
+            ),
+            search_retained_improvement=(
+                self._search_retained_improvement
+            ),
+            search_stagnant=self._search_stagnant,
+            search_escape_count=self._search_escape_count,
             search_step_deg=None,
-            search_cycle_improvement=None,
             search_low_improvement_cycles=0,
             best_score=self._search_best_score,
             best_position=self._search_best_position,
@@ -392,6 +441,15 @@ class PolCompController:
 
         if (
             self._search_state
+            is SearchState.ESCAPE_MOVE
+        ):
+            self._search_state = SearchState.START
+            self._reset_search_line()
+            self._search_results.clear()
+            return
+
+        if (
+            self._search_state
             is SearchState.RETURN_TO_LOCK
         ):
             self._lock_results.clear()
@@ -425,6 +483,55 @@ class PolCompController:
         )
         self._score = score
 
+        if self._search_waveplate_index == 0:
+            self._search_cycle_start_score = score
+            self._search_cycle_best_score = score
+            self._search_cycle_improvement = None
+
+            self._search_cycle_start_scores.append(
+                score
+            )
+
+            history_length = (
+                self.search_stagnation_cycles + 1
+            )
+            if (
+                len(self._search_cycle_start_scores)
+                > history_length
+            ):
+                self._search_cycle_start_scores.pop(0)
+
+            self._search_retained_improvement = None
+            self._search_stagnant = False
+
+            if (
+                len(self._search_cycle_start_scores)
+                == history_length
+            ):
+                old_score = (
+                    self._search_cycle_start_scores[0]
+                )
+                new_score = (
+                    self._search_cycle_start_scores[-1]
+                )
+
+                if old_score > 0:
+                    self._search_retained_improvement = (
+                        old_score - new_score
+                    ) / old_score
+                else:
+                    self._search_retained_improvement = 0.0
+
+                self._search_stagnant = (
+                    self._search_retained_improvement
+                    < self.search_stagnation_threshold
+                )
+        elif (
+            self._search_cycle_best_score is None
+            or score < self._search_cycle_best_score
+        ):
+            self._search_cycle_best_score = score
+
         position = self.search_waveplate.position
 
         if self.target_reached(
@@ -435,6 +542,13 @@ class PolCompController:
             self._search_best_position = position
             self._lock_results.clear()
             self.state = CompensationState.LOCK
+            return
+
+        if (
+            self._search_waveplate_index == 0
+            and self._search_stagnant
+        ):
+            self._escape_search()
             return
 
         self._search_reference_score = score
@@ -521,6 +635,12 @@ class PolCompController:
         )
         self._score = score
 
+        if (
+            self._search_cycle_best_score is None
+            or score < self._search_cycle_best_score
+        ):
+            self._search_cycle_best_score = score
+
         assert self._search_reference_score is not None
         assert self._search_reference_position is not None
         assert self._search_best_score is not None
@@ -602,6 +722,36 @@ class PolCompController:
             f'Unexpected jog state: {self._search_state}'
         )
 
+    def _escape_search(
+        self,
+    ) -> None:
+        # Alternate the direction of successive deterministic QWP1 jumps.
+        # The retained-progress history is cleared so the relocated search
+        # receives a fresh three-cycle opportunity before another escape.
+        direction = (
+            1.0
+            if self._search_escape_count % 2 == 0
+            else -1.0
+        )
+        target_position = (
+            self.qwp1.position
+            + direction * self.search_escape_angle
+        )
+
+        self._search_escape_count += 1
+        self._search_cycle_start_scores.clear()
+        self._search_retained_improvement = None
+        self._search_stagnant = False
+
+        self._search_state = SearchState.ESCAPE_MOVE
+        self._search_results.clear()
+        self._search_jog_results.clear()
+        self._search_previous_position = None
+
+        self.qwp1.move_to(
+            target_position
+        )
+
     def _start_jog(
         self,
         *,
@@ -650,6 +800,20 @@ class PolCompController:
             >= len(self.waveplates)
         ):
             self._search_waveplate_index = 0
+
+            if (
+                self._search_cycle_start_score is not None
+                and self._search_cycle_best_score is not None
+            ):
+                if self._search_cycle_start_score > 0:
+                    self._search_cycle_improvement = (
+                        self._search_cycle_start_score
+                        - self._search_cycle_best_score
+                    ) / self._search_cycle_start_score
+                else:
+                    self._search_cycle_improvement = 0.0
+
+            self._search_cycle += 1
 
         self._search_state = SearchState.START
         self._reset_search_line()

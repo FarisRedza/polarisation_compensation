@@ -30,6 +30,13 @@ def load_log(
         'objective',
         'search_jog_velocity_deg_s',
         'search_worsening_count',
+        'search_cycle',
+        'search_cycle_start_score',
+        'search_cycle_best_score',
+        'search_cycle_improvement',
+        'search_retained_improvement',
+        'search_stagnant',
+        'search_escape_count',
         'controller_moving',
     }
 
@@ -371,6 +378,187 @@ def plot_search_worsening_count(
     ax.legend()
 
     fig.tight_layout()
+
+
+
+def plot_search_cycles(
+    data: pd.DataFrame,
+) -> None:
+    search = data[
+        data['controller_state'] == 'SEARCH'
+    ].copy()
+
+    completed = search[
+        search['search_cycle_improvement'].notna()
+    ].copy()
+
+    if completed.empty:
+        return
+
+    # Keep one row for each completed cycle. The completion row is the
+    # first row carrying that cycle's calculated improvement.
+    completed = (
+        completed
+        .drop_duplicates(
+            subset=['search_cycle'],
+            keep='first',
+        )
+        .sort_values('search_cycle')
+    )
+
+    fig, ax = plt.subplots(
+        figsize=(11, 5)
+    )
+
+    ax.plot(
+        completed['search_cycle'],
+        completed['search_cycle_start_score'],
+        marker='o',
+        label='Cycle start',
+    )
+
+    ax.plot(
+        completed['search_cycle'],
+        completed['search_cycle_best_score'],
+        marker='o',
+        label='Cycle best',
+    )
+
+    ax.set_title(
+        'SEARCH Cycle Objective'
+    )
+
+    ax.set_xlabel(
+        'Completed search cycle'
+    )
+
+    ax.set_ylabel(
+        'RMS search objective'
+    )
+
+    ax.grid(
+        alpha=0.3
+    )
+
+    ax.legend()
+
+    fig.tight_layout()
+
+    fig, ax = plt.subplots(
+        figsize=(11, 5)
+    )
+
+    ax.plot(
+        completed['search_cycle'],
+        100 * completed['search_cycle_improvement'],
+        marker='o',
+    )
+
+    ax.axhline(
+        0.0,
+        linestyle='--',
+        alpha=0.6,
+    )
+
+    ax.set_title(
+        'SEARCH Cycle Improvement'
+    )
+
+    ax.set_xlabel(
+        'Completed search cycle'
+    )
+
+    ax.set_ylabel(
+        'Improvement (%)'
+    )
+
+    ax.grid(
+        alpha=0.3
+    )
+
+    fig.tight_layout()
+
+
+
+def plot_search_stagnation(
+    data: pd.DataFrame,
+) -> None:
+    search = data[
+        data['controller_state'] == 'SEARCH'
+    ].copy()
+
+    retained = search[
+        search['search_retained_improvement'].notna()
+    ].copy()
+
+    if not retained.empty:
+        retained = (
+            retained
+            .drop_duplicates(
+                subset=[
+                    'search_cycle',
+                    'search_retained_improvement',
+                ],
+                keep='first',
+            )
+            .sort_values('time_s')
+        )
+
+        fig, ax = plt.subplots(
+            figsize=(11, 5)
+        )
+
+        ax.plot(
+            retained['time_s'],
+            100 * retained[
+                'search_retained_improvement'
+            ],
+            marker='o',
+            label='Retained improvement',
+        )
+
+        ax.axhline(
+            5.0,
+            linestyle='--',
+            alpha=0.6,
+            label='Stagnation threshold',
+        )
+
+        ax.set_title(
+            'SEARCH Retained Progress'
+        )
+
+        ax.set_xlabel(
+            'Time (s)'
+        )
+
+        ax.set_ylabel(
+            'Improvement over 3 cycles (%)'
+        )
+
+        ax.grid(
+            alpha=0.3
+        )
+
+        ax.legend()
+
+        fig.tight_layout()
+
+    escapes = search[
+        search['search_escape_count'].diff().fillna(0) > 0
+    ]
+
+    if not escapes.empty:
+        print()
+        print('SEARCH escapes')
+        print('--------------')
+
+        for _, row in escapes.iterrows():
+            print(
+                f'{row["time_s"]:8.3f} s  '
+                f'escape {int(row["search_escape_count"])}  '
+                f'QWP1={row["comp_qwp1_deg"]:.2f}°'
+            )
 
 
 def plot_coincidences(
@@ -720,6 +908,14 @@ def main() -> None:
     )
 
     plot_search_worsening_count(
+        data
+    )
+
+    plot_search_cycles(
+        data
+    )
+
+    plot_search_stagnation(
         data
     )
 

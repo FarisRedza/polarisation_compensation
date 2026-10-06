@@ -80,6 +80,13 @@ LOG_FIELDS = [
     'objective',
     'search_jog_velocity_deg_s',
     'search_worsening_count',
+    'search_cycle',
+    'search_cycle_start_score',
+    'search_cycle_best_score',
+    'search_cycle_improvement',
+    'search_retained_improvement',
+    'search_stagnant',
+    'search_escape_count',
     'best_score',
     'best_position_deg',
     'controller_moving',
@@ -298,6 +305,35 @@ def log_result(
         'search_worsening_count': (
             status.search_worsening_count
         ),
+        'search_cycle': (
+            status.search_cycle
+        ),
+        'search_cycle_start_score': (
+            status.search_cycle_start_score
+            if status.search_cycle_start_score is not None
+            else ''
+        ),
+        'search_cycle_best_score': (
+            status.search_cycle_best_score
+            if status.search_cycle_best_score is not None
+            else ''
+        ),
+        'search_cycle_improvement': (
+            status.search_cycle_improvement
+            if status.search_cycle_improvement is not None
+            else ''
+        ),
+        'search_retained_improvement': (
+            status.search_retained_improvement
+            if status.search_retained_improvement is not None
+            else ''
+        ),
+        'search_stagnant': (
+            status.search_stagnant
+        ),
+        'search_escape_count': (
+            status.search_escape_count
+        ),
         'best_score': (
             status.best_score
             if status.best_score is not None
@@ -382,6 +418,26 @@ def draw_ui(
         if status.state.name == 'SEARCH'
         else '-'
     )
+    cycle_start_score = (
+        f'{status.search_cycle_start_score:.3f}'
+        if status.search_cycle_start_score is not None
+        else '-'
+    )
+    cycle_best_score = (
+        f'{status.search_cycle_best_score:.3f}'
+        if status.search_cycle_best_score is not None
+        else '-'
+    )
+    cycle_improvement = (
+        f'{status.search_cycle_improvement:.2%}'
+        if status.search_cycle_improvement is not None
+        else '-'
+    )
+    retained_improvement = (
+        f'{status.search_retained_improvement:.2%}'
+        if status.search_retained_improvement is not None
+        else '-'
+    )
     motion = (
         'MOVING'
         if status.is_moving
@@ -427,6 +483,13 @@ def draw_ui(
         f'Motor:          {motion}',
         f'Jog velocity:   {search_jog_velocity}',
         f'Worse samples:  {status.search_worsening_count}',
+        f'Search cycle:   {status.search_cycle}',
+        f'Cycle start:    {cycle_start_score}',
+        f'Cycle best:     {cycle_best_score}',
+        f'Cycle improve:  {cycle_improvement}',
+        f'Retained:       {retained_improvement}',
+        f'Stagnant:       {status.search_stagnant}',
+        f'Escapes:        {status.search_escape_count}',
         f'Objective:      {score}',
         f'Best objective: {best_score}',
         f'Best position:  {best_position}',
