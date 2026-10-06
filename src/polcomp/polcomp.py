@@ -61,6 +61,28 @@ class PolCompStatus:
 
 
 class PolCompController:
+    """Control a QWP-HWP-QWP stack using BB84 error feedback.
+
+    SEARCH uses cyclic coordinate descent: QWP1, HWP, and QWP2 are
+    searched one at a time and the sequence repeats. Each line search
+    starts with a stationary three-measurement reference, then jogs the
+    selected waveplate continuously. While jogging, a rolling window of
+    three BB84 measurements is combined at the coincidence-count level
+    and scored using max(QBER/target_QBER, Qx/target_Qx). The score is
+    associated with the centre of the angular interval covered by that
+    window.
+
+    A jog stops after several consecutive rolling windows fail to improve
+    the best score. Positive direction is tried first; if it does not beat
+    the stationary reference, the negative direction is tested. A moving
+    score comfortably inside the target is only a candidate: the motor is
+    returned to the best sampled position and LOCK verifies the result
+    using fresh stationary measurements. Only LOCK can declare COMPLETE.
+
+    TRACK and RECOVER are reserved for later closed-loop tracking and
+    local recovery behaviour.
+    """
+
     def __init__(
         self,
         *,
@@ -83,11 +105,16 @@ class PolCompController:
 
         self.measurements = measurements
 
-        # SEARCH uses stationary measurements to establish a reference,
-        # then one BB84 result at a time while continuously jogging.
+        # SEARCH uses a stationary aggregate as its line-search reference
+        # and a rolling aggregate while the selected waveplate is jogging.
         self.search_measurements = 3
+        self.search_jog_measurements = 3
         self.search_worsening_measurements = 3
         self.search_jog_velocity = 5.0
+
+        # A moving rolling-window score must be comfortably inside the
+        # true target before SEARCH is interrupted for stationary LOCK.
+        self.search_candidate_score = 0.90
 
         self.target_qber = target_qber
         self.target_qx = target_qx
@@ -119,6 +146,13 @@ class PolCompController:
             BB84DetectionResult
         ] = []
         self._search_worsening_count = 0
+
+        # Rolling moving-measurement window. Each entry stores the BB84
+        # result together with the angular interval traversed while it was
+        # measured.
+        self._search_jog_results: list[
+            tuple[BB84DetectionResult, float, float]
+        ] = []
 
         # Position interval associated with the most recent moving
         # measurement. The midpoint is used as the representative angle.
@@ -390,24 +424,59 @@ class PolCompController:
 
         start_position = self._search_previous_position
         end_position = current_position
+        self._search_previous_position = current_position
+
+        self._search_jog_results.append(
+            (result, start_position, end_position)
+        )
+
+        if (
+            len(self._search_jog_results)
+            > self.search_jog_measurements
+        ):
+            self._search_jog_results.pop(0)
+
+        # Do not make a SEARCH decision until the moving window contains
+        # the same number of measurements as the stationary reference.
+        if (
+            len(self._search_jog_results)
+            < self.search_jog_measurements
+        ):
+            return
+
+        window_results = [
+            item[0]
+            for item in self._search_jog_results
+        ]
+
+        qber, qx = self._aggregate_results(
+            window_results
+        )
+
+        window_start_position = (
+            self._search_jog_results[0][1]
+        )
+        window_end_position = (
+            self._search_jog_results[-1][2]
+        )
         measurement_position = (
-            start_position + end_position
+            window_start_position
+            + window_end_position
         ) / 2
 
-        self._search_previous_position = current_position
         self._search_measurement_start_position = (
-            start_position
+            window_start_position
         )
         self._search_measurement_end_position = (
-            end_position
+            window_end_position
         )
         self._search_measurement_position = (
             measurement_position
         )
 
         score = self.objective(
-            qber=result.qber,
-            qx=result.qx,
+            qber=qber,
+            qx=qx,
         )
         self._score = score
 
@@ -425,13 +494,10 @@ class PolCompController:
         else:
             self._search_worsening_count += 1
 
-        # A moving measurement below the target is only a candidate.
-        # Stop immediately, return to its representative angle, and let
-        # stationary LOCK measurements decide whether it is valid.
-        if self.target_reached(
-            qber=result.qber,
-            qx=result.qx,
-        ):
+        # A moving result is only a candidate. Requiring the rolling
+        # objective to be comfortably below 1.0 avoids repeatedly entering
+        # LOCK because of marginal measurements near the target boundary.
+        if score <= self.search_candidate_score:
             self._return_to_position(
                 position=self._search_best_position,
                 state=SearchState.RETURN_TO_LOCK,
@@ -501,6 +567,7 @@ class PolCompController:
         state: SearchState,
     ) -> None:
         self._search_worsening_count = 0
+        self._search_jog_results.clear()
 
         self._search_previous_position = (
             self.search_waveplate.position
@@ -528,6 +595,7 @@ class PolCompController:
 
         self._search_state = state
         self._search_worsening_count = 0
+        self._search_jog_results.clear()
         self._search_previous_position = None
 
     def _next_search_waveplate(
@@ -553,6 +621,7 @@ class PolCompController:
         self._search_best_score = None
         self._search_best_position = None
         self._search_worsening_count = 0
+        self._search_jog_results.clear()
 
         self._search_previous_position = None
         self._search_measurement_position = None

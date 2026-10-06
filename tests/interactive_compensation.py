@@ -79,7 +79,7 @@ LOG_FIELDS = [
     'search_measurement_count',
     'objective',
     'search_jog_velocity_deg_s',
-    'search_worse_count',
+    'search_worsening_count',
     'best_score',
     'best_position_deg',
     'controller_moving',
