@@ -67,10 +67,16 @@ class PolCompController:
     searched one at a time and the sequence repeats. Each line search
     starts with a stationary three-measurement reference, then jogs the
     selected waveplate continuously. While jogging, a rolling window of
-    three BB84 measurements is combined at the coincidence-count level
-    and scored using max(QBER/target_QBER, Qx/target_Qx). The score is
-    associated with the centre of the angular interval covered by that
+    three BB84 measurements is combined at the coincidence-count level.
+    SEARCH scores both the stationary reference and moving windows with a
+    smooth RMS objective over the normalised QBER and Qx errors. The score
+    is associated with the centre of the angular interval covered by that
     window.
+
+    The max(QBER/target_QBER, Qx/target_Qx) objective remains the
+    authoritative acceptance metric: it is used for candidate detection,
+    LOCK verification, and deciding whether both BB84 error targets are
+    satisfied.
 
     A jog stops after several consecutive rolling windows fail to improve
     the best score. Positive direction is tried first; if it does not beat
@@ -261,6 +267,37 @@ class PolCompController:
             qx / self.target_qx,
         )
 
+    def search_objective(
+        self,
+        qber: float,
+        qx: float,
+    ) -> float:
+        """Return the smooth objective used to guide SEARCH.
+
+        The RMS of the two normalised BB84 errors rewards reductions in
+        either basis while still weighting the larger error more strongly
+        than a simple arithmetic mean. Unlike ``objective()``, it does not
+        develop a hard ridge when QBER and Qx exchange which is larger.
+
+        This value is only used to choose SEARCH directions and positions.
+        Candidate acceptance and LOCK continue to use ``objective()`` so
+        both QBER and Qx must satisfy their individual targets.
+        """
+        qber_normalised = (
+            qber / self.target_qber
+        )
+        qx_normalised = (
+            qx / self.target_qx
+        )
+
+        return (
+            (
+                qber_normalised ** 2
+                + qx_normalised ** 2
+            )
+            / 2
+        ) ** 0.5
+
     def target_reached(
         self,
         qber: float,
@@ -382,7 +419,7 @@ class PolCompController:
         )
         self._search_results.clear()
 
-        score = self.objective(
+        score = self.search_objective(
             qber=qber,
             qx=qx,
         )
@@ -474,7 +511,11 @@ class PolCompController:
             measurement_position
         )
 
-        score = self.objective(
+        score = self.search_objective(
+            qber=qber,
+            qx=qx,
+        )
+        acceptance_score = self.objective(
             qber=qber,
             qx=qx,
         )
@@ -494,10 +535,11 @@ class PolCompController:
         else:
             self._search_worsening_count += 1
 
-        # A moving result is only a candidate. Requiring the rolling
-        # objective to be comfortably below 1.0 avoids repeatedly entering
-        # LOCK because of marginal measurements near the target boundary.
-        if score <= self.search_candidate_score:
+        # A moving result is only a candidate. Candidate acceptance uses
+        # the authoritative max objective rather than the smoother SEARCH
+        # objective, so both bases must be comfortably inside their targets
+        # before SEARCH is interrupted for LOCK.
+        if acceptance_score <= self.search_candidate_score:
             self._return_to_position(
                 position=self._search_best_position,
                 state=SearchState.RETURN_TO_LOCK,
