@@ -28,7 +28,8 @@ def load_log(
         'search_waveplate',
         'search_measurement_count',
         'objective',
-        'search_step_deg',
+        'search_jog_velocity_deg_s',
+        'search_worsening_count',
         'controller_moving',
     }
 
@@ -276,33 +277,26 @@ def plot_objective(
 
     fig.tight_layout()
 
-def plot_search_step(
+def plot_search_jog(
     data: pd.DataFrame,
 ) -> None:
     fig, ax = plt.subplots(
         figsize=(11, 5)
     )
 
-    for waveplate in (
-        'QWP1',
-        'HWP',
-        'QWP2',
-    ):
-        search = data[
-            data['search_waveplate']
-            == waveplate
-        ]
+    search = data[
+        data['controller_state'] == 'SEARCH'
+    ]
 
-        if search.empty:
-            continue
+    if search.empty:
+        plt.close(fig)
+        return
 
-        ax.plot(
-            search['time_s'],
-            search['search_step_deg'],
-            marker='.',
-            linestyle='-',
-            label=waveplate,
-        )
+    ax.plot(
+        search['time_s'],
+        search['search_jog_velocity_deg_s'],
+        label='Jog velocity',
+    )
 
     add_event_lines(
         ax,
@@ -310,7 +304,7 @@ def plot_search_step(
     )
 
     ax.set_title(
-        'Search Step Size'
+        'Search Jog Velocity'
     )
 
     ax.set_xlabel(
@@ -318,7 +312,7 @@ def plot_search_step(
     )
 
     ax.set_ylabel(
-        'Step size (deg)'
+        'Jog velocity (deg/s)'
     )
 
     ax.grid(
@@ -328,6 +322,56 @@ def plot_search_step(
     ax.legend()
 
     fig.tight_layout()
+
+
+def plot_search_worsening_count(
+    data: pd.DataFrame,
+) -> None:
+    fig, ax = plt.subplots(
+        figsize=(11, 5)
+    )
+
+    search = data[
+        data['controller_state'] == 'SEARCH'
+    ]
+
+    if search.empty:
+        plt.close(fig)
+        return
+
+    ax.plot(
+        search['time_s'],
+        search['search_worsening_count'],
+        marker='.',
+        linestyle='-',
+        label='Worsening samples',
+    )
+
+    add_event_lines(
+        ax,
+        data,
+    )
+
+    ax.set_title(
+        'Search Worsening Count'
+    )
+
+    ax.set_xlabel(
+        'Time (s)'
+    )
+
+    ax.set_ylabel(
+        'Consecutive samples'
+    )
+
+    ax.grid(
+        alpha=0.3
+    )
+
+    ax.legend()
+
+    fig.tight_layout()
+
 
 def plot_coincidences(
     data: pd.DataFrame,
@@ -467,11 +511,6 @@ def plot_search_trajectory(
                 data['search_waveplate']
                 == waveplate
             )
-            & (
-                ~data[
-                    'controller_moving'
-                ].astype(bool)
-            )
             & data['objective'].notna()
         ]
 
@@ -482,12 +521,30 @@ def plot_search_trajectory(
             figsize=(8, 5)
         )
 
-        ax.plot(
-            search[position_column],
-            search['objective'],
-            marker='.',
-            linestyle='-',
-        )
+        moving = search[
+            search['controller_moving'].astype(bool)
+        ]
+
+        stationary = search[
+            ~search['controller_moving'].astype(bool)
+        ]
+
+        if not moving.empty:
+            ax.plot(
+                moving[position_column],
+                moving['objective'],
+                marker='.',
+                linestyle='-',
+                label='Jog measurements',
+            )
+
+        if not stationary.empty:
+            ax.scatter(
+                stationary[position_column],
+                stationary['objective'],
+                marker='x',
+                label='Stationary measurements',
+            )
 
         ax.axhline(
             1.0,
@@ -658,7 +715,11 @@ def main() -> None:
         data
     )
 
-    plot_search_step(
+    plot_search_jog(
+        data
+    )
+
+    plot_search_worsening_count(
         data
     )
 

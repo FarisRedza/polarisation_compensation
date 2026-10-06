@@ -78,7 +78,8 @@ LOG_FIELDS = [
     'search_waveplate',
     'search_measurement_count',
     'objective',
-    'search_step_deg',
+    'search_jog_velocity_deg_s',
+    'search_worse_count',
     'best_score',
     'best_position_deg',
     'controller_moving',
@@ -291,8 +292,11 @@ def log_result(
             if status.score is not None
             else ''
         ),
-        'search_step_deg': (
-            status.search_step_deg
+        'search_jog_velocity_deg_s': (
+            controller.search_jog_velocity
+        ),
+        'search_worsening_count': (
+            status.search_worsening_count
         ),
         'best_score': (
             status.best_score
@@ -373,6 +377,11 @@ def draw_ui(
         if status.state.name == 'SEARCH'
         else '-'
     )
+    search_jog_velocity = (
+        f'{controller.search_jog_velocity:.2f}°/s'
+        if status.state.name == 'SEARCH'
+        else '-'
+    )
     motion = (
         'MOVING'
         if status.is_moving
@@ -416,7 +425,8 @@ def draw_ui(
         f'Search plate:   {search_waveplate}',
         f'Search state:   {search_state}',
         f'Motor:          {motion}',
-        f'Step:           {status.search_step_deg:.2f}°',
+        f'Jog velocity:   {search_jog_velocity}',
+        f'Worse samples:  {status.search_worsening_count}',
         f'Objective:      {score}',
         f'Best objective: {best_score}',
         f'Best position:  {best_position}',

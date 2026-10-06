@@ -1,9 +1,7 @@
 import dataclasses
 import typing
-import time
 import enum
 
-import numpy as np
 import motor
 import qtoolkit
 
@@ -28,10 +26,11 @@ class CompensationState(enum.Enum):
 
 class SearchState(enum.Enum):
     START = enum.auto()
-    PROBE_POSITIVE = enum.auto()
-    PROBE_NEGATIVE = enum.auto()
-    MOVE_POSITIVE = enum.auto()
-    MOVE_NEGATIVE = enum.auto()
+    JOG_POSITIVE = enum.auto()
+    RETURN_FROM_POSITIVE = enum.auto()
+    JOG_NEGATIVE = enum.auto()
+    RETURN_TO_BEST = enum.auto()
+    RETURN_TO_LOCK = enum.auto()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -42,14 +41,21 @@ class PolCompStatus:
     score: typing.Optional[float]
 
     search_waveplate_index: int
-    search_step_deg: float
     search_measurement_count: int
+    search_worsening_count: int
 
+    # Retained for compatibility with the existing logger. Jog SEARCH
+    # no longer has a discrete angular step or cycle refinement.
+    search_step_deg: typing.Optional[float]
     search_cycle_improvement: typing.Optional[float]
     search_low_improvement_cycles: int
 
     best_score: typing.Optional[float]
     best_position: typing.Optional[float]
+
+    measurement_position: typing.Optional[float]
+    measurement_start_position: typing.Optional[float]
+    measurement_end_position: typing.Optional[float]
 
     is_moving: bool
 
@@ -77,19 +83,11 @@ class PolCompController:
 
         self.measurements = measurements
 
-        # Search resolution
-        self.initial_search_step_deg = 4
-        self.min_search_step_deg = 0.125
-        self.search_step_scale = 0.5
-
-        self.search_step_deg = (
-            self.initial_search_step_deg
-        )
+        # SEARCH uses stationary measurements to establish a reference,
+        # then one BB84 result at a time while continuously jogging.
         self.search_measurements = 3
-
-        # Search convergence
-        self.search_cycle_improvement_threshold = 0.05
-        self.search_converged_cycles = 2
+        self.search_worsening_measurements = 3
+        self.search_jog_velocity = 5.0
 
         self.target_qber = target_qber
         self.target_qx = target_qx
@@ -101,11 +99,13 @@ class PolCompController:
 
         self._score: typing.Optional[float] = None
 
-        # Current waveplate line search
         self._search_state = SearchState.START
         self._search_waveplate_index = 0
 
         self._search_reference_score: typing.Optional[
+            float
+        ] = None
+        self._search_reference_position: typing.Optional[
             float
         ] = None
         self._search_best_score: typing.Optional[
@@ -118,16 +118,22 @@ class PolCompController:
         self._search_results: list[
             BB84DetectionResult
         ] = []
+        self._search_worsening_count = 0
 
-        # Complete QWP1 -> HWP -> QWP2 cycle
-        self._search_cycle_start_score: typing.Optional[
+        # Position interval associated with the most recent moving
+        # measurement. The midpoint is used as the representative angle.
+        self._search_previous_position: typing.Optional[
             float
         ] = None
-        self._search_cycle_improvement: typing.Optional[
+        self._search_measurement_position: typing.Optional[
             float
         ] = None
-        self._search_cycle_pending = False
-        self._search_low_improvement_cycles = 0
+        self._search_measurement_start_position: typing.Optional[
+            float
+        ] = None
+        self._search_measurement_end_position: typing.Optional[
+            float
+        ] = None
 
         self._lock_results: list[
             BB84DetectionResult
@@ -145,26 +151,19 @@ class PolCompController:
         self.active = True
         self.state = CompensationState.SEARCH
 
-        self.search_step_deg = (
-            self.initial_search_step_deg
-        )
-
         self._search_state = SearchState.START
         self._search_waveplate_index = 0
 
-        self._search_reference_score = None
-        self._search_best_score = None
-        self._search_best_position = None
-
-        self._search_cycle_start_score = None
-        self._search_cycle_improvement = None
-        self._search_cycle_pending = False
-        self._search_low_improvement_cycles = 0
+        self._reset_search_line()
 
         self._search_results.clear()
         self._lock_results.clear()
 
     def stop(self) -> None:
+        for waveplate in self.waveplates:
+            if waveplate.is_moving:
+                waveplate.stop()
+
         self.active = False
         self.state = CompensationState.IDLE
 
@@ -190,18 +189,26 @@ class PolCompController:
             search_waveplate_index=(
                 self._search_waveplate_index
             ),
-            search_step_deg=self.search_step_deg,
             search_measurement_count=(
                 len(self._search_results)
             ),
-            search_cycle_improvement=(
-                self._search_cycle_improvement
+            search_worsening_count=(
+                self._search_worsening_count
             ),
-            search_low_improvement_cycles=(
-                self._search_low_improvement_cycles
-            ),
+            search_step_deg=None,
+            search_cycle_improvement=None,
+            search_low_improvement_cycles=0,
             best_score=self._search_best_score,
             best_position=self._search_best_position,
+            measurement_position=(
+                self._search_measurement_position
+            ),
+            measurement_start_position=(
+                self._search_measurement_start_position
+            ),
+            measurement_end_position=(
+                self._search_measurement_end_position
+            ),
             is_moving=self.is_moving,
         )
 
@@ -240,9 +247,6 @@ class PolCompController:
         if not self.active:
             return
 
-        if self.is_moving:
-            return
-
         match self.state:
             case CompensationState.IDLE:
                 return
@@ -253,6 +257,10 @@ class PolCompController:
                 )
 
             case CompensationState.LOCK:
+                # LOCK only uses stationary measurements.
+                if self.is_moving:
+                    return
+
                 self._update_lock(
                     result=result,
                 )
@@ -271,256 +279,60 @@ class PolCompController:
                     f'Unknown state: {self.state}'
                 )
 
-    def _update_search(
-        self,
-        *,
-        score: float,
-        qber: float,
-        qx: float,
-    ) -> None:
-        # -------------------------------------------------------------
-        # Search complete
-        # -------------------------------------------------------------
-        if self.target_reached(
-            qber=qber,
-            qx=qx,
-        ):
-            self._search_best_score = score
-            self._search_best_position = (
-                self.search_waveplate.position
-            )
-
-            self._lock_results.clear()
-
-            self.state = CompensationState.LOCK
-
-            return
-
-        # -------------------------------------------------------------
-        # Initial measurement
-        # -------------------------------------------------------------
-        if self._search_state is SearchState.START:
-            # If QWP2 completed the previous cycle, this fresh
-            # measurement at the settled position is the endpoint of
-            # that cycle.
-            if (
-                self._search_waveplate_index == 0
-                and self._search_cycle_pending
-            ):
-                self._update_search_cycle(
-                    score=score
-                )
-
-            # The endpoint of the previous cycle is also the starting
-            # point of the next cycle. On the first cycle, simply use
-            # the first QWP1 measurement.
-            if (
-                self._search_waveplate_index == 0
-                and self._search_cycle_start_score
-                is None
-            ):
-                self._search_cycle_start_score = score
-
-            self._search_reference_score = score
-            self._search_best_score = score
-            self._search_best_position = (
-                self.search_waveplate.position
-            )
-
-            self._search_results.clear()
-
-            self.search_waveplate.move_by(
-                self.search_step_deg
-            )
-
-            self._search_state = (
-                SearchState.PROBE_POSITIVE
-            )
-
-            return
-
-        # -------------------------------------------------------------
-        # Test positive direction
-        # -------------------------------------------------------------
-        if (
-            self._search_state
-            is SearchState.PROBE_POSITIVE
-        ):
-            assert (
-                self._search_reference_score
-                is not None
-            )
-            assert (
-                self._search_best_score
-                is not None
-            )
-
-            if (
-                score
-                < self._search_reference_score
-            ):
-                self._search_best_score = score
-                self._search_best_position = (
-                    self.search_waveplate.position
-                )
-
-                self._search_results.clear()
-
-                self.search_waveplate.move_by(
-                    self.search_step_deg
-                )
-
-                self._search_state = (
-                    SearchState.MOVE_POSITIVE
-                )
-
-            else:
-                # Undo the positive probe and then move the same
-                # amount in the negative direction from the original
-                # position.
-                self._search_results.clear()
-
-                self.search_waveplate.move_by(
-                    -2 * self.search_step_deg
-                )
-
-                self._search_state = (
-                    SearchState.PROBE_NEGATIVE
-                )
-
-            return
-
-        # -------------------------------------------------------------
-        # Continue positive direction
-        # -------------------------------------------------------------
-        if (
-            self._search_state
-            is SearchState.MOVE_POSITIVE
-        ):
-            assert (
-                self._search_best_score
-                is not None
-            )
-            assert (
-                self._search_best_position
-                is not None
-            )
-
-            if score < self._search_best_score:
-                self._search_best_score = score
-                self._search_best_position = (
-                    self.search_waveplate.position
-                )
-
-                self._search_results.clear()
-
-                self.search_waveplate.move_by(
-                    self.search_step_deg
-                )
-
-            else:
-                self._search_results.clear()
-
-                self.search_waveplate.move_to(
-                    self._search_best_position
-                )
-
-                self._next_search_waveplate()
-
-            return
-
-        # -------------------------------------------------------------
-        # Test negative direction
-        # -------------------------------------------------------------
-        if (
-            self._search_state
-            is SearchState.PROBE_NEGATIVE
-        ):
-            assert (
-                self._search_reference_score
-                is not None
-            )
-            assert (
-                self._search_best_score
-                is not None
-            )
-
-            if (
-                score
-                < self._search_reference_score
-            ):
-                self._search_best_score = score
-                self._search_best_position = (
-                    self.search_waveplate.position
-                )
-
-                self._search_results.clear()
-
-                self.search_waveplate.move_by(
-                    -self.search_step_deg
-                )
-
-                self._search_state = (
-                    SearchState.MOVE_NEGATIVE
-                )
-
-            else:
-                # Neither direction helped. Return to the original
-                # position and continue with the next waveplate.
-                self._search_results.clear()
-
-                self.search_waveplate.move_by(
-                    self.search_step_deg
-                )
-
-                self._next_search_waveplate()
-
-            return
-
-        # -------------------------------------------------------------
-        # Continue negative direction
-        # -------------------------------------------------------------
-        if (
-            self._search_state
-            is SearchState.MOVE_NEGATIVE
-        ):
-            assert (
-                self._search_best_score
-                is not None
-            )
-            assert (
-                self._search_best_position
-                is not None
-            )
-
-            if score < self._search_best_score:
-                self._search_best_score = score
-                self._search_best_position = (
-                    self.search_waveplate.position
-                )
-
-                self._search_results.clear()
-
-                self.search_waveplate.move_by(
-                    -self.search_step_deg
-                )
-
-            else:
-                self._search_results.clear()
-
-                self.search_waveplate.move_to(
-                    self._search_best_position
-                )
-
-                self._next_search_waveplate()
-
-            return
-
     def _update_search_measurement(
         self,
         *,
         result: BB84DetectionResult,
     ) -> None:
+        # During a jog, consume each BB84 result immediately. The motor
+        # position is still available while moving, so associate the
+        # result with the midpoint of the travelled interval.
+        if self._search_state in (
+            SearchState.JOG_POSITIVE,
+            SearchState.JOG_NEGATIVE,
+        ):
+            self._update_jog_measurement(
+                result=result,
+            )
+            return
+
+        # Ignore measurements while move_to() is returning to a known
+        # position. Once the motor settles, the next result advances the
+        # state machine or becomes the first LOCK result.
+        if self.is_moving:
+            return
+
+        if (
+            self._search_state
+            is SearchState.RETURN_FROM_POSITIVE
+        ):
+            self._start_jog(
+                direction=motor.MotorDirection.BACKWARD,
+                state=SearchState.JOG_NEGATIVE,
+            )
+            return
+
+        if (
+            self._search_state
+            is SearchState.RETURN_TO_BEST
+        ):
+            self._next_search_waveplate()
+            return
+
+        if (
+            self._search_state
+            is SearchState.RETURN_TO_LOCK
+        ):
+            self._lock_results.clear()
+            self.state = CompensationState.LOCK
+            self._update_lock(
+                result=result,
+            )
+            return
+
+        # START uses the same three-result aggregate as the old SEARCH
+        # implementation. This gives each line search a less noisy
+        # stationary reference before continuous motion begins.
         self._search_results.append(
             result
         )
@@ -534,21 +346,218 @@ class PolCompController:
         qber, qx = self._aggregate_results(
             self._search_results
         )
-
         self._search_results.clear()
 
         score = self.objective(
             qber=qber,
             qx=qx,
         )
-
         self._score = score
 
-        self._update_search(
-            score=score,
+        position = self.search_waveplate.position
+
+        if self.target_reached(
             qber=qber,
             qx=qx,
+        ):
+            self._search_best_score = score
+            self._search_best_position = position
+            self._lock_results.clear()
+            self.state = CompensationState.LOCK
+            return
+
+        self._search_reference_score = score
+        self._search_reference_position = position
+        self._search_best_score = score
+        self._search_best_position = position
+        self._search_worsening_count = 0
+
+        self._start_jog(
+            direction=motor.MotorDirection.FORWARD,
+            state=SearchState.JOG_POSITIVE,
         )
+
+    def _update_jog_measurement(
+        self,
+        *,
+        result: BB84DetectionResult,
+    ) -> None:
+        current_position = self.search_waveplate.position
+
+        if self._search_previous_position is None:
+            self._search_previous_position = current_position
+            return
+
+        start_position = self._search_previous_position
+        end_position = current_position
+        measurement_position = (
+            start_position + end_position
+        ) / 2
+
+        self._search_previous_position = current_position
+        self._search_measurement_start_position = (
+            start_position
+        )
+        self._search_measurement_end_position = (
+            end_position
+        )
+        self._search_measurement_position = (
+            measurement_position
+        )
+
+        score = self.objective(
+            qber=result.qber,
+            qx=result.qx,
+        )
+        self._score = score
+
+        assert self._search_reference_score is not None
+        assert self._search_reference_position is not None
+        assert self._search_best_score is not None
+        assert self._search_best_position is not None
+
+        if score < self._search_best_score:
+            self._search_best_score = score
+            self._search_best_position = (
+                measurement_position
+            )
+            self._search_worsening_count = 0
+        else:
+            self._search_worsening_count += 1
+
+        # A moving measurement below the target is only a candidate.
+        # Stop immediately, return to its representative angle, and let
+        # stationary LOCK measurements decide whether it is valid.
+        if self.target_reached(
+            qber=result.qber,
+            qx=result.qx,
+        ):
+            self._return_to_position(
+                position=self._search_best_position,
+                state=SearchState.RETURN_TO_LOCK,
+            )
+            return
+
+        if (
+            self._search_worsening_count
+            < self.search_worsening_measurements
+        ):
+            return
+
+        if (
+            self._search_state
+            is SearchState.JOG_POSITIVE
+        ):
+            if (
+                self._search_best_score
+                < self._search_reference_score
+            ):
+                self._return_to_position(
+                    position=self._search_best_position,
+                    state=SearchState.RETURN_TO_BEST,
+                )
+            else:
+                # Positive motion did not improve on the stationary
+                # reference. Return to the reference and try negative.
+                self._return_to_position(
+                    position=self._search_reference_position,
+                    state=SearchState.RETURN_FROM_POSITIVE,
+                )
+            return
+
+        if (
+            self._search_state
+            is SearchState.JOG_NEGATIVE
+        ):
+            # If negative improved, return to its best point. Otherwise
+            # return to the original reference. In either case this line
+            # search is complete and the next waveplate is selected.
+            if (
+                self._search_best_score
+                < self._search_reference_score
+            ):
+                return_position = (
+                    self._search_best_position
+                )
+            else:
+                return_position = (
+                    self._search_reference_position
+                )
+
+            self._return_to_position(
+                position=return_position,
+                state=SearchState.RETURN_TO_BEST,
+            )
+            return
+
+        raise ValueError(
+            f'Unexpected jog state: {self._search_state}'
+        )
+
+    def _start_jog(
+        self,
+        *,
+        direction: motor.MotorDirection,
+        state: SearchState,
+    ) -> None:
+        self._search_worsening_count = 0
+
+        self._search_previous_position = (
+            self.search_waveplate.position
+        )
+        self._search_measurement_position = None
+        self._search_measurement_start_position = None
+        self._search_measurement_end_position = None
+
+        self.search_waveplate.jog(
+            direction=direction,
+            max_velocity=self.search_jog_velocity,
+        )
+        self._search_state = state
+
+    def _return_to_position(
+        self,
+        *,
+        position: float,
+        state: SearchState,
+    ) -> None:
+        self.search_waveplate.stop()
+        self.search_waveplate.move_to(
+            position
+        )
+
+        self._search_state = state
+        self._search_worsening_count = 0
+        self._search_previous_position = None
+
+    def _next_search_waveplate(
+        self,
+    ) -> None:
+        self._search_waveplate_index += 1
+
+        if (
+            self._search_waveplate_index
+            >= len(self.waveplates)
+        ):
+            self._search_waveplate_index = 0
+
+        self._search_state = SearchState.START
+        self._reset_search_line()
+        self._search_results.clear()
+
+    def _reset_search_line(
+        self,
+    ) -> None:
+        self._search_reference_score = None
+        self._search_reference_position = None
+        self._search_best_score = None
+        self._search_best_position = None
+        self._search_worsening_count = 0
+
+        self._search_previous_position = None
+        self._search_measurement_position = None
+        self._search_measurement_start_position = None
+        self._search_measurement_end_position = None
 
     def _update_lock(
         self,
@@ -568,7 +577,6 @@ class PolCompController:
         qber, qx = self._aggregate_results(
             self._lock_results
         )
-
         self._lock_results.clear()
 
         self._score = self.objective(
@@ -580,21 +588,14 @@ class PolCompController:
             qber=qber,
             qx=qx,
         ):
-            self.state = (
-                CompensationState.COMPLETE
-            )
-
+            self.state = CompensationState.COMPLETE
         else:
-            # A failed lock is not evidence that the current search
-            # resolution has converged. Resume the current coordinate
-            # search without changing the step size or cycle
-            # convergence state.
+            # A failed LOCK returns to a fresh line search from the
+            # current, stationary position.
             self._search_state = SearchState.START
+            self._reset_search_line()
             self._search_results.clear()
-
-            self.state = (
-                CompensationState.SEARCH
-            )
+            self.state = CompensationState.SEARCH
 
     def _aggregate_results(
         self,
@@ -639,91 +640,3 @@ class PolCompController:
             zz.qber,
             xx.qber,
         )
-
-    def _next_search_waveplate(
-        self,
-    ) -> None:
-        self._search_waveplate_index += 1
-
-        if (
-            self._search_waveplate_index
-            >= len(self.waveplates)
-        ):
-            self._search_waveplate_index = 0
-
-            # QWP2 has completed its line search. The next fresh
-            # settled measurement at QWP1 will be used to evaluate
-            # the complete search cycle.
-            self._search_cycle_pending = True
-
-        self._search_state = SearchState.START
-
-        self._search_reference_score = None
-        self._search_best_score = None
-        self._search_best_position = None
-
-    def _update_search_cycle(
-        self,
-        *,
-        score: float,
-    ) -> None:
-        assert (
-            self._search_cycle_start_score
-            is not None
-        )
-
-        if self._search_cycle_start_score > 0:
-            relative_improvement = (
-                (
-                    self._search_cycle_start_score
-                    - score
-                )
-                / self._search_cycle_start_score
-            )
-        else:
-            relative_improvement = 0.0
-
-        self._search_cycle_improvement = (
-            relative_improvement
-        )
-
-        if (
-            relative_improvement
-            < self.search_cycle_improvement_threshold
-        ):
-            self._search_low_improvement_cycles += 1
-
-        else:
-            self._search_low_improvement_cycles = 0
-
-        if (
-            self._search_low_improvement_cycles
-            >= self.search_converged_cycles
-        ):
-            self._refine_search_step()
-
-            self._search_low_improvement_cycles = 0
-
-        # The endpoint of this cycle is also the starting point of
-        # the next cycle.
-        self._search_cycle_start_score = score
-        self._search_cycle_pending = False
-
-    def _refine_search_step(
-        self,
-    ) -> None:
-        next_step = (
-            self.search_step_deg
-            * self.search_step_scale
-        )
-
-        if (
-            next_step
-            >= self.min_search_step_deg
-        ):
-            self.search_step_deg = next_step
-
-        else:
-            self.search_step_deg = (
-                self.initial_search_step_deg
-            )
