@@ -443,6 +443,12 @@ class PolCompController:
             self._search_state
             is SearchState.ESCAPE_MOVE
         ):
+            # The escape has finished. Start retained-progress
+            # tracking afresh from the relocated search basin.
+            self._search_cycle_start_scores.clear()
+            self._search_retained_improvement = None
+            self._search_stagnant = False
+
             self._search_state = SearchState.START
             self._reset_search_line()
             self._search_results.clear()
@@ -739,9 +745,6 @@ class PolCompController:
         )
 
         self._search_escape_count += 1
-        self._search_cycle_start_scores.clear()
-        self._search_retained_improvement = None
-        self._search_stagnant = False
 
         self._search_state = SearchState.ESCAPE_MOVE
         self._search_results.clear()
