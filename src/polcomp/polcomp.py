@@ -135,7 +135,7 @@ class PolCompController:
         # SEARCH is considered stagnant and performs a deterministic escape.
         self.search_stagnation_cycles = 3
         self.search_stagnation_threshold = 0.05
-        self.search_escape_angle = 22.5
+        self.search_escape_angle = 11.25#22.5
 
         self.target_qber = target_qber
         self.target_qx = target_qx
