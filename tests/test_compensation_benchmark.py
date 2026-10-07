@@ -1,9 +1,5 @@
-import sys
-import pathlib
-
 import pytest
 
-sys.path.append(str(pathlib.Path(__file__).parent.parent.joinpath('tests')))
 from benchmark import (
     run_compensation_benchmark,
 )
