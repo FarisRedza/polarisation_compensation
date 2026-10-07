@@ -230,3 +230,5 @@ PKG_SOURCE/
 
 # Dev container
 devcontainer-lock.json
+
+logs/
