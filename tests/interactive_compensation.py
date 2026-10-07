@@ -485,7 +485,7 @@ def draw_ui(
 
     lines = [
         'Polarisation Compensation Test',
-        '',
+
 
         'User-controlled disturbance',
         '---------------------------',
@@ -494,7 +494,7 @@ def draw_ui(
             f'HWP: {disturbance_hwp.position:8.2f}°    '
             f'QWP2: {disturbance_qwp2.position:8.2f}°'
         ),
-        '',
+
 
         'Active compensation',
         '-------------------',
@@ -503,7 +503,7 @@ def draw_ui(
             f'HWP: {compensation_hwp.position:8.2f}°    '
             f'QWP2: {compensation_qwp2.position:8.2f}°'
         ),
-        '',
+
 
         'Measurement',
         '-----------',
@@ -512,7 +512,7 @@ def draw_ui(
             f'Qx: {result.qx:7.2%}    '
             f'Worst: {worst:7.2%}'
         ),
-        '',
+
 
         'Controller',
         '----------',
@@ -549,21 +549,21 @@ def draw_ui(
         f'Objective:      {score}',
         f'Best objective: {best_score}',
         f'Best position:  {best_position}',
-        '',
+
 
         'Manual disturbance controls',
         '---------------------------',
         f'Step size: {manual_step_deg:.2f}°',
-        '',
+
         'Q / A    QWP1 + / -',
         'W / S    HWP  + / -',
         'E / D    QWP2 + / -',
-        '',
+
         '+ / -    Increase / decrease manual step',
-        '',
+
         'R        Restart compensation search',
         'X        Quit',
-        '',
+
         f'Log: {log_file}',
     ]
 
