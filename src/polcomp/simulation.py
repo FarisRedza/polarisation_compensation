@@ -1,5 +1,6 @@
 import dataclasses
 import math
+import time
 import typing
 
 import numpy as np
@@ -10,6 +11,29 @@ import qtoolkit
 from qtoolkit.polarisation import Waveplate
 
 from .polcomp import BB84DetectionResult
+
+
+class Clock(typing.Protocol):
+    """Clock interface used by deterministic simulated motors."""
+
+    def time(self) -> float:
+        ...
+
+    def advance(self, seconds: float) -> None:
+        ...
+
+
+class RealTimeClock:
+    """Clock whose advancement follows real wall-clock time."""
+
+    def time(self) -> float:
+        return time.monotonic()
+
+    def advance(self, seconds: float) -> None:
+        if seconds < 0:
+            raise ValueError('seconds must be non-negative')
+
+        time.sleep(seconds)
 
 
 class SimulationClock:
@@ -45,7 +69,7 @@ class SimulatedMotor(motor.Motor):
         self,
         waveplate: Waveplate,
         *,
-        clock: typing.Optional[SimulationClock] = None,
+        clock: typing.Optional[Clock] = None,
     ) -> None:
         super().__init__(
             serial_number='simulated_motor'

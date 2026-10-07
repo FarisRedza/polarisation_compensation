@@ -1,4 +1,5 @@
 import dataclasses
+import time
 import typing
 
 import numpy as np
@@ -19,7 +20,11 @@ from polcomp import (
     SimulatedMotor,
     PolCompController,
 )
-from polcomp.simulation import SimulationClock
+from polcomp.simulation import (
+    Clock,
+    RealTimeClock,
+    SimulationClock
+)
 
 
 INTERVAL_S = 0.1
@@ -48,8 +53,10 @@ class BenchmarkResult:
     disturbance: tuple[float, float, float]
     seed: int
     timeout_s: float
+    simulated_time: bool
     completed: bool
     elapsed_s: float
+    wall_clock_runtime_s: float
 
     initial_qber: float
     initial_qx: float
@@ -88,10 +95,21 @@ class BenchmarkResult:
                 ),
                 f'RNG seed:             {self.seed}',
                 (
+                    'Clock:                '
+                    f'{"simulated" if self.simulated_time else "real-time"}'
+                ),
+                (
                     'Result:               '
                     f'{"COMPLETE" if self.completed else "TIMEOUT"}'
                 ),
-                f'Simulated time:       {self.elapsed_s:.2f} s',
+                f'Elapsed model time:   {self.elapsed_s:.2f} s',
+                f'Wall-clock runtime:    {self.wall_clock_runtime_s:.2f} s',
+                (
+                    'Simulation speedup:   '
+                    f'{self.elapsed_s / self.wall_clock_runtime_s:.1f}x'
+                    if self.wall_clock_runtime_s > 0
+                    else 'Simulation speedup:   -'
+                ),
                 f'Timeout:              {self.timeout_s:.2f} s',
                 (
                     'Initial QBER / Qx:    '
@@ -180,7 +198,7 @@ class BenchmarkResult:
 def _set_initial_disturbance(
     motors: tuple[SimulatedMotor, SimulatedMotor, SimulatedMotor],
     disturbance: tuple[float, float, float],
-    clock: SimulationClock,
+    clock: Clock,
 ) -> None:
     """Position disturbance plates before benchmark timing begins."""
 
@@ -209,6 +227,7 @@ def run_compensation_benchmark(
     interval_s: float = INTERVAL_S,
     measurement_time_s: float = MEASUREMENT_TIME_S,
     coincidence_window_ps: int = COINCIDENCE_WINDOW_PS,
+    simulated_time: bool = True,
 ) -> BenchmarkResult:
     """Run one accelerated end-to-end compensation benchmark.
 
@@ -235,7 +254,12 @@ def run_compensation_benchmark(
             'measurement_time_s must be positive'
         )
 
-    clock = SimulationClock()
+    clock = (
+        SimulationClock()
+        if simulated_time
+        else RealTimeClock()
+    )
+    wall_clock_start = time.monotonic()
 
     source = SimulatedEPS(
         state=PHI_PLUS,
@@ -491,11 +515,16 @@ def run_compensation_benchmark(
             disturbance=disturbance,
             seed=seed,
             timeout_s=timeout_s,
+            simulated_time=simulated_time,
             completed=(
                 final_status.state.name
                 == 'COMPLETE'
             ),
             elapsed_s=final_elapsed_s,
+            wall_clock_runtime_s=(
+                time.monotonic()
+                - wall_clock_start
+            ),
             initial_qber=initial_qber,
             initial_qx=initial_qx,
             initial_search_score=(
