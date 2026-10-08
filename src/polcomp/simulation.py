@@ -1,3 +1,4 @@
+import abc
 import dataclasses
 import math
 import time
@@ -13,17 +14,19 @@ from qtoolkit.polarisation import Waveplate
 from .polcomp import BB84DetectionResult
 
 
-class Clock(typing.Protocol):
+class Clock(abc.ABC):
     """Clock interface used by deterministic simulated motors."""
 
+    @abc.abstractmethod
     def time(self) -> float:
         ...
 
+    @abc.abstractmethod
     def advance(self, seconds: float) -> None:
         ...
 
 
-class RealTimeClock:
+class RealTimeClock(Clock):
     """Clock whose advancement follows real wall-clock time."""
 
     def time(self) -> float:
@@ -36,7 +39,7 @@ class RealTimeClock:
         time.sleep(seconds)
 
 
-class SimulationClock:
+class SimulationClock(Clock):
     """A manually advanced monotonic clock for deterministic simulations."""
 
     def __init__(self) -> None:
@@ -53,34 +56,31 @@ class SimulationClock:
 
 
 class SimulatedMotor(motor.Motor):
-    """Deterministic motor model driven by a :class:`SimulationClock`.
+    """Motor model driven by an injectable clock.
 
     The motion profile mirrors DummyMotor: finite moves use triangular or
     trapezoidal acceleration profiles and jogs accelerate to a constant
     velocity.  No background tracking thread is required; position and
     motion state are updated whenever they are read.
 
-    If no clock is supplied, the motor owns a SimulationClock.  Code that
-    needs motion to progress must advance that clock.  For an experiment
-    containing several motors, pass the same clock to every motor.
+    The default clock is real time, so standalone motors progress naturally.
+    Accelerated experiments must explicitly supply and advance a shared
+    SimulationClock for all participating motors.
     """
 
     def __init__(
         self,
         waveplate: Waveplate,
         *,
-        clock: typing.Optional[Clock] = None,
+        clock: Clock = RealTimeClock(),
     ) -> None:
         super().__init__(
             serial_number='simulated_motor'
         )
-
+        print('hello')
+        print(f'hello, {type(clock)}')
         self.waveplate = waveplate
-        self.clock = (
-            clock
-            if clock is not None
-            else SimulationClock()
-        )
+        self.clock = clock
 
         self.acceleration = 20.0
         self.max_velocity = 25.0
