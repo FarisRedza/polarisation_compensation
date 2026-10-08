@@ -351,3 +351,49 @@ def test_begin_fallback_cycle_preserves_counter():
     assert state.cycle_start_score is None
     assert state.cycle_best_score is None
     assert state.cycle_improvement is None
+
+def test_record_motor_position():
+    search = JogSearch(JogSearchConfig())
+
+    assert search.record_motor_position(
+        position=10.0,
+    ) is None
+
+    assert search.record_motor_position(
+        position=12.0,
+    ) == (10.0, 12.0)
+
+    assert search.record_motor_position(
+        position=15.0,
+    ) == (12.0, 15.0)
+
+    assert search.state.previous_position == 15.0
+
+def test_record_measurement_position():
+    search = JogSearch(JogSearchConfig())
+
+    search.record_measurement_position(
+        start_position=10.0,
+        end_position=14.0,
+    )
+
+    assert search.state.measurement_start_position == 10.0
+    assert search.state.measurement_end_position == 14.0
+    assert search.state.measurement_position == 12.0
+
+def test_reset_line_clears_position_tracking():
+    search = JogSearch(JogSearchConfig())
+
+    search.record_motor_position(position=10.0)
+
+    search.record_measurement_position(
+        start_position=10.0,
+        end_position=12.0,
+    )
+
+    search.reset_line()
+
+    assert search.state.previous_position is None
+    assert search.state.measurement_position is None
+    assert search.state.measurement_start_position is None
+    assert search.state.measurement_end_position is None

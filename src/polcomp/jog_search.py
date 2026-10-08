@@ -148,6 +148,37 @@ class JogSearch:
 
         raise ValueError(f'Unexpected jog direction: {direction}')
 
+    def record_measurement_position(
+        self,
+        *,
+        start_position: float,
+        end_position: float,
+    ) -> None:
+        """Record the position interval of a moving measurement."""
+        state = self.state
+
+        state.measurement_start_position = start_position
+        state.measurement_end_position = end_position
+        state.measurement_position = (
+            start_position + end_position
+        ) / 2
+
+    def record_motor_position(
+        self,
+        *,
+        position: float,
+    ) -> typing.Optional[tuple[float, float]]:
+        """Record motor position and return the preceding interval."""
+        state = self.state
+
+        previous_position = state.previous_position
+        state.previous_position = position
+
+        if previous_position is None:
+            return None
+
+        return previous_position, position
+
     def begin_line(
         self,
         *,

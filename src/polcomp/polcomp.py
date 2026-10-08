@@ -574,13 +574,14 @@ class PolCompController:
     ) -> None:
         current_position = self.search_waveplate.position
 
-        if self._jog_search.state.previous_position is None:
-            self._jog_search.state.previous_position = current_position
+        interval = self._jog_search.record_motor_position(
+            position=current_position,
+        )
+
+        if interval is None:
             return
 
-        start_position = self._jog_search.state.previous_position
-        end_position = current_position
-        self._jog_search.state.previous_position = current_position
+        start_position, end_position = interval
 
         self._search_jog_results.append(
             (result, start_position, end_position)
@@ -620,14 +621,9 @@ class PolCompController:
             + window_end_position
         ) / 2
 
-        self._jog_search.state.measurement_start_position = (
-            window_start_position
-        )
-        self._jog_search.state.measurement_end_position = (
-            window_end_position
-        )
-        self._jog_search.state.measurement_position = (
-            measurement_position
+        self._jog_search.record_measurement_position(
+            start_position=window_start_position,
+            end_position=window_end_position,
         )
 
         score = self.search_objective(
@@ -703,16 +699,6 @@ class PolCompController:
         self._search_state = SearchState.START
         self._reset_search_line()
         self._search_results.clear()
-
-        self._start_fallback_reference()
-
-    def _start_fallback_reference(
-        self,
-    ) -> None:
-        # START itself is shared with Jacobian baseline collection.  Set a
-        # sentinel reference score so the dispatcher can distinguish the
-        # fallback path on subsequent stationary samples.
-        self._jog_search.state.reference_score = float('nan')
 
     def _start_jog(
         self,
