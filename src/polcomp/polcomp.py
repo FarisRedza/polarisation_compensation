@@ -16,6 +16,7 @@ from .jog_search import (
     JogActionType,
     JogDirection
 )
+from .measurement import aggregate_bb84_measurements
 
 
 @dataclasses.dataclass(frozen=True)
@@ -790,47 +791,15 @@ class PolCompController:
 
     def _aggregate_results(
         self,
-        results: typing.Sequence[
-            BB84DetectionResult
-        ],
+        results: typing.Sequence[BB84DetectionResult],
     ) -> tuple[float, float]:
-        coincidences: dict[
-            tuple[int, int],
-            int,
-        ] = {}
-
-        for result in results:
-            for pair, count in (
-                result.coincidences.items()
-            ):
-                coincidences[pair] = (
-                    coincidences.get(
-                        pair,
-                        0,
-                    )
-                    + count
-                )
-
-        zz = (
-            qtoolkit.qkd.BasisMetrics
-            .from_coincidences(
-                coincidences=coincidences,
-                pairs=self.measurements.z_pairs,
-            )
+        measurement = aggregate_bb84_measurements(
+            results=results,
+            z_pairs=self.measurements.z_pairs,
+            x_pairs=self.measurements.x_pairs,
         )
 
-        xx = (
-            qtoolkit.qkd.BasisMetrics
-            .from_coincidences(
-                coincidences=coincidences,
-                pairs=self.measurements.x_pairs,
-            )
-        )
-
-        return (
-            zz.qber,
-            xx.qber,
-        )
+        return measurement.qber, measurement.qx
 
     def _execute_jacobian_action(
         self,
