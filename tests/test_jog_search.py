@@ -210,3 +210,144 @@ def test_equal_score_counts_as_worsening():
     assert action.type is JogActionType.CONTINUE
     assert search.state.worsening_count == 1
     assert search.state.best_position == 10.0
+
+def test_begin_line_initializes_reference():
+    search = JogSearch(JogSearchConfig())
+
+    search.begin_line(
+        score=1.5,
+        position=20.0,
+    )
+
+    state = search.state
+
+    assert state.reference_score == 1.5
+    assert state.reference_position == 20.0
+    assert state.best_score == 1.5
+    assert state.best_position == 20.0
+    assert state.worsening_count == 0
+
+    assert state.cycle_start_score == 1.5
+    assert state.cycle_best_score == 1.5
+
+def test_begin_line_preserves_cycle_start():
+    search = JogSearch(JogSearchConfig())
+
+    search.begin_line(
+        score=1.5,
+        position=10.0,
+    )
+
+    search.state.waveplate_index = 1
+
+    search.begin_line(
+        score=1.2,
+        position=20.0,
+    )
+
+    assert search.state.cycle_start_score == 1.5
+    assert search.state.cycle_best_score == 1.2
+    assert search.state.reference_score == 1.2
+
+def test_begin_jog_resets_measurement_state():
+    search = JogSearch(JogSearchConfig())
+
+    state = search.state
+    state.worsening_count = 3
+    state.measurement_position = 15.0
+    state.measurement_start_position = 14.0
+    state.measurement_end_position = 16.0
+
+    search.begin_jog(position=20.0)
+
+    assert state.worsening_count == 0
+    assert state.previous_position == 20.0
+    assert state.measurement_position is None
+    assert state.measurement_start_position is None
+    assert state.measurement_end_position is None
+
+def test_begin_return_preserves_best_position():
+    search = JogSearch(JogSearchConfig())
+
+    state = search.state
+    state.best_score = 0.8
+    state.best_position = 25.0
+    state.worsening_count = 3
+    state.previous_position = 24.0
+
+    search.begin_return()
+
+    assert state.worsening_count == 0
+    assert state.previous_position is None
+
+    assert state.best_score == 0.8
+    assert state.best_position == 25.0
+
+def test_advance_waveplate():
+    search = JogSearch(JogSearchConfig())
+
+    assert not search.advance_waveplate(
+        waveplate_count=3,
+    )
+    assert search.state.waveplate_index == 1
+
+    assert not search.advance_waveplate(
+        waveplate_count=3,
+    )
+    assert search.state.waveplate_index == 2
+
+    assert search.advance_waveplate(
+        waveplate_count=3,
+    )
+    assert search.state.waveplate_index == 0
+    assert search.state.cycle == 1
+
+def test_cycle_improvement():
+    search = JogSearch(JogSearchConfig())
+
+    state = search.state
+
+    state.waveplate_index = 2
+    state.cycle_start_score = 2.0
+    state.cycle_best_score = 1.5
+
+    completed = search.advance_waveplate(
+        waveplate_count=3,
+    )
+
+    assert completed
+    assert state.cycle_improvement == 0.25
+    assert state.cycle == 1
+
+def test_cycle_improvement_zero_start():
+    search = JogSearch(JogSearchConfig())
+
+    state = search.state
+
+    state.waveplate_index = 2
+    state.cycle_start_score = 0.0
+    state.cycle_best_score = 0.0
+
+    search.advance_waveplate(waveplate_count=3)
+
+    assert state.cycle_improvement == 0.0
+
+def test_begin_fallback_cycle_preserves_counter():
+    search = JogSearch(JogSearchConfig())
+
+    state = search.state
+
+    state.waveplate_index = 2
+    state.cycle = 4
+    state.cycle_start_score = 2.0
+    state.cycle_best_score = 1.5
+    state.cycle_improvement = 0.25
+
+    search.begin_fallback_cycle()
+
+    assert state.waveplate_index == 0
+    assert state.cycle == 4
+
+    assert state.cycle_start_score is None
+    assert state.cycle_best_score is None
+    assert state.cycle_improvement is None

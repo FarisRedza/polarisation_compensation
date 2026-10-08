@@ -523,22 +523,10 @@ class PolCompController:
                 self.state = CompensationState.LOCK
                 return
 
-            if self._jog_search.state.waveplate_index == 0:
-                self._jog_search.state.cycle_start_score = score
-                self._jog_search.state.cycle_best_score = score
-                self._jog_search.state.cycle_improvement = None
-            elif (
-                self._jog_search.state.cycle_best_score is None
-                or score < self._jog_search.state.cycle_best_score
-            ):
-                self._jog_search.state.cycle_best_score = score
-
-            position = self.search_waveplate.position
-            self._jog_search.state.reference_score = score
-            self._jog_search.state.reference_position = position
-            self._jog_search.state.best_score = score
-            self._jog_search.state.best_position = position
-            self._jog_search.state.worsening_count = 0
+            self._jog_search.begin_line(
+                score=score,
+                position=self.search_waveplate.position,
+            )
 
             self._start_jog(
                 direction=motor.MotorDirection.FORWARD,
@@ -706,25 +694,16 @@ class PolCompController:
         ):
             self._search_state = SearchState.JACOBIAN_PROBE_MOVE
 
-    def _start_jog_fallback(
-        self,
-    ) -> None:
-        # Run one complete QWP1 -> HWP -> QWP2 rolling-jog cycle, then
-        # return to a fresh empirical Jacobian measurement.
+    def _start_jog_fallback(self) -> None:
         self._jacobian_search.state.fallback_count += 1
         self._using_jog_fallback = True
 
-        self._jog_search.state.waveplate_index = 0
-        self._jog_search.state.cycle_start_score = None
-        self._jog_search.state.cycle_best_score = None
-        self._jog_search.state.cycle_improvement = None
+        self._jog_search.begin_fallback_cycle()
 
         self._search_state = SearchState.START
         self._reset_search_line()
         self._search_results.clear()
 
-        # Mark START as fallback by retaining this flag.  The next
-        # stationary aggregate is handled by the fallback starter below.
         self._start_fallback_reference()
 
     def _start_fallback_reference(
@@ -735,27 +714,23 @@ class PolCompController:
         # fallback path on subsequent stationary samples.
         self._jog_search.state.reference_score = float('nan')
 
-
     def _start_jog(
         self,
         *,
         direction: motor.MotorDirection,
         state: SearchState,
     ) -> None:
-        self._jog_search.state.worsening_count = 0
         self._search_jog_results.clear()
 
-        self._jog_search.state.previous_position = (
-            self.search_waveplate.position
+        self._jog_search.begin_jog(
+            position=self.search_waveplate.position,
         )
-        self._jog_search.state.measurement_position = None
-        self._jog_search.state.measurement_start_position = None
-        self._jog_search.state.measurement_end_position = None
 
         self.search_waveplate.jog(
             direction=direction,
             max_velocity=self.search_jog_velocity,
         )
+
         self._search_state = state
 
     def _return_to_position(
@@ -765,42 +740,19 @@ class PolCompController:
         state: SearchState,
     ) -> None:
         self.search_waveplate.stop()
-        self.search_waveplate.move_to(
-            position
-        )
+        self.search_waveplate.move_to(position)
 
         self._search_state = state
-        self._jog_search.state.worsening_count = 0
+        self._jog_search.begin_return()
         self._search_jog_results.clear()
-        self._jog_search.state.previous_position = None
 
-    def _next_search_waveplate(
-        self,
-    ) -> None:
-        self._jog_search.state.waveplate_index += 1
+    def _next_search_waveplate(self) -> None:
+        cycle_complete = self._jog_search.advance_waveplate(
+            waveplate_count=len(self.waveplates),
+        )
 
-        if (
-            self._jog_search.state.waveplate_index
-            >= len(self.waveplates)
-        ):
-            self._jog_search.state.waveplate_index = 0
-
-            if (
-                self._jog_search.state.cycle_start_score is not None
-                and self._jog_search.state.cycle_best_score is not None
-            ):
-                if self._jog_search.state.cycle_start_score > 0:
-                    self._jog_search.state.cycle_improvement = (
-                        self._jog_search.state.cycle_start_score
-                        - self._jog_search.state.cycle_best_score
-                    ) / self._jog_search.state.cycle_start_score
-                else:
-                    self._jog_search.state.cycle_improvement = 0.0
-
-            self._jog_search.state.cycle += 1
-
-            if self._using_jog_fallback:
-                self._using_jog_fallback = False
+        if cycle_complete and self._using_jog_fallback:
+            self._using_jog_fallback = False
 
         self._search_state = SearchState.START
         self._reset_search_line()

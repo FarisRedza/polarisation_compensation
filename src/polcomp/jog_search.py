@@ -147,3 +147,87 @@ class JogSearch:
             )
 
         raise ValueError(f'Unexpected jog direction: {direction}')
+
+    def begin_line(
+        self,
+        *,
+        score: float,
+        position: float,
+    ) -> None:
+        """Initialize a line from a stationary reference measurement."""
+        state = self.state
+
+        if state.waveplate_index == 0:
+            state.cycle_start_score = score
+            state.cycle_best_score = score
+            state.cycle_improvement = None
+        elif (
+            state.cycle_best_score is None
+            or score < state.cycle_best_score
+        ):
+            state.cycle_best_score = score
+
+        state.reference_score = score
+        state.reference_position = position
+        state.best_score = score
+        state.best_position = position
+        state.worsening_count = 0
+
+    def begin_jog(self, *, position: float) -> None:
+        """Prepare runtime state before starting motor jogging."""
+        state = self.state
+
+        state.worsening_count = 0
+        state.previous_position = position
+
+        state.measurement_position = None
+        state.measurement_start_position = None
+        state.measurement_end_position = None
+
+    def begin_return(self) -> None:
+        """Reset rolling-jog state when returning to a position."""
+        self.state.worsening_count = 0
+        self.state.previous_position = None
+
+    def advance_waveplate(
+        self,
+        *,
+        waveplate_count: int,
+    ) -> bool:
+        """Advance to the next waveplate.
+
+        Return True when a complete cycle has finished.
+        """
+        state = self.state
+
+        state.waveplate_index += 1
+
+        if state.waveplate_index < waveplate_count:
+            return False
+
+        state.waveplate_index = 0
+
+        if (
+            state.cycle_start_score is not None
+            and state.cycle_best_score is not None
+        ):
+            if state.cycle_start_score > 0:
+                state.cycle_improvement = (
+                    state.cycle_start_score
+                    - state.cycle_best_score
+                ) / state.cycle_start_score
+            else:
+                state.cycle_improvement = 0.0
+
+        state.cycle += 1
+
+        return True
+
+    def begin_fallback_cycle(self) -> None:
+        """Prepare for a new fallback cycle."""
+        state = self.state
+
+        state.waveplate_index = 0
+        state.cycle_start_score = None
+        state.cycle_best_score = None
+        state.cycle_improvement = None
