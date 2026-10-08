@@ -6,7 +6,7 @@ import motor
 import qtoolkit
 
 from .config import PolCompConfig
-from .jacobian import JacobianSolver
+from .jacobian_search import JacobianSearch
 
 
 @dataclasses.dataclass(frozen=True)
@@ -140,7 +140,7 @@ class PolCompController:
             if config is not None
             else PolCompConfig()
         )
-        self._jacobian_solver = JacobianSolver(
+        self._jacobian_search = JacobianSearch(
             config=self.config.jacobian,
         )
 
@@ -176,25 +176,6 @@ class PolCompController:
         self._search_cycle_best_score: typing.Optional[float] = None
         self._search_cycle_improvement: typing.Optional[float] = None
 
-        # Empirical Jacobian state.
-        self._jacobian_iteration = 0
-        self._jacobian_probe_index = 0
-        self._jacobian_baseline_errors: typing.Optional[
-            tuple[float, float]
-        ] = None
-        self._jacobian_baseline_score: typing.Optional[float] = None
-        self._jacobian_baseline_positions: typing.Optional[
-            tuple[float, float, float]
-        ] = None
-        self._jacobian_columns: list[
-            tuple[float, float]
-        ] = []
-        self._jacobian_condition: typing.Optional[float] = None
-        self._jacobian_predicted_score: typing.Optional[float] = None
-        self._jacobian_step: typing.Optional[
-            tuple[float, float, float]
-        ] = None
-        self._jacobian_fallback_count = 0
         self._using_jog_fallback = False
 
         # Rolling moving-measurement window. Each entry stores the BB84
@@ -304,16 +285,7 @@ class PolCompController:
         self._search_cycle_best_score = None
         self._search_cycle_improvement = None
 
-        self._jacobian_iteration = 0
-        self._jacobian_probe_index = 0
-        self._jacobian_baseline_errors = None
-        self._jacobian_baseline_score = None
-        self._jacobian_baseline_positions = None
-        self._jacobian_columns.clear()
-        self._jacobian_condition = None
-        self._jacobian_predicted_score = None
-        self._jacobian_step = None
-        self._jacobian_fallback_count = 0
+        self._jacobian_search.reset()
         self._using_jog_fallback = False
 
         self._reset_search_line()
@@ -340,7 +312,7 @@ class PolCompController:
     def status(
         self,
     ) -> PolCompStatus:
-        step = self._jacobian_step
+        step = self._jacobian_search.state.step
 
         return PolCompStatus(
             state=self.state,
@@ -357,14 +329,14 @@ class PolCompController:
             search_cycle_start_score=self._search_cycle_start_score,
             search_cycle_best_score=self._search_cycle_best_score,
             search_cycle_improvement=self._search_cycle_improvement,
-            jacobian_probe_index=self._jacobian_probe_index,
-            jacobian_iteration=self._jacobian_iteration,
-            jacobian_condition=self._jacobian_condition,
-            jacobian_predicted_score=self._jacobian_predicted_score,
+            jacobian_probe_index=self._jacobian_search.state.probe_index,
+            jacobian_iteration=self._jacobian_search.state.iteration,
+            jacobian_condition=self._jacobian_search.state.condition,
+            jacobian_predicted_score=self._jacobian_search.state.predicted_score,
             jacobian_step_qwp1=(step[0] if step is not None else None),
             jacobian_step_hwp=(step[1] if step is not None else None),
             jacobian_step_qwp2=(step[2] if step is not None else None),
-            jacobian_fallback_count=self._jacobian_fallback_count,
+            jacobian_fallback_count=self._jacobian_search.state.fallback_count,
             search_step_deg=None,
             search_retained_improvement=None,
             search_stagnant=False,
@@ -547,23 +519,23 @@ class PolCompController:
             qber, qx = self._aggregate_results(self._search_results)
             self._search_results.clear()
 
-            assert self._jacobian_baseline_errors is not None
-            base_z, base_x = self._jacobian_baseline_errors
+            assert self._jacobian_search.state.baseline_errors is not None
+            base_z, base_x = self._jacobian_search.state.baseline_errors
 
             probe_z = qber / self.target_qber
             probe_x = qx / self.target_qx
 
-            self._jacobian_columns.append(
+            self._jacobian_search.state.columns.append(
                 (
                     (probe_z - base_z) / self.jacobian_probe_deg,
                     (probe_x - base_x) / self.jacobian_probe_deg,
                 )
             )
 
-            assert self._jacobian_baseline_positions is not None
-            motor_index = self._jacobian_probe_index
+            assert self._jacobian_search.state.baseline_positions is not None
+            motor_index = self._jacobian_search.state.probe_index
             self.waveplates[motor_index].move_to(
-                self._jacobian_baseline_positions[motor_index]
+                self._jacobian_search.state.baseline_positions[motor_index]
             )
             self._search_state = SearchState.JACOBIAN_PROBE_RETURN
             return
@@ -627,20 +599,20 @@ class PolCompController:
             self.state = CompensationState.LOCK
             return
 
-        self._jacobian_baseline_errors = (
+        self._jacobian_search.state.baseline_errors = (
             qber / self.target_qber,
             qx / self.target_qx,
         )
-        self._jacobian_baseline_score = score
-        self._jacobian_baseline_positions = tuple(
+        self._jacobian_search.state.baseline_score = score
+        self._jacobian_search.state.baseline_positions = tuple(
             waveplate.position
             for waveplate in self.waveplates
         )
-        self._jacobian_columns.clear()
-        self._jacobian_probe_index = 0
-        self._jacobian_condition = None
-        self._jacobian_predicted_score = None
-        self._jacobian_step = None
+        self._jacobian_search.state.columns.clear()
+        self._jacobian_search.state.probe_index = 0
+        self._jacobian_search.state.condition = None
+        self._jacobian_search.state.predicted_score = None
+        self._jacobian_search.state.step = None
 
         self._start_jacobian_probe()
 
@@ -808,11 +780,11 @@ class PolCompController:
     def _start_jacobian_probe(
         self,
     ) -> None:
-        assert self._jacobian_baseline_positions is not None
+        assert self._jacobian_search.state.baseline_positions is not None
 
-        index = self._jacobian_probe_index
+        index = self._jacobian_search.state.probe_index
         target = (
-            self._jacobian_baseline_positions[index]
+            self._jacobian_search.state.baseline_positions[index]
             + self.jacobian_probe_deg
         )
 
@@ -822,33 +794,33 @@ class PolCompController:
     def _advance_jacobian_probe(
         self,
     ) -> None:
-        self._jacobian_probe_index += 1
+        self._jacobian_search.state.probe_index += 1
 
-        if self._jacobian_probe_index < len(self.waveplates):
+        if self._jacobian_search.state.probe_index < len(self.waveplates):
             self._start_jacobian_probe()
             return
 
         self._finish_jacobian_iteration()
 
-    def _finish_jacobian_iteration(
-        self,
-    ) -> None:
-        assert self._jacobian_baseline_errors is not None
-        assert self._jacobian_baseline_score is not None
+    def _finish_jacobian_iteration(self) -> None:
+        state = self._jacobian_search.state
 
-        if len(self._jacobian_columns) != 3:
+        assert state.baseline_errors is not None
+        assert state.baseline_score is not None
+
+        if len(state.columns) != 3:
             self._start_jog_fallback()
             return
 
-        solution = self._jacobian_solver.solve(
-            columns=self._jacobian_columns,
-            baseline_errors=self._jacobian_baseline_errors,
-            baseline_score=self._jacobian_baseline_score,
+        solution = self._jacobian_search.solver.solve(
+            columns=state.columns,
+            baseline_errors=state.baseline_errors,
+            baseline_score=state.baseline_score,
         )
 
-        self._jacobian_condition = solution.condition
-        self._jacobian_predicted_score = solution.predicted_score
-        self._jacobian_step = solution.step
+        state.condition = solution.condition
+        state.predicted_score = solution.predicted_score
+        state.step = solution.step
 
         if not solution.accepted:
             self._start_jog_fallback()
@@ -864,7 +836,7 @@ class PolCompController:
                 waveplate.position + delta
             )
 
-        self._jacobian_iteration += 1
+        state.iteration += 1
         self._search_state = SearchState.JACOBIAN_APPLY
 
     def _start_jog_fallback(
@@ -872,7 +844,7 @@ class PolCompController:
     ) -> None:
         # Run one complete QWP1 -> HWP -> QWP2 rolling-jog cycle, then
         # return to a fresh empirical Jacobian measurement.
-        self._jacobian_fallback_count += 1
+        self._jacobian_search.state.fallback_count += 1
         self._using_jog_fallback = True
 
         self._search_waveplate_index = 0
