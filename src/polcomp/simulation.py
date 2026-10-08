@@ -1,4 +1,3 @@
-import abc
 import dataclasses
 import math
 import time
@@ -14,19 +13,17 @@ from qtoolkit.polarisation import Waveplate
 from .polcomp import BB84DetectionResult
 
 
-class Clock(abc.ABC):
+class Clock:
     """Clock interface used by deterministic simulated motors."""
 
-    @abc.abstractmethod
     def time(self) -> float:
         ...
 
-    @abc.abstractmethod
     def advance(self, seconds: float) -> None:
         ...
 
 
-class RealTimeClock(Clock):
+class RealTimeClock:
     """Clock whose advancement follows real wall-clock time."""
 
     def time(self) -> float:
@@ -39,7 +36,7 @@ class RealTimeClock(Clock):
         time.sleep(seconds)
 
 
-class SimulationClock(Clock):
+class SimulationClock:
     """A manually advanced monotonic clock for deterministic simulations."""
 
     def __init__(self) -> None:
@@ -72,13 +69,17 @@ class SimulatedMotor(motor.Motor):
         self,
         waveplate: Waveplate,
         *,
-        clock: Clock = RealTimeClock(),
+        clock: typing.Optional[Clock] = None,
     ) -> None:
         super().__init__(
             serial_number='simulated_motor'
         )
         self.waveplate = waveplate
-        self.clock = clock
+        self.clock = (
+            clock
+            if clock is not None
+            else RealTimeClock()
+        )
 
         self.acceleration = 20.0
         self.max_velocity = 25.0
