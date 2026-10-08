@@ -43,7 +43,7 @@ class JacobianSearchState:
 
 
 class JacobianSearch:
-    """Manage emperical Jacobian search and correction decisions.
+    """Manage empirical Jacobian search and correction decisions.
 
     Motor execution and measurement acquisition are handled by
     PolCompController.

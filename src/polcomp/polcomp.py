@@ -157,23 +157,10 @@ class PolCompController:
         self._score: typing.Optional[float] = None
 
         self._search_state = SearchState.START
-        self._jog_search.state.waveplate_index = 0
-
-        self._jog_search.state.reference_score = None
-        self._jog_search.state.reference_position = None
-        self._jog_search.state.best_score = None
-        self._jog_search.state.best_position = None
 
         self._search_results: list[
             BB84DetectionResult
         ] = []
-        self._jog_search.state.worsening_count = 0
-
-        # Rolling-jog fallback diagnostics.
-        self._search_cycle = 0
-        self._jog_search.state.cycle_start_score = None
-        self._jog_search.state.cycle_best_score = None
-        self._jog_search.state.cycle_improvement = None
 
         self._using_jog_fallback = False
 
@@ -183,13 +170,6 @@ class PolCompController:
         self._search_jog_results: list[
             tuple[BB84DetectionResult, float, float]
         ] = []
-
-        # Position interval associated with the most recent moving
-        # measurement. The midpoint is used as the representative angle.
-        self._jog_search.state.previous_position = None
-        self._jog_search.state.measurement_position = None
-        self._jog_search.state.measurement_start_position = None
-        self._jog_search.state.measurement_end_position = None
 
         self._lock_results: list[
             BB84DetectionResult
@@ -312,7 +292,7 @@ class PolCompController:
             search_waveplate_index=self._jog_search.state.waveplate_index,
             search_measurement_count=len(self._search_results),
             search_worsening_count=self._jog_search.state.worsening_count,
-            search_cycle=self._search_cycle,
+            search_cycle=self._jog_search.state.cycle,
             search_cycle_start_score=self._jog_search.state.cycle_start_score,
             search_cycle_best_score=self._jog_search.state.cycle_best_score,
             search_cycle_improvement=self._jog_search.state.cycle_improvement,
@@ -855,7 +835,7 @@ class PolCompController:
                 else:
                     self._jog_search.state.cycle_improvement = 0.0
 
-            self._search_cycle += 1
+            self._jog_search.state.cycle += 1
 
             if self._using_jog_fallback:
                 self._using_jog_fallback = False
