@@ -11,7 +11,12 @@ from .jacobian_search import (
     JacobianAction,
     JacobianActionType,
 )
-from .jog_search import JogSearch
+from .jog_search import (
+    JogSearch,
+    JogActionType,
+    JogDirection
+)
+
 
 @dataclasses.dataclass(frozen=True)
 class BB84DetectionResult:
@@ -647,92 +652,49 @@ class PolCompController:
         )
         self._score = score
 
-        if (
-            self._jog_search.state.cycle_best_score is None
-            or score < self._jog_search.state.cycle_best_score
-        ):
-            self._jog_search.state.cycle_best_score = score
-
-        assert self._jog_search.state.reference_score is not None
-        assert self._jog_search.state.reference_position is not None
-        assert self._jog_search.state.best_score is not None
-        assert self._jog_search.state.best_position is not None
-
-        if score < self._jog_search.state.best_score:
-            self._jog_search.state.best_score = score
-            self._jog_search.state.best_position = (
-                measurement_position
-            )
-            self._jog_search.state.worsening_count = 0
+        if self._search_state is SearchState.JOG_POSITIVE:
+            direction = JogDirection.POSITIVE
+        elif self._search_state is SearchState.JOG_NEGATIVE:
+            direction = JogDirection.NEGATIVE
         else:
-            self._jog_search.state.worsening_count += 1
+            raise ValueError(
+                f'Unexpected jog state: {self._search_state}'
+            )
 
-        # A moving result is only a candidate. Candidate acceptance uses
-        # the authoritative max objective rather than the smoother SEARCH
-        # objective, so both bases must be comfortably inside their targets
-        # before SEARCH is interrupted for LOCK.
-        if acceptance_score <= self.search_candidate_score:
+        action = self._jog_search.record_measurement(
+            score=score,
+            acceptance_score=acceptance_score,
+            position=measurement_position,
+            direction=direction,
+        )
+
+        if action.type is JogActionType.CONTINUE:
+            return
+
+        assert action.position is not None
+
+        if action.type is JogActionType.RETURN_TO_LOCK:
             self._return_to_position(
-                position=self._jog_search.state.best_position,
+                position=action.position,
                 state=SearchState.RETURN_TO_LOCK,
             )
             return
 
-        if (
-            self._jog_search.state.worsening_count
-            < self.search_worsening_measurements
-        ):
-            return
-
-        if (
-            self._search_state
-            is SearchState.JOG_POSITIVE
-        ):
-            if (
-                self._jog_search.state.best_score
-                < self._jog_search.state.reference_score
-            ):
-                self._return_to_position(
-                    position=self._jog_search.state.best_position,
-                    state=SearchState.RETURN_TO_BEST,
-                )
-            else:
-                # Positive motion did not improve on the stationary
-                # reference. Return to the reference and try negative.
-                self._return_to_position(
-                    position=self._jog_search.state.reference_position,
-                    state=SearchState.RETURN_FROM_POSITIVE,
-                )
-            return
-
-        if (
-            self._search_state
-            is SearchState.JOG_NEGATIVE
-        ):
-            # If negative improved, return to its best point. Otherwise
-            # return to the original reference. In either case this line
-            # search is complete and the next waveplate is selected.
-            if (
-                self._jog_search.state.best_score
-                < self._jog_search.state.reference_score
-            ):
-                return_position = (
-                    self._jog_search.state.best_position
-                )
-            else:
-                return_position = (
-                    self._jog_search.state.reference_position
-                )
-
+        if action.type is JogActionType.RETURN_FROM_POSITIVE:
             self._return_to_position(
-                position=return_position,
+                position=action.position,
+                state=SearchState.RETURN_FROM_POSITIVE,
+            )
+            return
+
+        if action.type is JogActionType.RETURN_TO_BEST:
+            self._return_to_position(
+                position=action.position,
                 state=SearchState.RETURN_TO_BEST,
             )
             return
 
-        raise ValueError(
-            f'Unexpected jog state: {self._search_state}'
-        )
+        raise ValueError(f'Unexpected jog action: {action.type}')
 
     def _advance_jacobian_probe(self) -> None:
         action = self._jacobian_search.advance_probe()

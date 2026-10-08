@@ -3,8 +3,22 @@ import dataclasses
 from polcomp.config import JogSearchConfig
 from polcomp.jog_search import (
     JogSearch,
-    JogSearchState
+    JogSearchState,
+    JogActionType,
+    JogDirection,
 )
+
+
+def make_search() -> JogSearch:
+    search = JogSearch(JogSearchConfig())
+
+    state = search.state
+    state.reference_score = 1.0
+    state.reference_position = 10.0
+    state.best_score = 1.0
+    state.best_position = 10.0
+
+    return search
 
 
 def test_initial_state():
@@ -92,3 +106,107 @@ def test_reset_line_is_idempotent():
     search.reset_line()
 
     assert search.state == expected
+
+def test_positive_improvement():
+    search = make_search()
+
+    action = search.record_measurement(
+        score=0.8,
+        acceptance_score=1.1,
+        position=12.0,
+        direction=JogDirection.POSITIVE,
+    )
+
+    assert action.type is JogActionType.CONTINUE
+    assert search.state.best_score == 0.8
+    assert search.state.best_position == 12.0
+    assert search.state.worsening_count == 0
+
+def test_positive_jog_reverses():
+    search = make_search()
+
+    for _ in range(
+        search.config.worsening_measurements
+    ):
+        action = search.record_measurement(
+            score=1.2,
+            acceptance_score=1.2,
+            position=12.0,
+            direction=JogDirection.POSITIVE,
+        )
+
+    assert action.type is JogActionType.RETURN_FROM_POSITIVE
+    assert action.position == 10.0
+
+def test_positive_jog_returns_to_best():
+    search = make_search()
+
+    search.record_measurement(
+        score=0.8,
+        acceptance_score=1.1,
+        position=12.0,
+        direction=JogDirection.POSITIVE,
+    )
+
+    for _ in range(
+        search.config.worsening_measurements
+    ):
+        action = search.record_measurement(
+            score=0.9,
+            acceptance_score=1.1,
+            position=14.0,
+            direction=JogDirection.POSITIVE,
+        )
+
+    assert action.type is JogActionType.RETURN_TO_BEST
+    assert action.position == 12.0
+
+def test_negative_jog_finishes():
+    search = make_search()
+
+    search.record_measurement(
+        score=0.7,
+        acceptance_score=1.1,
+        position=8.0,
+        direction=JogDirection.NEGATIVE,
+    )
+
+    for _ in range(
+        search.config.worsening_measurements
+    ):
+        action = search.record_measurement(
+            score=0.9,
+            acceptance_score=1.1,
+            position=7.0,
+            direction=JogDirection.NEGATIVE,
+        )
+
+    assert action.type is JogActionType.RETURN_TO_BEST
+    assert action.position == 8.0
+
+def test_candidate_acceptance():
+    search = make_search()
+
+    action = search.record_measurement(
+        score=0.7,
+        acceptance_score=0.8,
+        position=12.0,
+        direction=JogDirection.POSITIVE,
+    )
+
+    assert action.type is JogActionType.RETURN_TO_LOCK
+    assert action.position == 12.0
+
+def test_equal_score_counts_as_worsening():
+    search = make_search()
+
+    action = search.record_measurement(
+        score=1.0,
+        acceptance_score=1.1,
+        position=12.0,
+        direction=JogDirection.POSITIVE,
+    )
+
+    assert action.type is JogActionType.CONTINUE
+    assert search.state.worsening_count == 1
+    assert search.state.best_position == 10.0

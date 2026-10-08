@@ -1,7 +1,27 @@
 import dataclasses
 import typing
+import enum
 
 from .config import JogSearchConfig
+
+
+class JogDirection(enum.Enum):
+    POSITIVE = enum.auto()
+    NEGATIVE = enum.auto()
+
+
+class JogActionType(enum.Enum):
+    CONTINUE = enum.auto()
+    RETURN_TO_BEST = enum.auto()
+    RETURN_FROM_POSITIVE = enum.auto()
+    RETURN_TO_LOCK = enum.auto()
+
+
+@dataclasses.dataclass(frozen=True)
+class JogAction:
+    type: JogActionType
+    position: typing.Optional[float] = None
+
 
 
 @dataclasses.dataclass
@@ -61,3 +81,69 @@ class JogSearch:
         state.measurement_position = None
         state.measurement_start_position = None
         state.measurement_end_position = None
+
+    def record_measurement(
+        self,
+        *,
+        score: float,
+        acceptance_score: float,
+        position: float,
+        direction: JogDirection,
+    ) -> JogAction:
+        """Evaluate a rolling-jog measurement and choose the next action."""
+
+        state = self.state
+
+        if (
+            state.cycle_best_score is None
+            or score < state.cycle_best_score
+        ):
+            state.cycle_best_score = score
+
+        assert state.reference_score is not None
+        assert state.reference_position is not None
+        assert state.best_score is not None
+        assert state.best_position is not None
+
+        if score < state.best_score:
+            state.best_score = score
+            state.best_position = position
+            state.worsening_count = 0
+        else:
+            state.worsening_count += 1
+
+        # Preserve the existing order: candidate acceptance is checked
+        # before the worsening threshold.
+        if acceptance_score <= self.config.candidate_score:
+            return JogAction(
+                type=JogActionType.RETURN_TO_LOCK,
+                position=state.best_position,
+            )
+
+        if state.worsening_count < self.config.worsening_measurements:
+            return JogAction(type=JogActionType.CONTINUE)
+
+        if direction is JogDirection.POSITIVE:
+            if state.best_score < state.reference_score:
+                return JogAction(
+                    type=JogActionType.RETURN_TO_BEST,
+                    position=state.best_position,
+                )
+
+            return JogAction(
+                type=JogActionType.RETURN_FROM_POSITIVE,
+                position=state.reference_position,
+            )
+
+        if direction is JogDirection.NEGATIVE:
+            if state.best_score < state.reference_score:
+                return_position = state.best_position
+            else:
+                return_position = state.reference_position
+
+            return JogAction(
+                type=JogActionType.RETURN_TO_BEST,
+                position=return_position,
+            )
+
+        raise ValueError(f'Unexpected jog direction: {direction}')
