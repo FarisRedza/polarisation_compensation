@@ -2,6 +2,7 @@ from polcomp.config import JacobianSearchConfig
 from polcomp.jacobian_search import (
     JacobianSearch,
     JacobianSearchState,
+    JacobianActionType
 )
 
 
@@ -71,3 +72,32 @@ def test_search_instances_have_independent_state():
 
     assert second.state.columns == []
     assert second.state.iteration == 0
+
+def test_jacobian_probe_sequence():
+    search = JacobianSearch(
+        JacobianSearchConfig()
+    )
+
+    action = search.begin_iteration(
+        baseline_errors=(1.0, 1.0),
+        baseline_score=1.0,
+        baseline_positions=(10.0, 20.0, 30.0),
+    )
+
+    assert action.type is JacobianActionType.MOVE_TO
+    assert action.motor_index == 0
+    assert action.position == 12.0
+
+    action = search.record_probe(
+        probe_errors=(1.2, 1.0),
+    )
+
+    assert action.type is JacobianActionType.MOVE_TO
+    assert action.motor_index == 0
+    assert action.position == 10.0
+
+    action = search.advance_probe()
+
+    assert action.type is JacobianActionType.MOVE_TO
+    assert action.motor_index == 1
+    assert action.position == 22.0

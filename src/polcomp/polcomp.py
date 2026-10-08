@@ -6,8 +6,11 @@ import motor
 import qtoolkit
 
 from .config import PolCompConfig
-from .jacobian_search import JacobianSearch
-
+from .jacobian_search import (
+    JacobianSearch,
+    JacobianAction,
+    JacobianActionType,
+)
 
 @dataclasses.dataclass(frozen=True)
 class BB84DetectionResult:
@@ -520,23 +523,15 @@ class PolCompController:
             self._search_results.clear()
 
             assert self._jacobian_search.state.baseline_errors is not None
-            base_z, base_x = self._jacobian_search.state.baseline_errors
 
-            probe_z = qber / self.target_qber
-            probe_x = qx / self.target_qx
-
-            self._jacobian_search.state.columns.append(
-                (
-                    (probe_z - base_z) / self.jacobian_probe_deg,
-                    (probe_x - base_x) / self.jacobian_probe_deg,
-                )
+            action = self._jacobian_search.record_probe(
+                probe_errors=(
+                    qber / self.target_qber,
+                    qx / self.target_qx,
+                ),
             )
 
-            assert self._jacobian_search.state.baseline_positions is not None
-            motor_index = self._jacobian_search.state.probe_index
-            self.waveplates[motor_index].move_to(
-                self._jacobian_search.state.baseline_positions[motor_index]
-            )
+            self._execute_jacobian_action(action)
             self._search_state = SearchState.JACOBIAN_PROBE_RETURN
             return
 
@@ -599,22 +594,20 @@ class PolCompController:
             self.state = CompensationState.LOCK
             return
 
-        self._jacobian_search.state.baseline_errors = (
-            qber / self.target_qber,
-            qx / self.target_qx,
+        action = self._jacobian_search.begin_iteration(
+            baseline_errors=(
+                qber / self.target_qber,
+                qx / self.target_qx,
+            ),
+            baseline_score=score,
+            baseline_positions=tuple(
+                waveplate.position
+                for waveplate in self.waveplates
+            ),
         )
-        self._jacobian_search.state.baseline_score = score
-        self._jacobian_search.state.baseline_positions = tuple(
-            waveplate.position
-            for waveplate in self.waveplates
-        )
-        self._jacobian_search.state.columns.clear()
-        self._jacobian_search.state.probe_index = 0
-        self._jacobian_search.state.condition = None
-        self._jacobian_search.state.predicted_score = None
-        self._jacobian_search.state.step = None
 
-        self._start_jacobian_probe()
+        self._execute_jacobian_action(action)
+        self._search_state = SearchState.JACOBIAN_PROBE_MOVE
 
 
     def _update_jog_measurement(
@@ -777,67 +770,15 @@ class PolCompController:
             f'Unexpected jog state: {self._search_state}'
         )
 
-    def _start_jacobian_probe(
-        self,
-    ) -> None:
-        assert self._jacobian_search.state.baseline_positions is not None
+    def _advance_jacobian_probe(self) -> None:
+        action = self._jacobian_search.advance_probe()
 
-        index = self._jacobian_search.state.probe_index
-        target = (
-            self._jacobian_search.state.baseline_positions[index]
-            + self.jacobian_probe_deg
-        )
+        self._execute_jacobian_action(action)
 
-        self.waveplates[index].move_to(target)
-        self._search_state = SearchState.JACOBIAN_PROBE_MOVE
-
-    def _advance_jacobian_probe(
-        self,
-    ) -> None:
-        self._jacobian_search.state.probe_index += 1
-
-        if self._jacobian_search.state.probe_index < len(self.waveplates):
-            self._start_jacobian_probe()
-            return
-
-        self._finish_jacobian_iteration()
-
-    def _finish_jacobian_iteration(self) -> None:
-        state = self._jacobian_search.state
-
-        assert state.baseline_errors is not None
-        assert state.baseline_score is not None
-
-        if len(state.columns) != 3:
-            self._start_jog_fallback()
-            return
-
-        solution = self._jacobian_search.solver.solve(
-            columns=state.columns,
-            baseline_errors=state.baseline_errors,
-            baseline_score=state.baseline_score,
-        )
-
-        state.condition = solution.condition
-        state.predicted_score = solution.predicted_score
-        state.step = solution.step
-
-        if not solution.accepted:
-            self._start_jog_fallback()
-            return
-
-        assert solution.step is not None
-
-        for waveplate, delta in zip(
-            self.waveplates,
-            solution.step,
+        if (
+            action.type is JacobianActionType.MOVE_TO
         ):
-            waveplate.move_to(
-                waveplate.position + delta
-            )
-
-        state.iteration += 1
-        self._search_state = SearchState.JACOBIAN_APPLY
+            self._search_state = SearchState.JACOBIAN_PROBE_MOVE
 
     def _start_jog_fallback(
         self,
@@ -1035,4 +976,41 @@ class PolCompController:
         return (
             zz.qber,
             xx.qber,
+        )
+
+    def _execute_jacobian_action(
+        self,
+        action: JacobianAction,
+    ) -> None:
+        if action.type is JacobianActionType.MOVE_TO:
+            assert action.motor_index is not None
+            assert action.position is not None
+
+            self.waveplates[action.motor_index].move_to(
+                action.position
+            )
+
+            return
+
+        if action.type is JacobianActionType.APPLY_STEP:
+            assert action.step is not None
+
+            for waveplate, delta in zip(
+                self.waveplates,
+                action.step,
+            ):
+                waveplate.move_to(
+                    waveplate.position + delta
+                )
+
+            self._jacobian_search.state.iteration += 1
+            self._search_state = SearchState.JACOBIAN_APPLY
+            return
+
+        if action.type is JacobianActionType.FALLBACK:
+            self._start_jog_fallback()
+            return
+
+        raise ValueError(
+            f'Unknown Jacobian action: {action.type}'
         )
