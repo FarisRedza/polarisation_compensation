@@ -99,3 +99,133 @@ def test_inputs_are_not_modified(basis_metrics_stub):
     assert first.coincidences == before_first
     assert second.coincidences == before_second
     assert first.coincidences is not second.coincidences
+
+"""
+Tests for the optional qtoolkit MeasurementCounts integration.
+Will eventually be integrated properly.
+"""
+
+from types import SimpleNamespace
+
+import pytest
+
+from polcomp.measurement import measurement_counts_from_result
+from polcomp.polcomp import BB84DetectionResult
+
+
+def make_result(*, singles=None, coincidences=None, duration_s=0.25, file_path=None):
+    if singles is None:
+        singles = {1: 12, 2: 8}
+    if coincidences is None:
+        coincidences = {(1, 2): 3, (2, 1): 0}
+
+    # Only duration_s and file_path are used by the conversion helper.
+    # A full TimetagData instance is unnecessary for this unit test.
+    data = SimpleNamespace(duration_s=duration_s, file_path=file_path)
+    return BB84DetectionResult(
+        data=data,
+        qber=0.1,
+        qx=0.2,
+        singles=singles,
+        coincidences=coincidences,
+    )
+
+
+def test_counts_field_is_optional():
+    result = make_result()
+    assert result.counts is None
+
+
+def test_conversion_preserves_counts():
+    result = make_result()
+    counts = measurement_counts_from_result(
+        result=result,
+        coincidence_window_ps=500,
+    )
+
+    assert dict(counts.singles) == result.singles
+    assert dict(counts.coincidences) == result.coincidences
+
+
+def test_conversion_preserves_acquisition_metadata(tmp_path):
+    path = tmp_path / "measurement.ttbin"
+    result = make_result(duration_s=0.75, file_path=path)
+
+    counts = measurement_counts_from_result(
+        result=result,
+        coincidence_window_ps=250,
+    )
+
+    assert counts.duration_s == 0.75
+    assert counts.coincidence_window_ps == 250
+    assert counts.file_path == path
+    assert counts.source_file_paths == (path,)
+
+
+def test_conversion_preserves_unknown_duration():
+    result = make_result(duration_s=None)
+    counts = measurement_counts_from_result(
+        result=result,
+        coincidence_window_ps=500,
+    )
+    assert counts.duration_s is None
+
+
+def test_conversion_copies_input_counts():
+    result = make_result()
+    counts = measurement_counts_from_result(
+        result=result,
+        coincidence_window_ps=500,
+    )
+
+    result.singles[1] = 999
+    result.coincidences[(1, 2)] = 999
+
+    assert counts.singles[1] == 12
+    assert counts.coincidences[(1, 2)] == 3
+
+
+def test_converted_counts_are_immutable():
+    result = make_result()
+    counts = measurement_counts_from_result(
+        result=result,
+        coincidence_window_ps=500,
+    )
+
+    with pytest.raises(TypeError):
+        counts.singles[1] = 100
+
+    with pytest.raises(TypeError):
+        counts.coincidences[(1, 2)] = 100
+
+
+def test_counts_can_be_attached_without_changing_legacy_fields():
+    original = make_result()
+    counts = measurement_counts_from_result(
+        result=original,
+        coincidence_window_ps=500,
+    )
+
+    with_counts = BB84DetectionResult(
+        data=original.data,
+        qber=original.qber,
+        qx=original.qx,
+        singles=original.singles,
+        coincidences=original.coincidences,
+        counts=counts,
+    )
+
+    assert with_counts.counts is counts
+    assert with_counts.qber == original.qber
+    assert with_counts.qx == original.qx
+    assert with_counts.singles == original.singles
+    assert with_counts.coincidences == original.coincidences
+
+
+def test_invalid_coincidence_window_is_rejected():
+    result = make_result()
+    with pytest.raises(ValueError):
+        measurement_counts_from_result(
+            result=result,
+            coincidence_window_ps=-1,
+        )

@@ -27,6 +27,10 @@ class BB84DetectionResult:
     singles: dict[int, int]
     coincidences: dict[tuple[int, int], int]
 
+    counts: typing.Optional[
+        qtoolkit.timetags.MeasurementCounts
+    ] = None
+
 
 class CompensationState(enum.Enum):
     IDLE = enum.auto()

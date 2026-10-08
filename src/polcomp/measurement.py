@@ -42,3 +42,17 @@ def aggregate_bb84_measurements(
         qber=zz.qber,
         qx=xx.qber,
     )
+
+def measurement_counts_from_result(
+        *,
+        result: typing.Any,
+        coincidence_window_ps: int,
+) -> qtoolkit.timetags.MeasurementCounts:
+    """Construct immutable qtoolkit counts from detection result."""
+    return qtoolkit.timetags.MeasurementCounts(
+        singles=result.singles,
+        coincidences=result.coincidences,
+        duration_s=result.data.duration_s,
+        coincidence_window_ps=coincidence_window_ps,
+        file_path=result.data.file_path,
+    )
