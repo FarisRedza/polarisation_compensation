@@ -1,3 +1,5 @@
+from .config import PolCompConfig
+
 from .polcomp import (
     PolCompController,
 )
@@ -10,6 +12,8 @@ from .simulation import (
 )
 
 __all__ = [
+    'PolCompConfig',
+
     'PolCompController',
 
     'SimulatedMotor',

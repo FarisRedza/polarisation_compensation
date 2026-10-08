@@ -354,10 +354,7 @@ def run_compensation_benchmark(
             qwp1=compensation_motors[0],
             hwp=compensation_motors[1],
             qwp2=compensation_motors[2],
-            measurements=measurements,
-            target_qber=0.05,
-            target_qx=0.05,
-            lock_measurements=5,
+            measurements=measurements
         )
 
         samples: list[BenchmarkSample] = []

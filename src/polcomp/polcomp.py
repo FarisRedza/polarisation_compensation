@@ -5,6 +5,8 @@ import enum
 import motor
 import qtoolkit
 
+from polcomp.config import PolCompConfig
+
 
 @dataclasses.dataclass(frozen=True)
 class BB84DetectionResult:
@@ -120,9 +122,7 @@ class PolCompController:
         hwp: motor.Motor,
         qwp2: motor.Motor,
         measurements: qtoolkit.polarisation.BB84MeasurementPair,
-        target_qber: float = 0.05,
-        target_qx: float = 0.05,
-        lock_measurements: int = 5,
+        config: typing.Optional[PolCompConfig] = None,
     ) -> None:
         self.qwp1 = qwp1
         self.hwp = hwp
@@ -134,37 +134,11 @@ class PolCompController:
         )
 
         self.measurements = measurements
-
-        # SEARCH uses a stationary aggregate as its line-search reference
-        # and a rolling aggregate while the selected waveplate is jogging.
-        self.search_measurements = 3
-        self.search_jog_measurements = 3
-        self.search_worsening_measurements = 3
-        self.search_jog_velocity = 5.0
-
-        # A moving rolling-window score must be comfortably inside the
-        # true target before SEARCH is interrupted for stationary LOCK.
-        self.search_candidate_score = 0.90
-
-        # Empirical Jacobian SEARCH.  Each probe is measured while
-        # stationary, so the derivative estimate is not blurred by motion.
-        self.jacobian_probe_deg = 2.0
-        self.jacobian_measurements = 3
-
-        # Damped least-squares regularisation and correction limits.
-        self.jacobian_damping = 0.05
-        self.jacobian_max_step_deg = 10.0
-        self.jacobian_max_total_step_deg = 15.0
-
-        # Reject a Jacobian if it is effectively singular or if its local
-        # linear model does not predict a useful RMS reduction.
-        self.jacobian_min_determinant = 1e-6
-        self.jacobian_min_predicted_improvement = 0.02
-
-        self.target_qber = target_qber
-        self.target_qx = target_qx
-
-        self.lock_measurements = lock_measurements
+        self.config = (
+            config
+            if config is not None
+            else PolCompConfig()
+        )
 
         self.active = False
         self.state = CompensationState.IDLE
@@ -244,6 +218,67 @@ class PolCompController:
         self._lock_results: list[
             BB84DetectionResult
         ] = []
+
+    @property
+    def search_measurements(self) -> int:
+        return self.config.jog.reference_measurements
+
+    @property
+    def search_jog_measurements(self) -> int:
+        return self.config.jog.jog_measurements
+
+    @property
+    def search_worsening_measurements(self) -> int:
+        return self.config.jog.worsening_measurements
+
+    @property
+    def search_jog_velocity(self) -> float:
+        return self.config.jog.jog_velocity
+
+    @property
+    def search_candidate_score(self) -> float:
+        return self.config.jog.candidate_score
+
+    @property
+    def jacobian_probe_deg(self) -> float:
+        return self.config.jacobian.probe_deg
+
+    @property
+    def jacobian_measurements(self) -> int:
+        return self.config.jacobian.measurements
+
+    @property
+    def jacobian_damping(self) -> float:
+        return self.config.jacobian.damping    
+    
+    @property
+    def jacobian_max_step_deg(self) -> float:
+        return self.config.jacobian.max_step_deg
+
+    @property
+    def jacobian_max_total_step_deg(self) -> float:
+        return self.config.jacobian.max_total_step_deg
+
+    @property
+    def jacobian_min_determinant(self) -> float:
+        return self.config.jacobian.min_determinant
+
+    @property
+    def jacobian_min_predicted_improvement(self) -> float:
+        return self.config.jacobian.min_predicted_improvement
+
+    @property
+    def target_qber(self) -> float:
+        return self.config.target_qber
+
+    @property
+    def target_qx(self) -> float:
+        return self.config.target_qx
+
+    @property
+    def lock_measurements(self) -> int:
+        return self.config.lock.measurements
+
 
     @property
     def search_waveplate(
