@@ -11,6 +11,7 @@ from .jacobian_search import (
     JacobianAction,
     JacobianActionType,
 )
+from .jog_search import JogSearch
 
 @dataclasses.dataclass(frozen=True)
 class BB84DetectionResult:
@@ -146,6 +147,9 @@ class PolCompController:
         self._jacobian_search = JacobianSearch(
             config=self.config.jacobian,
         )
+        self._jog_search = JogSearch(
+            config=self.config.jog,
+        )
 
         self.active = False
         self.state = CompensationState.IDLE
@@ -153,31 +157,23 @@ class PolCompController:
         self._score: typing.Optional[float] = None
 
         self._search_state = SearchState.START
-        self._search_waveplate_index = 0
+        self._jog_search.state.waveplate_index = 0
 
-        self._search_reference_score: typing.Optional[
-            float
-        ] = None
-        self._search_reference_position: typing.Optional[
-            float
-        ] = None
-        self._search_best_score: typing.Optional[
-            float
-        ] = None
-        self._search_best_position: typing.Optional[
-            float
-        ] = None
+        self._jog_search.state.reference_score = None
+        self._jog_search.state.reference_position = None
+        self._jog_search.state.best_score = None
+        self._jog_search.state.best_position = None
 
         self._search_results: list[
             BB84DetectionResult
         ] = []
-        self._search_worsening_count = 0
+        self._jog_search.state.worsening_count = 0
 
         # Rolling-jog fallback diagnostics.
         self._search_cycle = 0
-        self._search_cycle_start_score: typing.Optional[float] = None
-        self._search_cycle_best_score: typing.Optional[float] = None
-        self._search_cycle_improvement: typing.Optional[float] = None
+        self._jog_search.state.cycle_start_score = None
+        self._jog_search.state.cycle_best_score = None
+        self._jog_search.state.cycle_improvement = None
 
         self._using_jog_fallback = False
 
@@ -190,18 +186,10 @@ class PolCompController:
 
         # Position interval associated with the most recent moving
         # measurement. The midpoint is used as the representative angle.
-        self._search_previous_position: typing.Optional[
-            float
-        ] = None
-        self._search_measurement_position: typing.Optional[
-            float
-        ] = None
-        self._search_measurement_start_position: typing.Optional[
-            float
-        ] = None
-        self._search_measurement_end_position: typing.Optional[
-            float
-        ] = None
+        self._jog_search.state.previous_position = None
+        self._jog_search.state.measurement_position = None
+        self._jog_search.state.measurement_start_position = None
+        self._jog_search.state.measurement_end_position = None
 
         self._lock_results: list[
             BB84DetectionResult
@@ -273,7 +261,7 @@ class PolCompController:
         self,
     ) -> motor.Motor:
         return self.waveplates[
-            self._search_waveplate_index
+            self._jog_search.state.waveplate_index
         ]
 
     def start(self) -> None:
@@ -281,15 +269,11 @@ class PolCompController:
         self.state = CompensationState.SEARCH
 
         self._search_state = SearchState.START
-        self._search_waveplate_index = 0
-
-        self._search_cycle = 0
-        self._search_cycle_start_score = None
-        self._search_cycle_best_score = None
-        self._search_cycle_improvement = None
 
         self._jacobian_search.reset()
         self._using_jog_fallback = False
+
+        self._jog_search.reset()
 
         self._reset_search_line()
 
@@ -325,13 +309,13 @@ class PolCompController:
                 else None
             ),
             score=self._score,
-            search_waveplate_index=self._search_waveplate_index,
+            search_waveplate_index=self._jog_search.state.waveplate_index,
             search_measurement_count=len(self._search_results),
-            search_worsening_count=self._search_worsening_count,
+            search_worsening_count=self._jog_search.state.worsening_count,
             search_cycle=self._search_cycle,
-            search_cycle_start_score=self._search_cycle_start_score,
-            search_cycle_best_score=self._search_cycle_best_score,
-            search_cycle_improvement=self._search_cycle_improvement,
+            search_cycle_start_score=self._jog_search.state.cycle_start_score,
+            search_cycle_best_score=self._jog_search.state.cycle_best_score,
+            search_cycle_improvement=self._jog_search.state.cycle_improvement,
             jacobian_probe_index=self._jacobian_search.state.probe_index,
             jacobian_iteration=self._jacobian_search.state.iteration,
             jacobian_condition=self._jacobian_search.state.condition,
@@ -345,14 +329,14 @@ class PolCompController:
             search_stagnant=False,
             search_escape_count=0,
             search_low_improvement_cycles=0,
-            best_score=self._search_best_score,
-            best_position=self._search_best_position,
-            measurement_position=self._search_measurement_position,
+            best_score=self._jog_search.state.best_score,
+            best_position=self._jog_search.state.best_position,
+            measurement_position=self._jog_search.state.measurement_position,
             measurement_start_position=(
-                self._search_measurement_start_position
+                self._jog_search.state.measurement_start_position
             ),
             measurement_end_position=(
-                self._search_measurement_end_position
+                self._jog_search.state.measurement_end_position
             ),
             is_moving=self.is_moving,
         )
@@ -554,22 +538,22 @@ class PolCompController:
                 self.state = CompensationState.LOCK
                 return
 
-            if self._search_waveplate_index == 0:
-                self._search_cycle_start_score = score
-                self._search_cycle_best_score = score
-                self._search_cycle_improvement = None
+            if self._jog_search.state.waveplate_index == 0:
+                self._jog_search.state.cycle_start_score = score
+                self._jog_search.state.cycle_best_score = score
+                self._jog_search.state.cycle_improvement = None
             elif (
-                self._search_cycle_best_score is None
-                or score < self._search_cycle_best_score
+                self._jog_search.state.cycle_best_score is None
+                or score < self._jog_search.state.cycle_best_score
             ):
-                self._search_cycle_best_score = score
+                self._jog_search.state.cycle_best_score = score
 
             position = self.search_waveplate.position
-            self._search_reference_score = score
-            self._search_reference_position = position
-            self._search_best_score = score
-            self._search_best_position = position
-            self._search_worsening_count = 0
+            self._jog_search.state.reference_score = score
+            self._jog_search.state.reference_position = position
+            self._jog_search.state.best_score = score
+            self._jog_search.state.best_position = position
+            self._jog_search.state.worsening_count = 0
 
             self._start_jog(
                 direction=motor.MotorDirection.FORWARD,
@@ -617,13 +601,13 @@ class PolCompController:
     ) -> None:
         current_position = self.search_waveplate.position
 
-        if self._search_previous_position is None:
-            self._search_previous_position = current_position
+        if self._jog_search.state.previous_position is None:
+            self._jog_search.state.previous_position = current_position
             return
 
-        start_position = self._search_previous_position
+        start_position = self._jog_search.state.previous_position
         end_position = current_position
-        self._search_previous_position = current_position
+        self._jog_search.state.previous_position = current_position
 
         self._search_jog_results.append(
             (result, start_position, end_position)
@@ -663,13 +647,13 @@ class PolCompController:
             + window_end_position
         ) / 2
 
-        self._search_measurement_start_position = (
+        self._jog_search.state.measurement_start_position = (
             window_start_position
         )
-        self._search_measurement_end_position = (
+        self._jog_search.state.measurement_end_position = (
             window_end_position
         )
-        self._search_measurement_position = (
+        self._jog_search.state.measurement_position = (
             measurement_position
         )
 
@@ -684,24 +668,24 @@ class PolCompController:
         self._score = score
 
         if (
-            self._search_cycle_best_score is None
-            or score < self._search_cycle_best_score
+            self._jog_search.state.cycle_best_score is None
+            or score < self._jog_search.state.cycle_best_score
         ):
-            self._search_cycle_best_score = score
+            self._jog_search.state.cycle_best_score = score
 
-        assert self._search_reference_score is not None
-        assert self._search_reference_position is not None
-        assert self._search_best_score is not None
-        assert self._search_best_position is not None
+        assert self._jog_search.state.reference_score is not None
+        assert self._jog_search.state.reference_position is not None
+        assert self._jog_search.state.best_score is not None
+        assert self._jog_search.state.best_position is not None
 
-        if score < self._search_best_score:
-            self._search_best_score = score
-            self._search_best_position = (
+        if score < self._jog_search.state.best_score:
+            self._jog_search.state.best_score = score
+            self._jog_search.state.best_position = (
                 measurement_position
             )
-            self._search_worsening_count = 0
+            self._jog_search.state.worsening_count = 0
         else:
-            self._search_worsening_count += 1
+            self._jog_search.state.worsening_count += 1
 
         # A moving result is only a candidate. Candidate acceptance uses
         # the authoritative max objective rather than the smoother SEARCH
@@ -709,13 +693,13 @@ class PolCompController:
         # before SEARCH is interrupted for LOCK.
         if acceptance_score <= self.search_candidate_score:
             self._return_to_position(
-                position=self._search_best_position,
+                position=self._jog_search.state.best_position,
                 state=SearchState.RETURN_TO_LOCK,
             )
             return
 
         if (
-            self._search_worsening_count
+            self._jog_search.state.worsening_count
             < self.search_worsening_measurements
         ):
             return
@@ -725,18 +709,18 @@ class PolCompController:
             is SearchState.JOG_POSITIVE
         ):
             if (
-                self._search_best_score
-                < self._search_reference_score
+                self._jog_search.state.best_score
+                < self._jog_search.state.reference_score
             ):
                 self._return_to_position(
-                    position=self._search_best_position,
+                    position=self._jog_search.state.best_position,
                     state=SearchState.RETURN_TO_BEST,
                 )
             else:
                 # Positive motion did not improve on the stationary
                 # reference. Return to the reference and try negative.
                 self._return_to_position(
-                    position=self._search_reference_position,
+                    position=self._jog_search.state.reference_position,
                     state=SearchState.RETURN_FROM_POSITIVE,
                 )
             return
@@ -749,15 +733,15 @@ class PolCompController:
             # return to the original reference. In either case this line
             # search is complete and the next waveplate is selected.
             if (
-                self._search_best_score
-                < self._search_reference_score
+                self._jog_search.state.best_score
+                < self._jog_search.state.reference_score
             ):
                 return_position = (
-                    self._search_best_position
+                    self._jog_search.state.best_position
                 )
             else:
                 return_position = (
-                    self._search_reference_position
+                    self._jog_search.state.reference_position
                 )
 
             self._return_to_position(
@@ -788,10 +772,10 @@ class PolCompController:
         self._jacobian_search.state.fallback_count += 1
         self._using_jog_fallback = True
 
-        self._search_waveplate_index = 0
-        self._search_cycle_start_score = None
-        self._search_cycle_best_score = None
-        self._search_cycle_improvement = None
+        self._jog_search.state.waveplate_index = 0
+        self._jog_search.state.cycle_start_score = None
+        self._jog_search.state.cycle_best_score = None
+        self._jog_search.state.cycle_improvement = None
 
         self._search_state = SearchState.START
         self._reset_search_line()
@@ -807,7 +791,7 @@ class PolCompController:
         # START itself is shared with Jacobian baseline collection.  Set a
         # sentinel reference score so the dispatcher can distinguish the
         # fallback path on subsequent stationary samples.
-        self._search_reference_score = float('nan')
+        self._jog_search.state.reference_score = float('nan')
 
 
     def _start_jog(
@@ -816,15 +800,15 @@ class PolCompController:
         direction: motor.MotorDirection,
         state: SearchState,
     ) -> None:
-        self._search_worsening_count = 0
+        self._jog_search.state.worsening_count = 0
         self._search_jog_results.clear()
 
-        self._search_previous_position = (
+        self._jog_search.state.previous_position = (
             self.search_waveplate.position
         )
-        self._search_measurement_position = None
-        self._search_measurement_start_position = None
-        self._search_measurement_end_position = None
+        self._jog_search.state.measurement_position = None
+        self._jog_search.state.measurement_start_position = None
+        self._jog_search.state.measurement_end_position = None
 
         self.search_waveplate.jog(
             direction=direction,
@@ -844,32 +828,32 @@ class PolCompController:
         )
 
         self._search_state = state
-        self._search_worsening_count = 0
+        self._jog_search.state.worsening_count = 0
         self._search_jog_results.clear()
-        self._search_previous_position = None
+        self._jog_search.state.previous_position = None
 
     def _next_search_waveplate(
         self,
     ) -> None:
-        self._search_waveplate_index += 1
+        self._jog_search.state.waveplate_index += 1
 
         if (
-            self._search_waveplate_index
+            self._jog_search.state.waveplate_index
             >= len(self.waveplates)
         ):
-            self._search_waveplate_index = 0
+            self._jog_search.state.waveplate_index = 0
 
             if (
-                self._search_cycle_start_score is not None
-                and self._search_cycle_best_score is not None
+                self._jog_search.state.cycle_start_score is not None
+                and self._jog_search.state.cycle_best_score is not None
             ):
-                if self._search_cycle_start_score > 0:
-                    self._search_cycle_improvement = (
-                        self._search_cycle_start_score
-                        - self._search_cycle_best_score
-                    ) / self._search_cycle_start_score
+                if self._jog_search.state.cycle_start_score > 0:
+                    self._jog_search.state.cycle_improvement = (
+                        self._jog_search.state.cycle_start_score
+                        - self._jog_search.state.cycle_best_score
+                    ) / self._jog_search.state.cycle_start_score
                 else:
-                    self._search_cycle_improvement = 0.0
+                    self._jog_search.state.cycle_improvement = 0.0
 
             self._search_cycle += 1
 
@@ -880,20 +864,10 @@ class PolCompController:
         self._reset_search_line()
         self._search_results.clear()
 
-    def _reset_search_line(
-        self,
-    ) -> None:
-        self._search_reference_score = None
-        self._search_reference_position = None
-        self._search_best_score = None
-        self._search_best_position = None
-        self._search_worsening_count = 0
+    def _reset_search_line(self) -> None:
+        self._jog_search.reset_line()
         self._search_jog_results.clear()
 
-        self._search_previous_position = None
-        self._search_measurement_position = None
-        self._search_measurement_start_position = None
-        self._search_measurement_end_position = None
 
     def _update_lock(
         self,

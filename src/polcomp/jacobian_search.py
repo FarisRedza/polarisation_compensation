@@ -43,10 +43,10 @@ class JacobianSearchState:
 
 
 class JacobianSearch:
-    """Own Jacobian search state and its numerical solver.
+    """Manage emperical Jacobian search and correction decisions.
 
-    Probe sequencing and motor commands remain in PolCompController
-    until the next decomposition stage.
+    Motor execution and measurement acquisition are handled by
+    PolCompController.
     """
 
     def __init__(
