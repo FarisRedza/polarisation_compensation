@@ -5,7 +5,8 @@ import enum
 import motor
 import qtoolkit
 
-from polcomp.config import PolCompConfig
+from .config import PolCompConfig
+from .jacobian import JacobianSolver
 
 
 @dataclasses.dataclass(frozen=True)
@@ -138,6 +139,9 @@ class PolCompController:
             config
             if config is not None
             else PolCompConfig()
+        )
+        self._jacobian_solver = JacobianSolver(
+            config=self.config.jacobian,
         )
 
         self.active = False
@@ -836,100 +840,26 @@ class PolCompController:
             self._start_jog_fallback()
             return
 
-        # J is 2x3.  Compute the damped pseudoinverse as
-        # J^T (J J^T + lambda^2 I)^-1 without adding a NumPy dependency.
-        jz = [column[0] for column in self._jacobian_columns]
-        jx = [column[1] for column in self._jacobian_columns]
-
-        a = sum(value * value for value in jz)
-        b = sum(
-            z_value * x_value
-            for z_value, x_value in zip(jz, jx)
+        solution = self._jacobian_solver.solve(
+            columns=self._jacobian_columns,
+            baseline_errors=self._jacobian_baseline_errors,
+            baseline_score=self._jacobian_baseline_score,
         )
-        d = sum(value * value for value in jx)
 
-        # Condition estimate is reported for diagnostics using the
-        # eigenvalues of J J^T.  It is not used alone to reject a step;
-        # damping makes near-singular cases numerically safe.
-        trace = a + d
-        determinant = a * d - b * b
-        discriminant = max(
-            trace * trace - 4.0 * determinant,
-            0.0,
-        ) ** 0.5
-        eig_max = (trace + discriminant) / 2.0
-        eig_min = (trace - discriminant) / 2.0
+        self._jacobian_condition = solution.condition
+        self._jacobian_predicted_score = solution.predicted_score
+        self._jacobian_step = solution.step
 
-        if eig_min > 0:
-            self._jacobian_condition = (
-                eig_max / eig_min
-            ) ** 0.5
-        else:
-            self._jacobian_condition = float('inf')
-
-        damping2 = self.jacobian_damping ** 2
-        aa = a + damping2
-        dd = d + damping2
-        det = aa * dd - b * b
-
-        if det <= self.jacobian_min_determinant:
+        if not solution.accepted:
             self._start_jog_fallback()
             return
 
-        ez, ex = self._jacobian_baseline_errors
+        assert solution.step is not None
 
-        # y = (J J^T + lambda^2 I)^-1 e
-        yz = (dd * ez - b * ex) / det
-        yx = (-b * ez + aa * ex) / det
-
-        step = [
-            -(jz[i] * yz + jx[i] * yx)
-            for i in range(3)
-        ]
-
-        # Limit individual movement and then the Euclidean total movement.
-        step = [
-            max(
-                -self.jacobian_max_step_deg,
-                min(self.jacobian_max_step_deg, value),
-            )
-            for value in step
-        ]
-
-        norm = sum(value * value for value in step) ** 0.5
-        if norm > self.jacobian_max_total_step_deg:
-            scale = self.jacobian_max_total_step_deg / norm
-            step = [value * scale for value in step]
-
-        predicted_z = ez + sum(
-            jz[i] * step[i]
-            for i in range(3)
-        )
-        predicted_x = ex + sum(
-            jx[i] * step[i]
-            for i in range(3)
-        )
-        predicted_score = (
-            (predicted_z ** 2 + predicted_x ** 2) / 2.0
-        ) ** 0.5
-
-        self._jacobian_predicted_score = predicted_score
-        self._jacobian_step = tuple(step)
-
-        predicted_improvement = (
-            self._jacobian_baseline_score - predicted_score
-        ) / self._jacobian_baseline_score
-
-        if (
-            predicted_improvement
-            < self.jacobian_min_predicted_improvement
+        for waveplate, delta in zip(
+            self.waveplates,
+            solution.step,
         ):
-            self._start_jog_fallback()
-            return
-
-        # All three move_to() calls are issued together.  DummyMotor moves
-        # them concurrently; real backends can do the same if asynchronous.
-        for waveplate, delta in zip(self.waveplates, step):
             waveplate.move_to(
                 waveplate.position + delta
             )
