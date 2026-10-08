@@ -9,7 +9,6 @@ from polcomp.simulation import RealTimeClock, SimulationClock, SimulatedMotor
 
 def test_default_motor_clock_is_realtime():
     motor = SimulatedMotor(waveplate=QuarterWaveplate())
-    print(type(motor.clock))
     assert isinstance(motor.clock, RealTimeClock)
 
 

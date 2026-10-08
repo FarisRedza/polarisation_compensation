@@ -77,8 +77,6 @@ class SimulatedMotor(motor.Motor):
         super().__init__(
             serial_number='simulated_motor'
         )
-        print('hello')
-        print(f'hello, {type(clock)}')
         self.waveplate = waveplate
         self.clock = clock
 
