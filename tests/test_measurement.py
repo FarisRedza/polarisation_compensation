@@ -1,5 +1,6 @@
 """Tests for BB84 count aggregation, metadata, and simulated acquisition."""
 
+import dataclasses
 from types import SimpleNamespace
 
 import numpy as np
@@ -303,3 +304,45 @@ def test_invalid_coincidence_window_is_rejected():
         measurement.measurement_counts_from_result(
             result=make_result(), coincidence_window_ps=-1,
         )
+
+def test_observation_preserves_metrics():
+    observation = measurement.make_observation(
+        qber=0.02,
+        qx=0.04,
+        score=0.5,
+    )
+
+    assert observation.qber == 0.02
+    assert observation.qx == 0.04
+    assert observation.score == 0.5
+    assert observation.counts is None
+
+
+def test_observation_is_immutable():
+    observation = measurement.make_observation(
+        qber=0.02,
+        qx=0.04,
+        score=0.5,
+    )
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        observation.score = 0.7
+
+
+def test_observation_preserves_measurement_counts():
+    counts = qtoolkit.timetags.MeasurementCounts(
+        singles={1: 100, 2: 100},
+        coincidences={(1, 2): 50},
+        duration_s=0.1,
+        coincidence_window_ps=500,
+    )
+
+    observation = measurement.make_observation(
+        qber=0.02,
+        qx=0.04,
+        score=0.5,
+        counts=counts,
+    )
+
+    assert observation.counts is counts
+    assert observation.counts.coincidence_window_ps == 500

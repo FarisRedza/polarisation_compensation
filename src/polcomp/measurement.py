@@ -12,6 +12,37 @@ class AggregatedBB84Measurement:
     qx: float
 
 
+@dataclasses.dataclass(frozen=True)
+class Observation:
+    """BB84 metrics observed during a compensation measurement."""
+
+    qber: float
+    qx: float
+    score: float
+
+    counts: typing.Optional[
+        qtoolkit.timetags.MeasurementCounts
+    ] = None
+
+
+def make_observation(
+    *,
+    qber: float,
+    qx: float,
+    score: float,
+    counts: typing.Optional[
+        qtoolkit.timetags.MeasurementCounts
+    ] = None,
+) -> Observation:
+    """Construct an immutable compensation observation."""
+
+    return Observation(
+        qber=qber,
+        qx=qx,
+        score=score,
+        counts=counts,
+    )
+
 def aggregate_bb84_measurements(
     *,
     results: typing.Sequence[typing.Any],
