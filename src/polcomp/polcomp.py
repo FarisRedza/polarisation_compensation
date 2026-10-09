@@ -497,16 +497,18 @@ class PolCompController:
             if len(self._search_results) < self.jacobian_measurements:
                 return
 
-            qber, qx = self._aggregate_results(self._search_results)
+            observation = self._observe_results(
+                self._search_results,
+                search=True,
+            )
             self._search_results.clear()
 
             assert self._jacobian_search.state.baseline_errors is not None
 
             action = self._jacobian_search.record_probe(
-                probe_errors=(
-                    qber / self.target_qber,
-                    qx / self.target_qx,
-                ),
+                observation=observation,
+                target_qber=self.target_qber,
+                target_qx=self.target_qx,
             )
 
             self._execute_jacobian_action(action)
@@ -571,11 +573,9 @@ class PolCompController:
             return
 
         action = self._jacobian_search.begin_iteration(
-            baseline_errors=(
-                observation.qber / self.target_qber,
-                observation.qx / self.target_qx,
-            ),
-            baseline_score=observation.score,
+            observation=observation,
+            target_qber=self.target_qber,
+            target_qx=self.target_qx,
             baseline_positions=tuple(
                 waveplate.position
                 for waveplate in self.waveplates

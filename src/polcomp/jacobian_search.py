@@ -4,6 +4,7 @@ import enum
 
 from .config import JacobianSearchConfig
 from .jacobian import JacobianSolver, Vector2, Vector3
+from .measurement import Observation
 
 
 class JacobianActionType(enum.Enum):
@@ -78,16 +79,22 @@ class JacobianSearch:
     def begin_iteration(
         self,
         *,
-        baseline_errors: Vector2,
-        baseline_score: float,
+        observation: Observation,
+        target_qber: float,
+        target_qx: float,
         baseline_positions: Vector3,
     ) -> JacobianAction:
         self.reset_iteration()
 
         state = self.state
 
-        state.baseline_errors = baseline_errors
-        state.baseline_score = baseline_score
+        state.baseline_errors = self._normalise_observation(
+            observation,
+            target_qber=target_qber,
+            target_qx=target_qx,
+        )
+
+        state.baseline_score = observation.score
         state.baseline_positions = baseline_positions
 
         return self.start_probe()
@@ -111,7 +118,9 @@ class JacobianSearch:
     def record_probe(
         self,
         *,
-        probe_errors: Vector2,
+        observation: Observation,
+        target_qber: float,
+        target_qx: float,
     ) -> JacobianAction:
         state = self.state
 
@@ -119,7 +128,12 @@ class JacobianSearch:
         assert state.baseline_positions is not None
 
         base_z, base_x = state.baseline_errors
-        probe_z, probe_x = probe_errors
+
+        probe_z, probe_x = self._normalise_observation(
+            observation,
+            target_qber=target_qber,
+            target_qx=target_qx,
+        )
 
         state.columns.append(
             (
@@ -177,4 +191,18 @@ class JacobianSearch:
         return JacobianAction(
             type=JacobianActionType.APPLY_STEP,
             step=solution.step,
+        )
+
+    def _normalise_observation(
+        self,
+        observation: Observation,
+        *,
+        target_qber: float,
+        target_qx: float,
+    ) -> Vector2:
+        """Convert observed BB84 errors to normalised target ratios."""
+
+        return (
+            observation.qber / target_qber,
+            observation.qx / target_qx,
         )

@@ -1,9 +1,13 @@
+import pytest
+
+from polcomp.measurement import make_observation
 from polcomp.config import JacobianSearchConfig
 from polcomp.jacobian_search import (
     JacobianSearch,
     JacobianSearchState,
     JacobianActionType
 )
+
 
 
 def test_initial_state():
@@ -79,8 +83,13 @@ def test_jacobian_probe_sequence():
     )
 
     action = search.begin_iteration(
-        baseline_errors=(1.0, 1.0),
-        baseline_score=1.0,
+        observation=make_observation(
+            qber=0.05,
+            qx=0.05,
+            score=1.0,
+        ),
+        target_qber=0.05,
+        target_qx=0.05,
         baseline_positions=(10.0, 20.0, 30.0),
     )
 
@@ -89,7 +98,13 @@ def test_jacobian_probe_sequence():
     assert action.position == 12.0
 
     action = search.record_probe(
-        probe_errors=(1.2, 1.0),
+        observation=make_observation(
+            qber=0.06,
+            qx=0.05,
+            score=1.2,
+        ),
+        target_qber=0.05,
+        target_qx=0.05,
     )
 
     assert action.type is JacobianActionType.MOVE_TO
@@ -101,3 +116,24 @@ def test_jacobian_probe_sequence():
     assert action.type is JacobianActionType.MOVE_TO
     assert action.motor_index == 1
     assert action.position == 22.0
+
+def test_observation_normalisation():
+    search = JacobianSearch(
+        JacobianSearchConfig()
+    )
+
+    observation = make_observation(
+        qber=0.02,
+        qx=0.06,
+        score=1.0,
+    )
+
+    errors = search._normalise_observation(
+        observation,
+        target_qber=0.04,
+        target_qx=0.03,
+    )
+
+    assert errors == pytest.approx(
+        (0.5, 2.0)
+    )
