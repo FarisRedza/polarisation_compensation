@@ -8,6 +8,11 @@ from polcomp.acquisition import BB84MeasurementSource
 from polcomp.measurement import aggregate_bb84_measurements
 from polcomp.polcomp import BB84DetectionResult
 from polcomp.simulation import SimulatedTimetagger
+from polcomp.acquisition import (
+    BB84MeasurementSource,
+    BB84TimetagAcquisition,
+    TimetagSource,
+)
 
 
 def test_simulated_timetagger_implements_protocol():
@@ -92,3 +97,96 @@ def test_simulated_acquisition_aggregates(
     assert aggregated.qx == pytest.approx(result.qx)
     assert dict(aggregated.counts.singles) == result.singles
     assert dict(aggregated.counts.coincidences) == result.coincidences
+
+def test_generic_acquisition_implements_protocol():
+    assert issubclass(
+        BB84TimetagAcquisition,
+        BB84MeasurementSource,
+    )
+
+def test_simulated_timetagger_uses_generic_acquisition():
+    assert issubclass(
+        SimulatedTimetagger,
+        BB84TimetagAcquisition,
+    )
+
+def test_generic_acquisition(
+    measurements,
+    deterministic_timetag_source,
+):
+    acquisition = BB84TimetagAcquisition(
+        source=deterministic_timetag_source,
+        measurements=measurements,
+    )
+
+    result = acquisition.measure(
+        duration_s=1.0,
+        coincidence_window_ps=100,
+    )
+
+    assert isinstance(result, BB84DetectionResult)
+    assert result.counts is not None
+
+    assert dict(result.counts.singles) == result.singles
+    assert dict(result.counts.coincidences) == result.coincidences
+
+    assert result.counts.duration_s == pytest.approx(1.0)
+    assert result.counts.coincidence_window_ps == 100
+
+    assert (
+        result.counts.get_basis_metrics(
+            measurements.z_pairs,
+        ).qber
+        == result.qber
+    )
+
+    assert (
+        result.counts.get_basis_metrics(
+            measurements.x_pairs,
+        ).qber
+        == result.qx
+    )
+
+def test_generic_and_simulated_acquisition_agree(
+    measurements,
+    deterministic_timetag_source,
+):
+    generic = BB84TimetagAcquisition(
+        source=deterministic_timetag_source,
+        measurements=measurements,
+    )
+
+    simulated = SimulatedTimetagger(
+        source=deterministic_timetag_source,
+        measurements=measurements,
+    )
+
+    generic_result = generic.measure(
+        duration_s=1.0,
+        coincidence_window_ps=100,
+    )
+
+    simulated_result = simulated.measure(
+        duration_s=1.0,
+        coincidence_window_ps=100,
+    )
+
+    assert generic_result.qber == simulated_result.qber
+    assert generic_result.qx == simulated_result.qx
+
+    assert generic_result.singles == simulated_result.singles
+    assert (
+        generic_result.coincidences
+        == simulated_result.coincidences
+    )
+
+    assert (
+        generic_result.counts
+        is not None
+        and simulated_result.counts is not None
+    )
+
+    assert (
+        dict(generic_result.counts.coincidences)
+        == dict(simulated_result.counts.coincidences)
+    )

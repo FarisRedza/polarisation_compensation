@@ -10,9 +10,7 @@ import motor
 import qtoolkit
 from qtoolkit.polarisation import Waveplate
 
-from .acquisition import BB84MeasurementSource
-from .polcomp import BB84DetectionResult
-from .measurement import measurement_counts_from_result
+from .acquisition import BB84TimetagAcquisition, TimetagSource
 
 
 class Clock:
@@ -520,110 +518,5 @@ class SimulatedPolCompSystem:
         )
 
 
-class TimetagSource(typing.Protocol):
-    def read(
-        self,
-        duration_s: float,
-    ) -> qtoolkit.timetags.TimetagData:
-        ...
-
-
-class SimulatedTimetagger(BB84MeasurementSource):
-    def __init__(
-        self,
-        source: TimetagSource,
-        measurements: qtoolkit.polarisation.BB84MeasurementPair,
-    ) -> None:
-        self._source = source
-        self.measurements = measurements
-
-    @property
-    def channels(
-        self,
-    ) -> tuple[int, ...]:
-        pairs = (
-            *self.measurements.z_pairs,
-            *self.measurements.x_pairs,
-        )
-
-        return tuple(
-            sorted({
-                channel
-                for pair in pairs
-                for channel in pair.as_tuple()
-            })
-        )
-
-    def read(
-        self,
-        duration_s: float,
-    ) -> qtoolkit.timetags.TimetagData:
-        return self._source.read(
-            duration_s
-        )
-
-    def measure(
-        self,
-        duration_s: float,
-        coincidence_window_ps: int,
-    ) -> BB84DetectionResult:
-        data = self.read(
-            duration_s
-        )
-
-        singles = {
-            channel: data.count(channel)
-            for channel in self.channels
-        }
-
-        pairs = (
-            *self.measurements.z_pairs,
-            *self.measurements.x_pairs,
-        )
-
-        coincidences = (
-            qtoolkit.timetags.count_coincidences(
-                data=data,
-                pairs=[
-                    pair.as_tuple()
-                    for pair in pairs
-                ],
-                coincidence_window=(
-                    coincidence_window_ps
-                ),
-            )
-        )
-
-        zz = (
-            qtoolkit.qkd.BasisMetrics
-            .from_coincidences(
-                coincidences=coincidences,
-                pairs=self.measurements.z_pairs,
-            )
-        )
-
-        xx = (
-            qtoolkit.qkd.BasisMetrics
-            .from_coincidences(
-                coincidences=coincidences,
-                pairs=self.measurements.x_pairs,
-            )
-        )
-
-        result = BB84DetectionResult(
-            data=data,
-            singles=singles,
-            coincidences=coincidences,
-            qber=zz.qber,
-            qx=xx.qber,
-        )
-
-        counts = measurement_counts_from_result(
-            result=result,
-            coincidence_window_ps=coincidence_window_ps,
-        )
-
-        return dataclasses.replace(
-            result,
-            counts=counts,
-        )
+class SimulatedTimetagger(BB84TimetagAcquisition):
+    """Compatibility wrapper for simulated BB84 acquisition."""
