@@ -11,6 +11,10 @@ class AggregatedBB84Measurement:
     qber: float
     qx: float
 
+    counts: typing.Optional[
+        qtoolkit.timetags.MeasurementCounts
+    ] = None
+
 
 @dataclasses.dataclass(frozen=True)
 class Observation:
@@ -76,6 +80,7 @@ def aggregate_bb84_measurements(
     return AggregatedBB84Measurement(
         qber=zz.qber,
         qx=xx.qber,
+        counts=combined,
     )
 
 def measurement_counts_from_result(

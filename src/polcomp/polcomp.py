@@ -822,23 +822,28 @@ class PolCompController:
     ) -> Observation:
         """Create an observation from an aggregated measurement window."""
 
-        qber, qx = self._aggregate_results(results)
+        measurement = aggregate_bb84_measurements(
+            results=results,
+            z_pairs=self.measurements.z_pairs,
+            x_pairs=self.measurements.x_pairs,
+        )
 
         if search:
             score = self.search_objective(
-                qber=qber,
-                qx=qx,
+                qber=measurement.qber,
+                qx=measurement.qx,
             )
         else:
             score = self.objective(
-                qber=qber,
-                qx=qx,
+                qber=measurement.qber,
+                qx=measurement.qx,
             )
 
         return make_observation(
-            qber=qber,
-            qx=qx,
+            qber=measurement.qber,
+            qx=measurement.qx,
             score=score,
+            counts=measurement.counts,
         )
 
     def _execute_jacobian_action(

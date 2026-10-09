@@ -346,3 +346,65 @@ def test_observation_preserves_measurement_counts():
 
     assert observation.counts is counts
     assert observation.counts.coincidence_window_ps == 500
+
+def test_aggregation_preserves_combined_counts(
+    measurements,
+    pairs,
+):
+    first = qtoolkit.timetags.MeasurementCounts(
+        singles={1: 100, 2: 100},
+        coincidences={
+            pair: 10
+            for pair in pairs
+        },
+        duration_s=0.1,
+        coincidence_window_ps=500,
+    )
+
+    second = qtoolkit.timetags.MeasurementCounts(
+        singles={1: 200, 2: 200},
+        coincidences={
+            pair: 20
+            for pair in pairs
+        },
+        duration_s=0.2,
+        coincidence_window_ps=500,
+    )
+
+    result = measurement.aggregate_bb84_measurements(
+        results=[
+            SimpleNamespace(counts=first),
+            SimpleNamespace(counts=second),
+        ],
+        z_pairs=measurements.z_pairs,
+        x_pairs=measurements.x_pairs,
+    )
+
+    assert result.counts is not None
+
+    # Acquisition metadata
+    assert result.counts.duration_s == pytest.approx(0.3)
+    assert result.counts.coincidence_window_ps == 500
+
+    # Aggregated singles
+    assert result.counts.singles == {
+        1: 300,
+        2: 300,
+    }
+
+    # Aggregated coincidences
+    assert result.counts.coincidences == {
+        pair: 30
+        for pair in pairs
+    }
+
+    # Verify that the basis metrics are derived from combined counts.
+    zz = result.counts.get_basis_metrics(
+        measurements.z_pairs
+    )
+    xx = result.counts.get_basis_metrics(
+        measurements.x_pairs
+    )
+
+    assert result.qber == pytest.approx(zz.qber)
+    assert result.qx == pytest.approx(xx.qber)
