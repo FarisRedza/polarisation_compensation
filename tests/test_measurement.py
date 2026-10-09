@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 
 import pytest
+import numpy as np
+import qtoolkit
 
-from polcomp import measurement
+from polcomp import measurement, simulation
 
 
 Z_PAIRS = object()
@@ -99,6 +101,68 @@ def test_inputs_are_not_modified(basis_metrics_stub):
     assert first.coincidences == before_first
     assert second.coincidences == before_second
     assert first.coincidences is not second.coincidences
+
+def test_simulated_timetagger_populates_measurement_counts():
+    first = qtoolkit.polarisation.BB84Measurement(
+        channels=qtoolkit.polarisation.PolarisationChannelMap(
+            h=1, v=2, d=3, a=4,
+        ),
+    )
+    second = qtoolkit.polarisation.BB84Measurement(
+        channels=qtoolkit.polarisation.PolarisationChannelMap(
+            h=5, v=6, d=7, a=8,
+        ),
+    )
+
+    measurements = qtoolkit.polarisation.BB84MeasurementPair(
+        first=first,
+        second=second,
+    )
+
+    data = qtoolkit.timetags.TimetagData(
+        timetags=np.array(
+            [100, 110, 1000, 1010],
+            dtype=np.int64,
+        ),
+        channels=np.array(
+            [1, 5, 3, 7],
+            dtype=np.int8,
+        ),
+        start_ps=0,
+        stop_ps=1_000_000_000_000,
+    )
+
+    class FakeSource:
+        def read(self, duration_s):
+            assert duration_s == 1.0
+            return data
+
+    timetagger = simulation.SimulatedTimetagger(
+        source=FakeSource(),
+        measurements=measurements,
+    )
+
+    result = timetagger.measure(
+        duration_s=1.0,
+        coincidence_window_ps=100,
+    )
+
+    assert result.counts is not None
+
+    assert dict(result.counts.singles) == result.singles
+    assert dict(result.counts.coincidences) == result.coincidences
+
+    assert result.counts.duration_s == pytest.approx(1.0)
+    assert result.counts.coincidence_window_ps == 100
+
+    assert (
+        result.counts.get_basis_metrics(measurements.z_pairs).qber
+        == result.qber
+    )
+    assert (
+        result.counts.get_basis_metrics(measurements.x_pairs).qber
+        == result.qx
+    )
 
 """
 Tests for the optional qtoolkit MeasurementCounts integration.

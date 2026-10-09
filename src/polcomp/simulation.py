@@ -11,6 +11,7 @@ import qtoolkit
 from qtoolkit.polarisation import Waveplate
 
 from .polcomp import BB84DetectionResult
+from .measurement import measurement_counts_from_result
 
 
 class Clock:
@@ -608,10 +609,20 @@ class SimulatedTimetagger:
             )
         )
 
-        return BB84DetectionResult(
+        result = BB84DetectionResult(
             data=data,
             singles=singles,
             coincidences=coincidences,
             qber=zz.qber,
             qx=xx.qber,
+        )
+
+        counts = measurement_counts_from_result(
+            result=result,
+            coincidence_window_ps=coincidence_window_ps,
+        )
+
+        return dataclasses.replace(
+            result,
+            counts=counts,
         )
