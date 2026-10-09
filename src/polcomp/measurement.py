@@ -13,30 +13,34 @@ class AggregatedBB84Measurement:
 
 
 def aggregate_bb84_measurements(
-        *,
-        results: typing.Sequence[typing.Any],
-        z_pairs: typing.Any,
-        x_pairs: typing.Any,
+    *,
+    results: typing.Sequence[typing.Any],
+    z_pairs: typing.Any,
+    x_pairs: typing.Any,
 ) -> AggregatedBB84Measurement:
-    """Aggregate coincidences and calculate BB84 error metrics."""
+    """Aggregate compatible BB84 measurements using qtoolkit."""
 
-    coincidences: dict[tuple[int, int], int] = {}
+    if not results:
+        raise ValueError(
+            'Cannot aggregate an empty collection of measurements.'
+        )
 
-    for result in results:
-        for pair, count in result.coincidences.items():
-            coincidences[pair] = (
-                coincidences.get(pair, 0) + count
+    counts = []
+
+    for index, result in enumerate(results):
+        if result.counts is None:
+            raise ValueError(
+                f'Measurement {index} has no MeasurementCounts.'
             )
 
-    zz = qtoolkit.qkd.BasisMetrics.from_coincidences(
-        coincidences=coincidences,
-        pairs=z_pairs,
+        counts.append(result.counts)
+
+    combined = qtoolkit.timetags.aggregate_measurements(
+        counts
     )
 
-    xx = qtoolkit.qkd.BasisMetrics.from_coincidences(
-        coincidences=coincidences,
-        pairs=x_pairs,
-    )
+    zz = combined.get_basis_metrics(z_pairs)
+    xx = combined.get_basis_metrics(x_pairs)
 
     return AggregatedBB84Measurement(
         qber=zz.qber,
