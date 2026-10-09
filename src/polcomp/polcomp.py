@@ -262,6 +262,12 @@ class PolCompController:
             self._jog_search.state.waveplate_index
         ]
 
+    @property
+    def search_waveplate_position(self) -> float:
+        return self._motor_executor.position(
+            self._jog_search.state.waveplate_index
+        )
+
     def start(self) -> None:
         self.active = True
         self.state = CompensationState.SEARCH
@@ -540,7 +546,7 @@ class PolCompController:
 
             self._jog_search.begin_line(
                 observation=observation,
-                position=self.search_waveplate.position,
+                position=self.search_waveplate_position,
             )
 
             self._start_jog(
@@ -575,10 +581,7 @@ class PolCompController:
             observation=observation,
             target_qber=self.target_qber,
             target_qx=self.target_qx,
-            baseline_positions=tuple(
-                waveplate.position
-                for waveplate in self.waveplates
-            ),
+            baseline_positions=self._motor_executor.positions(),
         )
 
         self._execute_jacobian_action(action)
@@ -721,7 +724,7 @@ class PolCompController:
         self._search_jog_results.clear()
 
         self._jog_search.begin_jog(
-            position=self.search_waveplate.position,
+            position=self.search_waveplate_position,
         )
 
         self._motor_executor.jog(

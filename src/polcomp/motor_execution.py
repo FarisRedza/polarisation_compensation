@@ -63,3 +63,14 @@ class MotorExecutor:
             waveplate.move_to(
                 waveplate.position + delta
             )
+
+    def position(self, index: int) -> float:
+        """Return the current position of one motor."""
+        return self.motors[index].position
+
+    def positions(self) -> tuple[float, ...]:
+        """Return the current positions of all motors."""
+        return tuple(
+            waveplate.position
+            for waveplate in self.motors
+        )

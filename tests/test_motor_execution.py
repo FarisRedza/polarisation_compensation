@@ -174,3 +174,34 @@ def test_controller_executes_jacobian_step(controller):
         controller._search_state
         is SearchState.JACOBIAN_APPLY
     )
+
+def test_position():
+    motors = [
+        RecordingMotor(position=10.0),
+        RecordingMotor(position=20.0),
+        RecordingMotor(position=30.0),
+    ]
+
+    executor = MotorExecutor(motors)
+
+    assert executor.position(1) == 20.0
+
+    motors[1].position = 25.0
+
+    assert executor.position(1) == 25.0
+
+
+def test_positions():
+    motors = [
+        RecordingMotor(position=10.0),
+        RecordingMotor(position=20.0),
+        RecordingMotor(position=30.0),
+    ]
+
+    executor = MotorExecutor(motors)
+
+    assert executor.positions() == (
+        10.0,
+        20.0,
+        30.0,
+    )
