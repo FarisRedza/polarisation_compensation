@@ -3,6 +3,7 @@ import typing
 import enum
 
 from .config import JogSearchConfig
+from .measurement import Observation
 
 
 class JogDirection(enum.Enum):
@@ -85,12 +86,20 @@ class JogSearch:
     def record_measurement(
         self,
         *,
-        score: float,
-        acceptance_score: float,
+        observation: Observation,
+        target_qber: float,
+        target_qx: float,
         position: float,
         direction: JogDirection,
     ) -> JogAction:
-        """Evaluate a rolling-jog measurement and choose the next action."""
+        """Evaluate a rolling-jog observation and choose the next action."""
+
+        score = observation.score
+
+        acceptance_score = max(
+            observation.qber / target_qber,
+            observation.qx / target_qx,
+        )
 
         state = self.state
 
@@ -182,10 +191,12 @@ class JogSearch:
     def begin_line(
         self,
         *,
-        score: float,
+        observation: Observation,
         position: float,
     ) -> None:
-        """Initialize a line from a stationary reference measurement."""
+        """Initialise a line from a stationary reference measurement."""
+
+        score = observation.score
         state = self.state
 
         if state.waveplate_index == 0:

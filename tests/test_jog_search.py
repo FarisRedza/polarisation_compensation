@@ -1,5 +1,6 @@
 import dataclasses
 
+from polcomp.measurement import make_observation
 from polcomp.config import JogSearchConfig
 from polcomp.jog_search import (
     JogSearch,
@@ -19,6 +20,17 @@ def make_search() -> JogSearch:
     state.best_position = 10.0
 
     return search
+
+def make_test_observation(
+    *,
+    score: float,
+    acceptance_score: float = 1.1,
+):
+    return make_observation(
+        qber=acceptance_score * 0.05,
+        qx=0.0,
+        score=score,
+    )
 
 
 def test_initial_state():
@@ -111,8 +123,12 @@ def test_positive_improvement():
     search = make_search()
 
     action = search.record_measurement(
-        score=0.8,
-        acceptance_score=1.1,
+        observation=make_test_observation(
+            score=0.8,
+            acceptance_score=1.1,
+        ),
+        target_qber=0.05,
+        target_qx=0.05,
         position=12.0,
         direction=JogDirection.POSITIVE,
     )
@@ -128,9 +144,14 @@ def test_positive_jog_reverses():
     for _ in range(
         search.config.worsening_measurements
     ):
+
         action = search.record_measurement(
-            score=1.2,
-            acceptance_score=1.2,
+            observation=make_test_observation(
+                score=1.2,
+                acceptance_score=1.2,
+            ),
+            target_qber=0.05,
+            target_qx=0.05,
             position=12.0,
             direction=JogDirection.POSITIVE,
         )
@@ -142,8 +163,12 @@ def test_positive_jog_returns_to_best():
     search = make_search()
 
     search.record_measurement(
-        score=0.8,
-        acceptance_score=1.1,
+        observation=make_test_observation(
+            score=0.8,
+            acceptance_score=1.1,
+        ),
+        target_qber=0.05,
+        target_qx=0.05,
         position=12.0,
         direction=JogDirection.POSITIVE,
     )
@@ -152,8 +177,12 @@ def test_positive_jog_returns_to_best():
         search.config.worsening_measurements
     ):
         action = search.record_measurement(
-            score=0.9,
-            acceptance_score=1.1,
+            observation=make_test_observation(
+                score=0.9,
+                acceptance_score=1.1,
+            ),
+            target_qber=0.05,
+            target_qx=0.05,
             position=14.0,
             direction=JogDirection.POSITIVE,
         )
@@ -165,8 +194,12 @@ def test_negative_jog_finishes():
     search = make_search()
 
     search.record_measurement(
-        score=0.7,
-        acceptance_score=1.1,
+        observation=make_test_observation(
+            score=0.7,
+            acceptance_score=1.1,
+        ),
+        target_qber=0.05,
+        target_qx=0.05,
         position=8.0,
         direction=JogDirection.NEGATIVE,
     )
@@ -175,8 +208,12 @@ def test_negative_jog_finishes():
         search.config.worsening_measurements
     ):
         action = search.record_measurement(
-            score=0.9,
-            acceptance_score=1.1,
+            observation=make_test_observation(
+                score=0.9,
+                acceptance_score=1.1,
+            ),
+            target_qber=0.05,
+            target_qx=0.05,
             position=7.0,
             direction=JogDirection.NEGATIVE,
         )
@@ -188,8 +225,12 @@ def test_candidate_acceptance():
     search = make_search()
 
     action = search.record_measurement(
-        score=0.7,
-        acceptance_score=0.8,
+        observation=make_test_observation(
+            score=0.7,
+            acceptance_score=0.8,
+        ),
+        target_qber=0.05,
+        target_qx=0.05,
         position=12.0,
         direction=JogDirection.POSITIVE,
     )
@@ -201,8 +242,12 @@ def test_equal_score_counts_as_worsening():
     search = make_search()
 
     action = search.record_measurement(
-        score=1.0,
-        acceptance_score=1.1,
+        observation=make_test_observation(
+            score=1.0,
+            acceptance_score=1.1,
+        ),
+        target_qber=0.05,
+        target_qx=0.05,
         position=12.0,
         direction=JogDirection.POSITIVE,
     )
@@ -215,7 +260,7 @@ def test_begin_line_initializes_reference():
     search = JogSearch(JogSearchConfig())
 
     search.begin_line(
-        score=1.5,
+        observation=make_test_observation(score=1.5),
         position=20.0,
     )
 
@@ -234,14 +279,14 @@ def test_begin_line_preserves_cycle_start():
     search = JogSearch(JogSearchConfig())
 
     search.begin_line(
-        score=1.5,
+        observation=make_test_observation(score=1.5),
         position=10.0,
     )
 
     search.state.waveplate_index = 1
 
     search.begin_line(
-        score=1.2,
+        observation=make_test_observation(score=1.2),
         position=20.0,
     )
 
@@ -397,3 +442,48 @@ def test_reset_line_clears_position_tracking():
     assert search.state.measurement_position is None
     assert search.state.measurement_start_position is None
     assert search.state.measurement_end_position is None
+
+def test_acceptance_uses_both_error_targets():
+    search = make_search()
+
+    observation = make_observation(
+        qber=0.01,
+        qx=0.06,
+        score=0.5,
+    )
+
+    action = search.record_measurement(
+        observation=observation,
+        target_qber=0.05,
+        target_qx=0.05,
+        position=12.0,
+        direction=JogDirection.POSITIVE,
+    )
+
+    # Qx exceeds its target:
+    # max(0.01 / 0.05, 0.06 / 0.05) = 1.2.
+    #
+    # The candidate must not be accepted merely because
+    # its search score is low.
+
+    assert action.type is JogActionType.CONTINUE
+
+def test_acceptable_observation_returns_to_lock():
+    search = make_search()
+
+    observation = make_observation(
+        qber=0.02,
+        qx=0.03,
+        score=0.5,
+    )
+
+    action = search.record_measurement(
+        observation=observation,
+        target_qber=0.05,
+        target_qx=0.05,
+        position=12.0,
+        direction=JogDirection.POSITIVE,
+    )
+
+    assert action.type is JogActionType.RETURN_TO_LOCK
+    assert action.position == 12.0

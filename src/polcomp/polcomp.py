@@ -540,7 +540,7 @@ class PolCompController:
                 return
 
             self._jog_search.begin_line(
-                score=observation.score,
+                observation=observation,
                 position=self.search_waveplate.position,
             )
 
@@ -646,10 +646,6 @@ class PolCompController:
             end_position=window_end_position,
         )
 
-        acceptance_score = self.objective(
-            qber=observation.qber,
-            qx=observation.qx,
-        )
         self._score = observation.score
 
         if self._search_state is SearchState.JOG_POSITIVE:
@@ -662,8 +658,9 @@ class PolCompController:
             )
 
         action = self._jog_search.record_measurement(
-            score=observation.score,
-            acceptance_score=acceptance_score,
+            observation=observation,
+            target_qber=self.target_qber,
+            target_qx=self.target_qx,
             position=measurement_position,
             direction=direction,
         )
