@@ -14,9 +14,13 @@ from .jacobian_search import (
 from .jog_search import (
     JogSearch,
     JogActionType,
-    JogDirection
+    JogDirection,
 )
-from .measurement import aggregate_bb84_measurements
+from .measurement import (
+    Observation,
+    make_observation,
+    aggregate_bb84_measurements,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -517,19 +521,24 @@ class PolCompController:
             if len(self._search_results) < self.search_measurements:
                 return
 
-            qber, qx = self._aggregate_results(self._search_results)
+            observation = self._observe_results(
+                self._search_results,
+                search=True,
+            )
             self._search_results.clear()
 
-            score = self.search_objective(qber=qber, qx=qx)
-            self._score = score
+            self._score = observation.score
 
-            if self.target_reached(qber=qber, qx=qx):
+            if self.target_reached(
+                qber=observation.qber,
+                qx=observation.qx
+            ):
                 self._lock_results.clear()
                 self.state = CompensationState.LOCK
                 return
 
             self._jog_search.begin_line(
-                score=score,
+                score=observation.score,
                 position=self.search_waveplate.position,
             )
 
@@ -545,23 +554,28 @@ class PolCompController:
         if len(self._search_results) < self.search_measurements:
             return
 
-        qber, qx = self._aggregate_results(self._search_results)
+        observation = self._observe_results(
+            self._search_results,
+            search=True,
+        )
         self._search_results.clear()
 
-        score = self.search_objective(qber=qber, qx=qx)
-        self._score = score
+        self._score = observation.score
 
-        if self.target_reached(qber=qber, qx=qx):
+        if self.target_reached(
+            qber=observation.qber, 
+            qx=observation.qx
+        ):
             self._lock_results.clear()
             self.state = CompensationState.LOCK
             return
 
         action = self._jacobian_search.begin_iteration(
             baseline_errors=(
-                qber / self.target_qber,
-                qx / self.target_qx,
+                observation.qber / self.target_qber,
+                observation.qx / self.target_qx,
             ),
-            baseline_score=score,
+            baseline_score=observation.score,
             baseline_positions=tuple(
                 waveplate.position
                 for waveplate in self.waveplates
@@ -611,8 +625,9 @@ class PolCompController:
             for item in self._search_jog_results
         ]
 
-        qber, qx = self._aggregate_results(
-            window_results
+        observation = self._observe_results(
+            window_results,
+            search=True,
         )
 
         window_start_position = (
@@ -631,15 +646,11 @@ class PolCompController:
             end_position=window_end_position,
         )
 
-        score = self.search_objective(
-            qber=qber,
-            qx=qx,
-        )
         acceptance_score = self.objective(
-            qber=qber,
-            qx=qx,
+            qber=observation.qber,
+            qx=observation.qx,
         )
-        self._score = score
+        self._score = observation.score
 
         if self._search_state is SearchState.JOG_POSITIVE:
             direction = JogDirection.POSITIVE
@@ -651,7 +662,7 @@ class PolCompController:
             )
 
         action = self._jog_search.record_measurement(
-            score=score,
+            score=observation.score,
             acceptance_score=acceptance_score,
             position=measurement_position,
             direction=direction,
@@ -769,19 +780,17 @@ class PolCompController:
         ):
             return
 
-        qber, qx = self._aggregate_results(
-            self._lock_results
+        observation = self._observe_results(
+            self._lock_results,
+            search=False,
         )
         self._lock_results.clear()
 
-        self._score = self.objective(
-            qber=qber,
-            qx=qx,
-        )
+        self._score = observation.score
 
         if self.target_reached(
-            qber=qber,
-            qx=qx,
+            qber=observation.qber,
+            qx=observation.qx,
         ):
             self.state = CompensationState.COMPLETE
         else:
@@ -804,6 +813,33 @@ class PolCompController:
         )
 
         return measurement.qber, measurement.qx
+
+    def _observe_results(
+        self,
+        results: typing.Sequence[BB84DetectionResult],
+        *,
+        search: bool,
+    ) -> Observation:
+        """Create an observation from an aggregated measurement window."""
+
+        qber, qx = self._aggregate_results(results)
+
+        if search:
+            score = self.search_objective(
+                qber=qber,
+                qx=qx,
+            )
+        else:
+            score = self.objective(
+                qber=qber,
+                qx=qx,
+            )
+
+        return make_observation(
+            qber=qber,
+            qx=qx,
+            score=score,
+        )
 
     def _execute_jacobian_action(
         self,
