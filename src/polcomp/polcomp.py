@@ -21,6 +21,7 @@ from .measurement import (
     make_observation,
     aggregate_bb84_measurements,
 )
+from .motor_execution import MotorExecutor
 
 
 @dataclasses.dataclass(frozen=True)
@@ -151,6 +152,9 @@ class PolCompController:
             self.hwp,
             self.qwp2,
         )
+        self._motor_executor = MotorExecutor(
+            self.waveplates
+        )
 
         self.measurements = measurements
         self.config = (
@@ -275,19 +279,14 @@ class PolCompController:
         self._lock_results.clear()
 
     def stop(self) -> None:
-        for waveplate in self.waveplates:
-            if waveplate.is_moving:
-                waveplate.stop()
+        self._motor_executor.stop_moving()
 
         self.active = False
         self.state = CompensationState.IDLE
 
     @property
     def is_moving(self) -> bool:
-        return any(
-            waveplate.is_moving
-            for waveplate in self.waveplates
-        )
+        return self._motor_executor.is_moving
 
     @property
     def status(
@@ -725,7 +724,8 @@ class PolCompController:
             position=self.search_waveplate.position,
         )
 
-        self.search_waveplate.jog(
+        self._motor_executor.jog(
+            index=self._jog_search.state.waveplate_index,
             direction=direction,
             max_velocity=self.search_jog_velocity,
         )
@@ -738,8 +738,10 @@ class PolCompController:
         position: float,
         state: SearchState,
     ) -> None:
-        self.search_waveplate.stop()
-        self.search_waveplate.move_to(position)
+        self._motor_executor.stop_and_move_to(
+            index=self._jog_search.state.waveplate_index,
+            position=position,
+        )
 
         self._search_state = state
         self._jog_search.begin_return()
@@ -851,8 +853,9 @@ class PolCompController:
             assert action.motor_index is not None
             assert action.position is not None
 
-            self.waveplates[action.motor_index].move_to(
-                action.position
+            self._motor_executor.move_to(
+                index=action.motor_index,
+                position=action.position,
             )
 
             return
@@ -860,13 +863,9 @@ class PolCompController:
         if action.type is JacobianActionType.APPLY_STEP:
             assert action.step is not None
 
-            for waveplate, delta in zip(
-                self.waveplates,
-                action.step,
-            ):
-                waveplate.move_to(
-                    waveplate.position + delta
-                )
+            self._motor_executor.apply_step(
+                action.step
+            )
 
             self._jacobian_search.state.iteration += 1
             self._search_state = SearchState.JACOBIAN_APPLY

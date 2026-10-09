@@ -1,21 +1,8 @@
-from unittest.mock import Mock
-
 import pytest
 import qtoolkit
 
 from polcomp import measurement
 import polcomp.polcomp as controller_module
-
-
-@pytest.fixture
-def controller():
-    """Construct a controller without running a simulation."""
-    return controller_module.PolCompController(
-        qwp1=Mock(),
-        hwp=Mock(),
-        qwp2=Mock(),
-        measurements=Mock(),
-    )
 
 
 def test_search_observation_uses_search_objective(
