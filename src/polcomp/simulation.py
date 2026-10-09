@@ -10,6 +10,7 @@ import motor
 import qtoolkit
 from qtoolkit.polarisation import Waveplate
 
+from .acquisition import BB84MeasurementSource
 from .polcomp import BB84DetectionResult
 from .measurement import measurement_counts_from_result
 
@@ -527,7 +528,7 @@ class TimetagSource(typing.Protocol):
         ...
 
 
-class SimulatedTimetagger:
+class SimulatedTimetagger(BB84MeasurementSource):
     def __init__(
         self,
         source: TimetagSource,
