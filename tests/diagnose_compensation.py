@@ -171,6 +171,18 @@ def sample_to_row(
         'correction_actual_improvement': (
             correction.actual_improvement if correction else None
         ),
+        'correction_condition': (
+            correction.condition if correction is not None else None
+        ),
+        'correction_step_qwp1_deg': (
+            correction.step[0] if correction is not None else None
+        ),
+        'correction_step_hwp_deg': (
+            correction.step[1] if correction is not None else None
+        ),
+        'correction_step_qwp2_deg': (
+            correction.step[2] if correction is not None else None
+        ),
     }
 
 

@@ -14,6 +14,7 @@ class JacobianCorrection:
     predicted_score: float
     measured_score: float
     step: Vector3
+    condition: float | None = None
 
     @property
     def predicted_improvement(self) -> float:

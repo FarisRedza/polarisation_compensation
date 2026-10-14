@@ -175,7 +175,7 @@ def plot_step_accuracy(
     output: Path,
 ) -> None:
     if 'step_magnitude_deg' not in corrections:
-        return
+        raise ValueError('Missing correction step data: regenerate diagnostic traces')
 
     fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -206,6 +206,40 @@ def plot_step_accuracy(
     ax.legend()
     fig.tight_layout()
 
+    fig.savefig(output, dpi=150)
+    plt.close(fig)
+
+
+def plot_condition_accuracy(
+    corrections: pd.DataFrame,
+    output: Path,
+) -> None:
+    """Plot correction prediction error against Jacobian conditioning."""
+    if 'correction_condition' not in corrections:
+        raise ValueError('Missing correction_condition: regenerate diagnostic traces')
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for completed, group in corrections.groupby('completed'):
+        error = (
+            group['correction_predicted_improvement']
+            - group['correction_actual_improvement']
+        )
+        ax.scatter(
+            group['correction_condition'],
+            error,
+            label='COMPLETE' if completed else 'TIMEOUT',
+            alpha=0.65,
+        )
+
+    ax.axhline(0, linestyle='--', alpha=0.6)
+    ax.set(
+        title='Jacobian Prediction Error vs Condition Number',
+        xlabel='Jacobian condition number',
+        ylabel='Predicted minus actual improvement',
+    )
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
     fig.savefig(output, dpi=150)
     plt.close(fig)
 
@@ -250,6 +284,11 @@ def main() -> None:
         plot_step_accuracy(
             corrections,
             args.output / 'step_accuracy.png',
+        )
+
+        plot_condition_accuracy(
+            corrections,
+            args.output / 'condition_accuracy.png',
         )
 
     print(f'\nResults written to {args.output}')

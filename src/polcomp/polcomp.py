@@ -202,7 +202,7 @@ class PolCompController:
         ] = []
 
         self._pending_jacobian_correction: (
-            tuple[int, float, float, tuple[float, float, float]]
+            tuple[int, float, float, tuple[float, float, float], float | None]
             | None
         ) = None
 
@@ -569,6 +569,7 @@ class PolCompController:
                 baseline_score,
                 predicted_score,
                 step,
+                condition,
             ) = self._pending_jacobian_correction
 
             self._last_jacobian_correction = JacobianCorrection(
@@ -577,6 +578,7 @@ class PolCompController:
                 predicted_score=predicted_score,
                 measured_score=observation.score,
                 step=step,
+                condition=condition,
             )
 
             self._pending_jacobian_correction = None
@@ -899,6 +901,7 @@ class PolCompController:
                     jacobian_state.baseline_score,
                     jacobian_state.predicted_score,
                     action.step,
+                    jacobian_state.condition,
                 )
             else:
                 self._pending_jacobian_correction = None
