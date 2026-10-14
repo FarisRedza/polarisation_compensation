@@ -232,3 +232,6 @@ PKG_SOURCE/
 devcontainer-lock.json
 
 logs/
+compensation_characterisation.csv
+compensation_traces/
+jacobian_analysis/
