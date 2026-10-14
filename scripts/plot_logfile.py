@@ -6,6 +6,36 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+BENCHMARK_COLUMNS = {
+    'elapsed_s',
+    'controller_state',
+    'search_state',
+    'qber',
+    'qx',
+    'search_rms',
+    'acceptance_score',
+    'jacobian_iteration',
+    'jacobian_condition',
+    'jacobian_fallback_count',
+    'qwp1_deg',
+    'hwp_deg',
+    'qwp2_deg',
+}
+
+
+def load_benchmark_trace(filename: Path) -> pd.DataFrame:
+    data = pd.read_csv(filename)
+
+    missing = BENCHMARK_COLUMNS - set(data.columns)
+
+    if missing:
+        raise ValueError(
+            'Benchmark trace is missing required columns: '
+            + ', '.join(sorted(missing))
+        )
+
+    return data
+
 def load_log(
     filename: Path,
 ) -> pd.DataFrame:
@@ -85,6 +115,121 @@ def add_target_line(
         alpha=0.6,
         label=f'Target ({target:.1%})',
     )
+
+def plot_benchmark_trace(
+    data: pd.DataFrame,
+    *,
+    target: float = 0.05,
+) -> None:
+    time_s = data['elapsed_s']
+
+    # Error convergence
+    fig, ax = plt.subplots(figsize=(11, 5))
+
+    ax.plot(time_s, data['qber'] * 100, label='QBER')
+    ax.plot(time_s, data['qx'] * 100, label='Qx')
+
+    ax.axhline(
+        target * 100,
+        linestyle='--',
+        alpha=0.6,
+        label=f'Target ({target:.1%})',
+    )
+
+    ax.set(
+        title='Benchmark: Polarisation Errors',
+        xlabel='Simulated Time (s)',
+        ylabel='Error (%)',
+    )
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+
+    # Objective convergence
+    fig, ax = plt.subplots(figsize=(11, 5))
+
+    ax.plot(
+        time_s,
+        data['search_rms'],
+        label='SEARCH RMS',
+    )
+    ax.plot(
+        time_s,
+        data['acceptance_score'],
+        label='Acceptance score',
+    )
+
+    ax.axhline(
+        1.0,
+        linestyle='--',
+        alpha=0.6,
+        label='Acceptance threshold',
+    )
+
+    ax.set(
+        title='Benchmark: Compensation Objectives',
+        xlabel='Simulated Time (s)',
+        ylabel='Normalised Score',
+    )
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+
+    # Motor trajectories
+    fig, ax = plt.subplots(figsize=(11, 5))
+
+    for column, label in (
+        ('qwp1_deg', 'QWP1'),
+        ('hwp_deg', 'HWP'),
+        ('qwp2_deg', 'QWP2'),
+    ):
+        ax.plot(
+            time_s,
+            data[column],
+            label=label,
+        )
+
+    ax.set(
+        title='Benchmark: Compensation Waveplates',
+        xlabel='Simulated Time (s)',
+        ylabel='Position (deg)',
+    )
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+
+    # Jacobian diagnostics
+    fig, ax = plt.subplots(figsize=(11, 5))
+
+    ax.plot(
+        time_s,
+        data['jacobian_condition'],
+        label='Jacobian condition',
+    )
+
+    fallback_events = data[
+        data['jacobian_fallback_count']
+        .diff()
+        .fillna(0)
+        > 0
+    ]
+
+    for index, (_, row) in enumerate(fallback_events.iterrows()):
+        ax.axvline(
+            row['elapsed_s'],
+            linestyle=':',
+            alpha=0.6,
+            label='Fallback' if index == 0 else None,
+        )
+
+    ax.set(
+        title='Benchmark: Jacobian Diagnostics',
+        xlabel='Simulated Time (s)',
+        ylabel='Condition Number',
+    )
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
 
 def plot_errors(
     data: pd.DataFrame,
@@ -869,6 +1014,21 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    data = pd.read_csv(args.log)
+
+    if BENCHMARK_COLUMNS.issubset(data.columns):
+        print(f'Loaded benchmark trace: {args.log}')
+
+        plot_benchmark_trace(
+            data,
+            target=args.target,
+        )
+
+        plt.show()
+        return
+
+    data = load_log(args.log)
 
     data = load_log(
         args.log
