@@ -27,6 +27,8 @@ from .objectives import (
     search_score,
     targets_satisfied,
 )
+from .lock import LockDecision, evaluate_lock
+
 
 @dataclasses.dataclass(frozen=True)
 class BB84DetectionResult:
@@ -771,12 +773,16 @@ class PolCompController:
 
         self._score = observation.score
 
-        if self.target_reached(
-            qber=observation.qber,
-            qx=observation.qx,
-        ):
+        decision = evaluate_lock(
+            observation=observation,
+            target_qber=self.target_qber,
+            target_qx=self.target_qx,
+        )
+
+        if decision is LockDecision.COMPLETE:
             self.state = CompensationState.COMPLETE
-        else:
+
+        elif decision is LockDecision.RETRY_SEARCH:
             # A failed LOCK returns to a fresh line search from the
             # current, stationary position.
             self._using_jog_fallback = False
@@ -784,6 +790,11 @@ class PolCompController:
             self._reset_search_line()
             self._search_results.clear()
             self.state = CompensationState.SEARCH
+
+        else:
+            raise ValueError(
+                f'Unexpected LOCK decision: {decision}'
+            )
 
     def _aggregate_results(
         self,
