@@ -22,6 +22,10 @@ from polcomp import (
     SimulatedMotor,
     PolCompController,
 )
+from polcomp.config import (
+    PolCompConfig,
+    LockConfig,
+)
 
 SEARCH_WAVEPLATE_NAMES = (
     'QWP1',
@@ -214,9 +218,13 @@ controller = PolCompController(
     hwp=compensation_hwp,
     qwp2=compensation_qwp2,
     measurements=measurements,
-    target_qber=0.05,
-    target_qx=0.05,
-    lock_measurements=5
+    config=PolCompConfig(
+        target_qber=0.05,
+        target_qx=0.05,
+        lock=LockConfig(
+            measurements=5,
+        ),
+    ),
 )
 
 # Coincidence definitions
