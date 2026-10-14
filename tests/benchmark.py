@@ -25,6 +25,7 @@ from polcomp.simulation import (
     RealTimeClock,
     SimulationClock
 )
+from polcomp.jacobian_search import JacobianCorrection
 
 
 INTERVAL_S = 0.1
@@ -55,6 +56,7 @@ class BenchmarkSample:
         tuple[float, float, float]
     ]
     controller_score: typing.Optional[float]
+    jacobian_correction: JacobianCorrection | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -494,6 +496,7 @@ def run_compensation_benchmark(
                         else None
                     ),
                     controller_score=status.score,
+                    jacobian_correction=status.last_jacobian_correction,
                 )
             )
 

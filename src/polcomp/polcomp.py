@@ -7,6 +7,7 @@ import qtoolkit
 
 from .config import PolCompConfig
 from .jacobian_search import (
+    JacobianCorrection,
     JacobianSearch,
     JacobianAction,
     JacobianActionType,
@@ -112,6 +113,7 @@ class PolCompStatus:
 
     is_moving: bool
 
+    last_jacobian_correction: JacobianCorrection | None
 
 
 class PolCompController:
@@ -199,6 +201,13 @@ class PolCompController:
             BB84DetectionResult
         ] = []
 
+        self._pending_jacobian_correction: (
+            tuple[int, float, float, tuple[float, float, float]]
+            | None
+        ) = None
+
+        self._last_jacobian_correction: JacobianCorrection | None = None
+
     @property
     def search_measurements(self) -> int:
         return self.config.jog.reference_measurements
@@ -281,6 +290,8 @@ class PolCompController:
         self._search_state = SearchState.START
 
         self._jacobian_search.reset()
+        self._pending_jacobian_correction = None
+        self._last_jacobian_correction = None
         self._using_jog_fallback = False
 
         self._jog_search.reset()
@@ -344,6 +355,7 @@ class PolCompController:
                 self._jog_search.state.measurement_end_position
             ),
             is_moving=self.is_moving,
+            last_jacobian_correction=self._last_jacobian_correction,
         )
 
     def objective(
@@ -551,6 +563,24 @@ class PolCompController:
         self._search_results.clear()
 
         self._score = observation.score
+        if self._pending_jacobian_correction is not None:
+            (
+                iteration,
+                baseline_score,
+                predicted_score,
+                step,
+            ) = self._pending_jacobian_correction
+
+            self._last_jacobian_correction = JacobianCorrection(
+                iteration=iteration,
+                baseline_score=baseline_score,
+                predicted_score=predicted_score,
+                measured_score=observation.score,
+                step=step,
+            )
+
+            self._pending_jacobian_correction = None
+
 
         if self.target_reached(
             qber=observation.qber, 
@@ -858,11 +888,24 @@ class PolCompController:
         if action.type is JacobianActionType.APPLY_STEP:
             assert action.step is not None
 
-            self._motor_executor.apply_step(
-                action.step
-            )
+            jacobian_state = self._jacobian_search.state
 
-            self._jacobian_search.state.iteration += 1
+            if (
+                jacobian_state.baseline_score is not None
+                and jacobian_state.predicted_score is not None
+            ):
+                self._pending_jacobian_correction = (
+                    jacobian_state.iteration + 1,
+                    jacobian_state.baseline_score,
+                    jacobian_state.predicted_score,
+                    action.step,
+                )
+            else:
+                self._pending_jacobian_correction = None
+
+            self._motor_executor.apply_step(action.step)
+
+            jacobian_state.iteration += 1
             self._search_state = SearchState.JACOBIAN_APPLY
             return
 

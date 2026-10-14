@@ -7,6 +7,23 @@ from .jacobian import JacobianSolver, Vector2, Vector3
 from .measurement import Observation
 
 
+@dataclasses.dataclass(frozen=True)
+class JacobianCorrection:
+    iteration: int
+    baseline_score: float
+    predicted_score: float
+    measured_score: float
+    step: Vector3
+
+    @property
+    def predicted_improvement(self) -> float:
+        return self.baseline_score - self.predicted_score
+
+    @property
+    def actual_improvement(self) -> float:
+        return self.baseline_score - self.measured_score
+
+
 class JacobianActionType(enum.Enum):
     MOVE_TO = enum.auto()
     APPLY_STEP = enum.auto()

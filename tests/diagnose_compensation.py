@@ -95,6 +95,7 @@ def generate_cases(
 def sample_to_row(
     sample: BenchmarkSample,
 ) -> dict[str, typing.Any]:
+    correction = sample.jacobian_correction
     return {
         'elapsed_s': sample.elapsed_s,
         'controller_state': (
@@ -151,6 +152,24 @@ def sample_to_row(
             sample.jacobian_step[2]
             if sample.jacobian_step is not None
             else None
+        ),
+        'correction_iteration': (
+            correction.iteration if correction else None
+        ),
+        'correction_baseline_score': (
+            correction.baseline_score if correction else None
+        ),
+        'correction_predicted_score': (
+            correction.predicted_score if correction else None
+        ),
+        'correction_measured_score': (
+            correction.measured_score if correction else None
+        ),
+        'correction_predicted_improvement': (
+            correction.predicted_improvement if correction else None
+        ),
+        'correction_actual_improvement': (
+            correction.actual_improvement if correction else None
         ),
     }
 

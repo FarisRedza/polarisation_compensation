@@ -3,6 +3,7 @@ import pytest
 from polcomp.measurement import make_observation
 from polcomp.config import JacobianSearchConfig
 from polcomp.jacobian_search import (
+    JacobianCorrection,
     JacobianSearch,
     JacobianSearchState,
     JacobianActionType
@@ -137,3 +138,15 @@ def test_observation_normalisation():
     assert errors == pytest.approx(
         (0.5, 2.0)
     )
+
+def test_jacobian_correction_improvement():
+    correction = JacobianCorrection(
+        iteration=2,
+        baseline_score=2.0,
+        predicted_score=1.2,
+        measured_score=1.5,
+        step=(2.0, -1.0, 0.5),
+    )
+
+    assert correction.predicted_improvement == pytest.approx(0.8)
+    assert correction.actual_improvement == pytest.approx(0.5)
