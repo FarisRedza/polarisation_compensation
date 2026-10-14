@@ -129,6 +129,29 @@ def sample_to_row(
         'qwp2_deg': (
             sample.compensation_positions[2]
         ),
+        'controller_score': sample.controller_score,
+
+        'jacobian_predicted_score': (
+            sample.jacobian_predicted_score
+        ),
+
+        'jacobian_step_qwp1_deg': (
+            sample.jacobian_step[0]
+            if sample.jacobian_step is not None
+            else None
+        ),
+
+        'jacobian_step_hwp_deg': (
+            sample.jacobian_step[1]
+            if sample.jacobian_step is not None
+            else None
+        ),
+
+        'jacobian_step_qwp2_deg': (
+            sample.jacobian_step[2]
+            if sample.jacobian_step is not None
+            else None
+        ),
     }
 
 

@@ -38,14 +38,23 @@ class BenchmarkSample:
     elapsed_s: float
     controller_state: str
     search_state: typing.Optional[str]
+
     qber: float
     qx: float
     search_score: float
     acceptance_score: float
+
     jacobian_iteration: int
     jacobian_condition: typing.Optional[float]
     jacobian_fallback_count: int
+
     compensation_positions: tuple[float, float, float]
+
+    jacobian_predicted_score: typing.Optional[float]
+    jacobian_step: typing.Optional[
+        tuple[float, float, float]
+    ]
+    controller_score: typing.Optional[float]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -470,6 +479,21 @@ def run_compensation_benchmark(
                         status.jacobian_fallback_count
                     ),
                     compensation_positions=positions,
+                    jacobian_predicted_score=(
+                        status.jacobian_predicted_score
+                    ),
+                    jacobian_step=(
+                        (
+                            status.jacobian_step_qwp1,
+                            status.jacobian_step_hwp,
+                            status.jacobian_step_qwp2,
+                        )
+                        if status.jacobian_step_qwp1 is not None
+                        and status.jacobian_step_hwp is not None
+                        and status.jacobian_step_qwp2 is not None
+                        else None
+                    ),
+                    controller_score=status.score,
                 )
             )
 
