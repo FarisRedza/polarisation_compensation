@@ -22,7 +22,11 @@ from .measurement import (
     aggregate_bb84_measurements,
 )
 from .motor_execution import MotorExecutor
-
+from .objectives import (
+    acceptance_score,
+    search_score,
+    targets_satisfied,
+)
 
 @dataclasses.dataclass(frozen=True)
 class BB84DetectionResult:
@@ -345,14 +349,11 @@ class PolCompController:
         qber: float,
         qx: float,
     ) -> float:
-        """
-        score < 1.0  -> both targets satisfied
-        score = 1.0  -> exactly at one target
-        score > 1.0  -> at least one target exceeded
-        """
-        return max(
-            qber / self.target_qber,
-            qx / self.target_qx,
+        return acceptance_score(
+            qber=qber,
+            qx=qx,
+            target_qber=self.target_qber,
+            target_qx=self.target_qx,
         )
 
     def search_objective(
@@ -360,43 +361,23 @@ class PolCompController:
         qber: float,
         qx: float,
     ) -> float:
-        """Return the smooth objective used to guide SEARCH.
-
-        The RMS of the two normalised BB84 errors rewards reductions in
-        either basis while still weighting the larger error more strongly
-        than a simple arithmetic mean. Unlike ``objective()``, it does not
-        develop a hard ridge when QBER and Qx exchange which is larger.
-
-        This value is only used to choose SEARCH directions and positions.
-        Candidate acceptance and LOCK continue to use ``objective()`` so
-        both QBER and Qx must satisfy their individual targets.
-        """
-        qber_normalised = (
-            qber / self.target_qber
+        return search_score(
+            qber=qber,
+            qx=qx,
+            target_qber=self.target_qber,
+            target_qx=self.target_qx,
         )
-        qx_normalised = (
-            qx / self.target_qx
-        )
-
-        return (
-            (
-                qber_normalised ** 2
-                + qx_normalised ** 2
-            )
-            / 2
-        ) ** 0.5
 
     def target_reached(
         self,
         qber: float,
         qx: float,
     ) -> bool:
-        return (
-            self.objective(
-                qber,
-                qx,
-            )
-            <= 1
+        return targets_satisfied(
+            qber=qber,
+            qx=qx,
+            target_qber=self.target_qber,
+            target_qx=self.target_qx,
         )
 
     def update(
