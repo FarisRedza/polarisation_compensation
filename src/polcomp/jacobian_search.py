@@ -5,6 +5,7 @@ import enum
 from .config import JacobianSearchConfig
 from .jacobian import JacobianSolver, Vector2, Vector3
 from .measurement import Observation
+from .adaptive_step import AdaptiveStepPolicy
 
 
 @dataclasses.dataclass(frozen=True)
@@ -75,10 +76,32 @@ class JacobianSearch:
         self.config = config
         self.solver = JacobianSolver(config)
         self.state = JacobianSearchState()
+        self._adaptive_step = (
+            AdaptiveStepPolicy()
+            if config.adaptive_step
+            else None
+        )
+
+        if config.adaptive_step and config.max_total_step_deg != 15.0:
+            raise ValueError(
+                'Adaptive step sizing currently requires '
+                'max_total_step_deg=15.0'
+            )
+
+    @property
+    def max_total_step_deg(self) -> float:
+        """Return the current permitted correction magnitude."""
+        if self._adaptive_step is not None:
+            return self._adaptive_step.max_total_step_deg
+
+        return self.config.max_total_step_deg
 
     def reset(self) -> None:
         """Reset all Jacobian state for a new compensation run."""
         self.state = JacobianSearchState()
+
+        if self._adaptive_step is not None:
+            self._adaptive_step.reset()
 
     def reset_iteration(self) -> None:
         """Clear measurements and diagnostics for a new Jacobian."""
@@ -93,6 +116,20 @@ class JacobianSearch:
         state.condition = None
         state.predicted_score = None
         state.step = None
+
+    def record_correction(
+        self,
+        correction: JacobianCorrection,
+    ) -> None:
+        """Update the adaptive limit from a measured correction."""
+
+        if self._adaptive_step is None:
+            return
+
+        self._adaptive_step.update(
+            predicted_improvement=correction.predicted_improvement,
+            actual_improvement=correction.actual_improvement,
+        )
 
     def begin_iteration(
         self,
@@ -193,6 +230,7 @@ class JacobianSearch:
             columns=state.columns,
             baseline_errors=state.baseline_errors,
             baseline_score=state.baseline_score,
+            max_total_step_deg=self.max_total_step_deg,
         )
 
         state.condition = solution.condition

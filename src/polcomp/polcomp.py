@@ -96,6 +96,7 @@ class PolCompStatus:
     jacobian_step_hwp: typing.Optional[float]
     jacobian_step_qwp2: typing.Optional[float]
     jacobian_fallback_count: int
+    jacobian_max_total_step_deg: float
 
     # Compatibility fields retained for the existing tools.
     search_step_deg: typing.Optional[float]
@@ -340,6 +341,9 @@ class PolCompController:
             jacobian_step_hwp=(step[1] if step is not None else None),
             jacobian_step_qwp2=(step[2] if step is not None else None),
             jacobian_fallback_count=self._jacobian_search.state.fallback_count,
+            jacobian_max_total_step_deg=(
+                self._jacobian_search.max_total_step_deg
+            ),
             search_step_deg=None,
             search_retained_improvement=None,
             search_stagnant=False,
@@ -583,6 +587,9 @@ class PolCompController:
 
             self._pending_jacobian_correction = None
 
+            self._jacobian_search.record_correction(
+                self._last_jacobian_correction
+            )
 
         if self.target_reached(
             qber=observation.qber, 

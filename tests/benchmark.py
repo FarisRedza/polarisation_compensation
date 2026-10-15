@@ -26,7 +26,10 @@ from polcomp.simulation import (
     SimulationClock
 )
 from polcomp.jacobian_search import JacobianCorrection
-
+from polcomp.config import (
+    PolCompConfig,
+    JacobianSearchConfig,
+)
 
 INTERVAL_S = 0.1
 PAIR_RATE_HZ = 40_000
@@ -48,6 +51,7 @@ class BenchmarkSample:
     jacobian_iteration: int
     jacobian_condition: typing.Optional[float]
     jacobian_fallback_count: int
+    jacobian_max_total_step_deg: float
 
     compensation_positions: tuple[float, float, float]
 
@@ -239,6 +243,7 @@ def run_compensation_benchmark(
     measurement_time_s: float = MEASUREMENT_TIME_S,
     coincidence_window_ps: int = COINCIDENCE_WINDOW_PS,
     simulated_time: bool = True,
+    adaptive_step: bool = False,
 ) -> BenchmarkResult:
     """Run one accelerated end-to-end compensation benchmark.
 
@@ -365,7 +370,12 @@ def run_compensation_benchmark(
             qwp1=compensation_motors[0],
             hwp=compensation_motors[1],
             qwp2=compensation_motors[2],
-            measurements=measurements
+            measurements=measurements,
+            config=PolCompConfig(
+                jacobian=JacobianSearchConfig(
+                    adaptive_step=adaptive_step,
+                ),
+            ),
         )
 
         samples: list[BenchmarkSample] = []
@@ -479,6 +489,9 @@ def run_compensation_benchmark(
                     ),
                     jacobian_fallback_count=(
                         status.jacobian_fallback_count
+                    ),
+                    jacobian_max_total_step_deg=(
+                        status.jacobian_max_total_step_deg
                     ),
                     compensation_positions=positions,
                     jacobian_predicted_score=(

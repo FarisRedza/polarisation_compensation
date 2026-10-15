@@ -419,6 +419,7 @@ def run_characterisation(
     seed: int,
     timeout_s: float,
     output: pathlib.Path,
+    adaptive_step: bool = False,
 ) -> CharacterisationSummary:
     disturbances = generate_disturbances(
         cases=cases,
@@ -468,6 +469,7 @@ def run_characterisation(
             seed=measurement_seed,
             timeout_s=timeout_s,
             simulated_time=True,
+            adaptive_step=adaptive_step,
         )
 
         results.append(
@@ -600,6 +602,11 @@ def parse_args() -> argparse.Namespace:
             f'(default: {DEFAULT_OUTPUT}).'
         ),
     )
+    parser.add_argument(
+        '--adaptive-step',
+        action='store_true',
+        help='Enable adaptive Jacobian correction limits.',
+    )
 
     return parser.parse_args()
 
@@ -612,6 +619,7 @@ def main() -> None:
         seed=args.seed,
         timeout_s=args.timeout,
         output=args.output,
+        adaptive_step=args.adaptive_step,
     )
 
 

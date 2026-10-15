@@ -33,11 +33,20 @@ def test_diagnostic_csv_exports_correction_fields():
         condition=4.5,
     )
     sample = SimpleNamespace(
-        elapsed_s=1.0, controller_state='SEARCH', search_state='START',
-        qber=0.1, qx=0.2, search_score=2.0, acceptance_score=3.0,
-        controller_score=2.0, jacobian_iteration=2,
-        jacobian_condition=None, jacobian_fallback_count=0,
-        jacobian_predicted_score=None, jacobian_step=None,
+        elapsed_s=1.0,
+        controller_state='SEARCH',
+        search_state='START',
+        qber=0.1,
+        qx=0.2,
+        search_score=2.0,
+        acceptance_score=3.0,
+        controller_score=2.0,
+        jacobian_iteration=2,
+        jacobian_condition=None,
+        jacobian_fallback_count=0,
+        jacobian_max_total_step_deg=15.0,
+        jacobian_predicted_score=None,
+        jacobian_step=None,
         compensation_positions=(0.0, 0.0, 0.0),
         jacobian_correction=correction,
     )
@@ -46,3 +55,4 @@ def test_diagnostic_csv_exports_correction_fields():
     assert row['correction_step_qwp1_deg'] == 5.0
     assert row['correction_step_hwp_deg'] == -10.0
     assert row['correction_step_qwp2_deg'] == 15.0
+    assert row['jacobian_max_total_step_deg'] == 15.0

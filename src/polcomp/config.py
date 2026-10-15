@@ -11,6 +11,7 @@ class JacobianSearchConfig:
     damping: float = 0.05
     max_step_deg: float = 10.0
     max_total_step_deg: float = 15.0
+    adaptive_step: bool = False
 
     min_determinant: float = 1e-6
     min_predicted_improvement: float = 0.02

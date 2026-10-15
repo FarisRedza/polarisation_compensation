@@ -1,5 +1,6 @@
 import dataclasses
 import typing
+import math
 
 from .config import JacobianSearchConfig
 
@@ -38,6 +39,7 @@ class JacobianSolver:
         columns: typing.Sequence[Vector2],
         baseline_errors: Vector2,
         baseline_score: float,
+        max_total_step_deg: float | None = None,
     ) -> JacobianSolution:
         if len(columns) != 3:
             raise ValueError(
@@ -107,8 +109,19 @@ class JacobianSolver:
 
         norm = sum(value * value for value in step) ** 0.5
 
-        if norm > self.config.max_total_step_deg:
-            scale = self.config.max_total_step_deg / norm
+        step_limit = (
+            self.config.max_total_step_deg
+            if max_total_step_deg is None
+            else max_total_step_deg
+        )
+
+        if not math.isfinite(step_limit) or step_limit <= 0:
+            raise ValueError(
+                'max_total_step_deg must be finite and positive'
+            )
+
+        if norm > step_limit:
+            scale = step_limit / norm
             step = [value * scale for value in step]
 
         predicted_z = ez + sum(

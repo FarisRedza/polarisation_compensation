@@ -121,6 +121,9 @@ def sample_to_row(
         'jacobian_fallback_count': (
             sample.jacobian_fallback_count
         ),
+        'jacobian_max_total_step_deg': (
+            sample.jacobian_max_total_step_deg
+        ),
         'qwp1_deg': (
             sample.compensation_positions[0]
         ),
@@ -274,6 +277,7 @@ def replay_case(
     seed: int,
     timeout_s: float,
     trace_dir: pathlib.Path,
+    adaptive_step: bool = False,
 ) -> None:
     if not 1 <= case_number <= cases:
         raise ValueError(
@@ -294,6 +298,7 @@ def replay_case(
         seed=measurement_seed,
         timeout_s=timeout_s,
         simulated_time=True,
+        adaptive_step=adaptive_step,
     )
 
     print(result.summary())
@@ -393,6 +398,11 @@ def parse_args() -> argparse.Namespace:
             f'(default: {DEFAULT_TRACE_DIR}).'
         ),
     )
+    parser.add_argument(
+        '--adaptive-step',
+        action='store_true',
+        help='Enable adaptive Jacobian correction limits.',
+    )
 
     return parser.parse_args()
 
@@ -406,6 +416,7 @@ def main() -> None:
         seed=args.seed,
         timeout_s=args.timeout,
         trace_dir=args.trace_dir,
+        adaptive_step=args.adaptive_step,
     )
 
 
