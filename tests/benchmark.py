@@ -247,6 +247,7 @@ def run_compensation_benchmark(
     simulated_time: bool = True,
     adaptive_step: bool = False,
     experimental_line_search: bool = False,
+    line_search_mode: str | None = None,
 ) -> BenchmarkResult:
     """Run one accelerated end-to-end compensation benchmark.
 
@@ -378,6 +379,7 @@ def run_compensation_benchmark(
                 jacobian=JacobianSearchConfig(
                     adaptive_step=adaptive_step,
                     experimental_line_search=experimental_line_search,
+                    line_search_mode=line_search_mode,
                 ),
             ),
         )

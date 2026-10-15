@@ -23,8 +23,9 @@ def main() -> None:
     parser.add_argument('--noise-seed', type=int, default=1000)
     parser.add_argument('--timeout', type=float, default=120.0)
     parser.add_argument(
-        '--experimental-line-search',
-        action='store_true',
+        '--line-search-mode',
+        choices=('disabled', 'single', 'extended', 'capped'),
+        default='disabled',
     )
     parser.add_argument(
         '--output',
@@ -58,6 +59,7 @@ def main() -> None:
             experimental_line_search=(
                 args.experimental_line_search
             ),
+            line_search_mode=args.line_search_mode,
         )
 
         rows.append({

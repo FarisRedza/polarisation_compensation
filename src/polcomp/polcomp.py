@@ -386,6 +386,24 @@ class PolCompController:
         return self._motor_executor.is_moving
 
     @property
+    def line_search_mode(self) -> str:
+        mode = self.config.jacobian.line_search_mode
+
+        if mode is None:
+            return (
+                'capped'
+                if self.config.jacobian.experimental_line_search
+                else 'disabled'
+            )
+
+        if mode not in ('disabled', 'single', 'extended', 'capped'):
+            raise ValueError(
+                f'Unknown line-search mode: {mode!r}'
+            )
+
+        return mode
+
+    @property
     def status(
         self,
     ) -> PolCompStatus:
@@ -601,30 +619,41 @@ class PolCompController:
                 )
             )
 
-            improved = trial_score < self._line_best_score
+            mode = self.line_search_mode
 
-            # Track the best score encountered during forward exploration.
-            if not self._line_trials[:-1]:
+            # For forward exploration, compare against the previous
+            # explored position, even if that position cannot be accepted.
+            if len(self._line_trials) == 1:
                 previous_explored_score = full_score
             else:
                 previous_explored_score = self._line_trials[-2].score
 
             improved = trial_score < previous_explored_score
 
-            if trial_alpha <= 1.5 and trial_score < self._line_best_score:
+            # Capped mode may explore beyond alpha=1.5, but cannot
+            # accept those positions.
+            max_accepted_alpha = (
+                1.5 if mode == 'capped' else 2.5
+            )
+
+            if (
+                trial_alpha <= max_accepted_alpha
+                and trial_score < self._line_best_score
+            ):
                 self._line_best_score = trial_score
                 self._line_best_alpha = trial_alpha
                 self._line_best_positions = trial_positions
 
-            # Continue only when:
-            # 1. We are extending forward, rather than backtracking.
-            # 2. The latest trial improved upon the best measured score.
-            # 3. We have not reached the compensation target.
-            # 4. Another extension is permitted.
+            # The single-trial mode never extends beyond its first trial.
+            max_trial_alpha = (
+                1.5 if mode == 'single' else 2.5
+            )
+
             continue_forward = (
-                trial_alpha >= 1.5
+                mode in ('extended', 'capped')
+                and trial_alpha >= 1.5
                 and improved
-                and trial_alpha < 2.5
+                and trial_alpha < max_trial_alpha
                 and not self.target_reached(
                     qber=observation.qber,
                     qx=observation.qx,
@@ -783,7 +812,7 @@ class PolCompController:
 
         self._score = observation.score
         if (
-            self.config.jacobian.experimental_line_search
+            self.line_search_mode != 'disabled'
             and self._pending_jacobian_correction is not None
             and not self._line_trial_completed
             and self._line_trial is None
