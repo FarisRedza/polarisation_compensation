@@ -96,6 +96,7 @@ def sample_to_row(
     sample: BenchmarkSample,
 ) -> dict[str, typing.Any]:
     correction = sample.jacobian_correction
+    line_search = sample.line_search
     return {
         'elapsed_s': sample.elapsed_s,
         'controller_state': (
@@ -185,6 +186,59 @@ def sample_to_row(
         ),
         'correction_step_qwp2_deg': (
             correction.step[2] if correction is not None else None
+        ),
+        'line_search_iteration': (
+            line_search.iteration
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_trial_alpha': (
+            line_search.trial_alpha
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_accepted_alpha': (
+            line_search.accepted_alpha
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_baseline_score': (
+            line_search.baseline_score
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_full_score': (
+            line_search.full_score
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_trial_score': (
+            line_search.trial_score
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_trial_improvement': (
+            line_search.trial_improvement
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_accepted_score': (
+            line_search.accepted_score
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_extra_travel_deg': (
+            line_search.extra_travel_deg
+            if line_search is not None
+            else None
         ),
     }
 

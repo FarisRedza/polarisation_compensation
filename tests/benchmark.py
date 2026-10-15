@@ -30,6 +30,7 @@ from polcomp.config import (
     PolCompConfig,
     JacobianSearchConfig,
 )
+from polcomp.polcomp import JacobianLineSearchResult
 
 INTERVAL_S = 0.1
 PAIR_RATE_HZ = 40_000
@@ -61,6 +62,7 @@ class BenchmarkSample:
     ]
     controller_score: typing.Optional[float]
     jacobian_correction: JacobianCorrection | None
+    line_search: JacobianLineSearchResult | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -512,6 +514,7 @@ def run_compensation_benchmark(
                     ),
                     controller_score=status.score,
                     jacobian_correction=status.last_jacobian_correction,
+                    line_search=status.last_line_search,
                 )
             )
 

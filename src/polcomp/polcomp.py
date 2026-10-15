@@ -44,6 +44,33 @@ class BB84DetectionResult:
     ] = None
 
 
+@dataclasses.dataclass(frozen=True)
+class JacobianLineSearchResult:
+    iteration: int
+
+    baseline_score: float
+    full_score: float
+    trial_score: float
+
+    trial_alpha: float
+    accepted_alpha: float
+
+    # Travel beyond simply applying the original Jacobian correction.
+    extra_travel_deg: float
+
+    @property
+    def trial_improvement(self) -> float:
+        return self.full_score - self.trial_improvement
+
+    @property
+    def accepted_score(self) -> float:
+        return min(
+            self.baseline_score,
+            self.full_score,
+            self.trial_score,
+        )
+
+
 class CompensationState(enum.Enum):
     IDLE = enum.auto()
     SEARCH = enum.auto()
@@ -118,6 +145,7 @@ class PolCompStatus:
     is_moving: bool
 
     last_jacobian_correction: JacobianCorrection | None
+    last_line_search: JacobianLineSearchResult | None
 
 
 class PolCompController:
@@ -215,6 +243,7 @@ class PolCompController:
         # finalised only after returning to the selected stationary point.
         self._line_trial: tuple[float, tuple[float, float, float]] | None = None
         self._line_trial_completed = False
+        self._last_line_search: JacobianLineSearchResult | None = None
 
 
     @property
@@ -303,6 +332,7 @@ class PolCompController:
         self._last_jacobian_correction = None
         self._line_trial = None
         self._line_trial_completed = False
+        self._last_line_search = None
         self._using_jog_fallback = False
 
         self._jog_search.reset()
@@ -370,6 +400,7 @@ class PolCompController:
             ),
             is_moving=self.is_moving,
             last_jacobian_correction=self._last_jacobian_correction,
+            last_line_search=self._last_line_search,
         )
 
     def objective(
@@ -509,12 +540,60 @@ class PolCompController:
             assert baseline_positions is not None
             # Choose the best measured point, without a noisy-score tolerance
             # for this first experiment. A fresh stationary measurement follows.
-            if observation.score < min(full_score, baseline_score):
+            trial_score = observation.score
+
+            trial_alpha = (
+                1.5 if full_score < baseline_score else 0.5
+            )
+
+            if trial_score < min(full_score, baseline_score):
+                accepted_alpha = trial_alpha
                 selected = self._motor_executor.positions()
+
             elif full_score < baseline_score:
+                accepted_alpha = 1.0
                 selected = full_positions
+
             else:
+                accepted_alpha = 0.0
                 selected = baseline_positions
+
+            # Calculate the extra commanded motor travel relative to
+            # stopping after the original Jacobian correction.
+            #
+            # The full correction has already been executed. We therefore
+            # count the trial movement and any return to the selected point.
+
+            trial_positions = self._motor_executor.positions()
+
+            trial_travel = sum(
+                abs(trial - full)
+                for trial, full in zip(
+                    trial_positions,
+                    full_positions,
+                )
+            )
+
+            return_travel = sum(
+                abs(chosen - trial)
+                for chosen, trial in zip(
+                    selected,
+                    trial_positions,
+                )
+            )
+
+            extra_travel = trial_travel + return_travel
+
+            self._last_line_search = JacobianLineSearchResult(
+                iteration=self._pending_jacobian_correction[0],
+                baseline_score=baseline_score,
+                full_score=full_score,
+                trial_score=trial_score,
+                trial_alpha=trial_alpha,
+                accepted_alpha=accepted_alpha,
+                extra_travel_deg=extra_travel,
+            )
+
             self._line_trial = None
             self._line_trial_completed = True
             if selected != self._motor_executor.positions():
