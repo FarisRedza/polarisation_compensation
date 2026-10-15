@@ -351,6 +351,7 @@ def replay_case(
     trace_dir: pathlib.Path,
     adaptive_step: bool = False,
     experimental_line_search: bool = False,
+    measurement_seed_override: int | None = None,
 ) -> None:
     if not 1 <= case_number <= cases:
         raise ValueError(
@@ -365,6 +366,9 @@ def replay_case(
     disturbance, measurement_seed = (
         case_set[case_number - 1]
     )
+
+    if measurement_seed_override is not None:
+        measurement_seed = measurement_seed_override
 
     result = run_compensation_benchmark(
         disturbance=disturbance,
@@ -482,6 +486,15 @@ def parse_args() -> argparse.Namespace:
         action='store_true',
         help='Enable adaptive Jacobian correction limits.',
     )
+    parser.add_argument(
+        '--measurement-seed',
+        type=int,
+        default=None,
+        help=(
+            'Override the photon-counting RNG seed '
+            'without changing the initial disturbance.'
+        ),
+    )
 
     return parser.parse_args()
 
@@ -497,6 +510,7 @@ def main() -> None:
         trace_dir=args.trace_dir,
         adaptive_step=args.adaptive_step,
         experimental_line_search=args.experimental_line_search,
+        measurement_seed_override=args.measurement_seed,
     )
 
 
