@@ -142,3 +142,18 @@ def test_solver_override_from_saturated_baseline():
 
     assert baseline_norm == pytest.approx(15.0)
     assert limited_norm == pytest.approx(10.0)
+
+
+def test_positive_correction_does_not_reduce_search_limit():
+    search = JacobianSearch(
+        JacobianSearchConfig(adaptive_step=True)
+    )
+
+    # A harmful correction reduces the limit.
+    search.record_correction(correction(1.0, -0.5))
+    assert search.max_total_step_deg == 12.0
+
+    # A positive but overoptimistically predicted correction
+    # must not reduce it further.
+    search.record_correction(correction(1.0, 0.2))
+    assert search.max_total_step_deg == 12.0

@@ -9,7 +9,7 @@ def test_starts_at_baseline_limit():
     assert policy.max_total_step_deg == 15.0
 
 
-def test_bad_corrections_reduce_limit():
+def test_harmful_corrections_reduce_limit():
     policy = AdaptiveStepPolicy()
 
     policy.update(
@@ -20,9 +20,46 @@ def test_bad_corrections_reduce_limit():
 
     policy.update(
         predicted_improvement=2.0,
-        actual_improvement=0.2,
+        actual_improvement=-0.2,
     )
     assert policy.max_total_step_deg == 10.0
+
+
+def test_positive_but_overoptimistic_correction_preserves_limit():
+    policy = AdaptiveStepPolicy()
+
+    # First reduce the limit using a harmful correction.
+    policy.update(
+        predicted_improvement=2.0,
+        actual_improvement=-0.5,
+    )
+    assert policy.max_total_step_deg == 12.0
+
+    # Only 20% of predicted improvement is achieved,
+    # but the correction still improves the score.
+    policy.update(
+        predicted_improvement=2.0,
+        actual_improvement=0.4,
+    )
+
+    assert policy.max_total_step_deg == 12.0
+
+
+def test_zero_improvement_preserves_limit():
+    policy = AdaptiveStepPolicy()
+
+    policy.update(
+        predicted_improvement=2.0,
+        actual_improvement=-0.5,
+    )
+    assert policy.max_total_step_deg == 12.0
+
+    policy.update(
+        predicted_improvement=2.0,
+        actual_improvement=0.0,
+    )
+
+    assert policy.max_total_step_deg == 12.0
 
 
 def test_step_limit_has_lower_bound():
@@ -43,7 +80,7 @@ def test_good_corrections_restore_limit():
     for _ in range(2):
         policy.update(
             predicted_improvement=2.0,
-            actual_improvement=0.0,
+            actual_improvement=-0.5,
         )
 
     assert policy.max_total_step_deg == 10.0

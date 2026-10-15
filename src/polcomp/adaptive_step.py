@@ -42,7 +42,12 @@ class AdaptiveStepPolicy:
         predicted_improvement: float,
         actual_improvement: float,
     ) -> float:
-        """Update the limit after a completed correction."""
+        """Update the limit after a completed correction.
+
+        Reduce the limit only when the correction worsens the score.
+        Positive improvements preserve the limit unless they achieve
+        at least 80% of the predicted improvement.
+        """
 
         if (
             not math.isfinite(predicted_improvement)
@@ -53,7 +58,7 @@ class AdaptiveStepPolicy:
 
         ratio = actual_improvement / predicted_improvement
 
-        if ratio < 0.5:
+        if actual_improvement < 0:
             self.index = max(0, self.index - 1)
 
         elif ratio >= 0.8:
