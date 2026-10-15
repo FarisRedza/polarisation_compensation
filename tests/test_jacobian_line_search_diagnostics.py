@@ -46,3 +46,30 @@ def test_rejected_trial_diagnostics():
 
     assert result.trial_improvement == pytest.approx(-1.0)
     assert result.accepted_score == pytest.approx(3.0)
+
+
+from polcomp.polcomp import (
+    JacobianLineSearchResult,
+    JacobianLineSearchTrial,
+)
+
+
+def test_multiple_forward_trials():
+    result = JacobianLineSearchResult(
+        iteration=3,
+        baseline_score=5.0,
+        full_score=4.0,
+        trial_score=3.2,
+        trial_alpha=2.5,
+        accepted_alpha=2.0,
+        extra_travel_deg=20.0,
+        trials=(
+            JacobianLineSearchTrial(1.5, 3.5),
+            JacobianLineSearchTrial(2.0, 3.0),
+            JacobianLineSearchTrial(2.5, 3.2),
+        ),
+    )
+
+    assert result.accepted_score == pytest.approx(3.0)
+    assert result.accepted_alpha == 2.0
+    assert len(result.trials) == 3

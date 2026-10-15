@@ -3,6 +3,7 @@ import csv
 import pathlib
 import sys
 import typing
+import json
 
 import numpy as np
 
@@ -237,6 +238,23 @@ def sample_to_row(
 
         'line_search_extra_travel_deg': (
             line_search.extra_travel_deg
+            if line_search is not None
+            else None
+        ),
+        'line_search_trial_count': (
+            len(line_search.trials)
+            if line_search is not None
+            else None
+        ),
+
+        'line_search_trials': (
+            json.dumps([
+                {
+                    "alpha": trial.alpha,
+                    "score": trial.score,
+                }
+                for trial in line_search.trials
+            ])
             if line_search is not None
             else None
         ),

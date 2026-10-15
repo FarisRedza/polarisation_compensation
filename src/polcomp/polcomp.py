@@ -45,6 +45,12 @@ class BB84DetectionResult:
 
 
 @dataclasses.dataclass(frozen=True)
+class JacobianLineSearchTrial:
+    alpha: float
+    score: float
+
+
+@dataclasses.dataclass(frozen=True)
 class JacobianLineSearchResult:
     iteration: int
 
@@ -54,9 +60,9 @@ class JacobianLineSearchResult:
 
     trial_alpha: float
     accepted_alpha: float
-
-    # Travel beyond simply applying the original Jacobian correction.
     extra_travel_deg: float
+
+    trials: tuple[JacobianLineSearchTrial, ...] = ()
 
     @property
     def trial_improvement(self) -> float:
@@ -64,10 +70,23 @@ class JacobianLineSearchResult:
 
     @property
     def accepted_score(self) -> float:
-        return min(
-            self.baseline_score,
-            self.full_score,
-            self.trial_score,
+        if self.accepted_alpha == 0.0:
+            return self.baseline_score
+
+        if self.accepted_alpha == 1.0:
+            return self.full_score
+
+        if self.trials:
+            for trial in self.trials:
+                if trial.alpha == self.accepted_alpha:
+                    return trial.score
+
+        if self.accepted_alpha == self.trial_alpha:
+            return self.trial_score
+
+        raise ValueError(
+            f"No score recorded for accepted alpha "
+            f"{self.accepted_alpha}"
         )
 
 
@@ -244,6 +263,13 @@ class PolCompController:
         self._line_trial: tuple[float, tuple[float, float, float]] | None = None
         self._line_trial_completed = False
         self._last_line_search: JacobianLineSearchResult | None = None
+        self._line_alpha = 0.0
+        self._line_best_alpha = 0.0
+        self._line_best_score = float("inf")
+        self._line_best_positions = None
+        self._line_trials: list[JacobianLineSearchTrial] = []
+        self._line_extra_travel = 0.0
+        self._line_previous_positions = None
 
 
     @property
@@ -333,6 +359,13 @@ class PolCompController:
         self._line_trial = None
         self._line_trial_completed = False
         self._last_line_search = None
+        self._line_alpha = 0.0
+        self._line_best_alpha = 0.0
+        self._line_best_score = float('inf')
+        self._line_best_positions = None
+        self._line_trials = []
+        self._line_extra_travel = 0.0
+        self._line_previous_positions = None
         self._using_jog_fallback = False
 
         self._jog_search.reset()
@@ -528,79 +561,125 @@ class PolCompController:
 
         if self._search_state is SearchState.JACOBIAN_LINE_MEASURE:
             self._search_results.append(result)
+
             if len(self._search_results) < self.search_measurements:
                 return
-            observation = self._observe_results(self._search_results, search=True)
-            self._search_results.clear()
-            assert self._line_trial is not None
-            full_score, full_positions = self._line_trial
-            assert self._pending_jacobian_correction is not None
-            baseline_score = self._pending_jacobian_correction[1]
-            baseline_positions = self._jacobian_search.state.baseline_positions
-            assert baseline_positions is not None
-            # Choose the best measured point, without a noisy-score tolerance
-            # for this first experiment. A fresh stationary measurement follows.
-            trial_score = observation.score
 
-            trial_alpha = (
-                1.5 if full_score < baseline_score else 0.5
+            observation = self._observe_results(
+                self._search_results,
+                search=True,
             )
+            self._search_results.clear()
 
-            if trial_score < min(full_score, baseline_score):
-                accepted_alpha = trial_alpha
-                selected = self._motor_executor.positions()
+            assert self._line_trial is not None
+            assert self._pending_jacobian_correction is not None
+            assert self._line_best_positions is not None
 
-            elif full_score < baseline_score:
-                accepted_alpha = 1.0
-                selected = full_positions
+            full_score, full_positions = self._line_trial
 
-            else:
-                accepted_alpha = 0.0
-                selected = baseline_positions
+            (
+                iteration,
+                baseline_score,
+                _,
+                step,
+                _,
+            ) = self._pending_jacobian_correction
 
-            # Calculate the extra commanded motor travel relative to
-            # stopping after the original Jacobian correction.
-            #
-            # The full correction has already been executed. We therefore
-            # count the trial movement and any return to the selected point.
+            baseline_positions = (
+                self._jacobian_search.state.baseline_positions
+            )
+            assert baseline_positions is not None
 
             trial_positions = self._motor_executor.positions()
+            trial_score = observation.score
+            trial_alpha = self._line_alpha
 
-            trial_travel = sum(
-                abs(trial - full)
-                for trial, full in zip(
-                    trial_positions,
-                    full_positions,
+            self._line_trials.append(
+                JacobianLineSearchTrial(
+                    alpha=trial_alpha,
+                    score=trial_score,
                 )
             )
 
-            return_travel = sum(
-                abs(chosen - trial)
-                for chosen, trial in zip(
+            improved = trial_score < self._line_best_score
+
+            if improved:
+                self._line_best_score = trial_score
+                self._line_best_alpha = trial_alpha
+                self._line_best_positions = trial_positions
+
+            # Continue only when:
+            # 1. We are extending forward, rather than backtracking.
+            # 2. The latest trial improved upon the best measured score.
+            # 3. We have not reached the compensation target.
+            # 4. Another extension is permitted.
+            continue_forward = (
+                trial_alpha >= 1.5
+                and improved
+                and trial_alpha < 2.5
+                and not self.target_reached(
+                    qber=observation.qber,
+                    qx=observation.qx,
+                )
+            )
+
+            if continue_forward:
+                next_alpha = min(trial_alpha + 0.5, 2.5)
+
+                next_positions = tuple(
+                    base + next_alpha * delta
+                    for base, delta in zip(
+                        baseline_positions,
+                        step,
+                    )
+                )
+
+                self._line_extra_travel += sum(
+                    abs(new - old)
+                    for new, old in zip(
+                        next_positions,
+                        trial_positions,
+                    )
+                )
+
+                self._line_alpha = next_alpha
+
+                self._motor_executor.move_positions(next_positions)
+                self._search_state = SearchState.JACOBIAN_LINE_MOVE
+                return
+
+            # The line search is finished.
+            # Return to the best measured position if necessary.
+            selected = self._line_best_positions
+
+            self._line_extra_travel += sum(
+                abs(chosen - current)
+                for chosen, current in zip(
                     selected,
                     trial_positions,
                 )
             )
 
-            extra_travel = trial_travel + return_travel
-
             self._last_line_search = JacobianLineSearchResult(
-                iteration=self._pending_jacobian_correction[0],
+                iteration=iteration,
                 baseline_score=baseline_score,
                 full_score=full_score,
                 trial_score=trial_score,
                 trial_alpha=trial_alpha,
-                accepted_alpha=accepted_alpha,
-                extra_travel_deg=extra_travel,
+                accepted_alpha=self._line_best_alpha,
+                extra_travel_deg=self._line_extra_travel,
+                trials=tuple(self._line_trials),
             )
 
             self._line_trial = None
             self._line_trial_completed = True
-            if selected != self._motor_executor.positions():
+
+            if selected != trial_positions:
                 self._motor_executor.move_positions(selected)
                 self._search_state = SearchState.JACOBIAN_LINE_RETURN
             else:
                 self._search_state = SearchState.START
+
             return
 
         # Rolling-jog fallback return states.
@@ -700,20 +779,57 @@ class PolCompController:
             and self._pending_jacobian_correction is not None
             and not self._line_trial_completed
             and self._line_trial is None
-            and not self.target_reached(qber=observation.qber, qx=observation.qx)
-        ):
-            _, baseline_score, _, step, _ = self._pending_jacobian_correction
-            baseline_positions = self._jacobian_search.state.baseline_positions
-            assert baseline_positions is not None
-            full_positions = tuple(
-                base + delta for base, delta in zip(baseline_positions, step)
+            and not self.target_reached(
+                qber=observation.qber,
+                qx=observation.qx,
             )
-            alpha = 1.5 if observation.score < baseline_score else 0.5
-            trial_positions = tuple(
-                base + alpha * delta
+        ):
+            _, baseline_score, _, step, _ = (
+                self._pending_jacobian_correction
+            )
+
+            baseline_positions = (
+                self._jacobian_search.state.baseline_positions
+            )
+            assert baseline_positions is not None
+
+            full_positions = tuple(
+                base + delta
                 for base, delta in zip(baseline_positions, step)
             )
-            self._line_trial = (observation.score, full_positions)
+
+            full_score = observation.score
+
+            if full_score < baseline_score:
+                self._line_best_alpha = 1.0
+                self._line_best_score = full_score
+                self._line_best_positions = full_positions
+                self._line_alpha = 1.5
+            else:
+                self._line_best_alpha = 0.0
+                self._line_best_score = baseline_score
+                self._line_best_positions = baseline_positions
+                self._line_alpha = 0.5
+
+            self._line_trials = []
+            self._line_extra_travel = 0.0
+            self._line_previous_positions = full_positions
+
+            trial_positions = tuple(
+                base + self._line_alpha * delta
+                for base, delta in zip(baseline_positions, step)
+            )
+
+            self._line_trial = (full_score, full_positions)
+
+            self._line_extra_travel += sum(
+                abs(new - old)
+                for new, old in zip(
+                    trial_positions,
+                    full_positions,
+                )
+            )
+
             self._motor_executor.move_positions(trial_positions)
             self._search_state = SearchState.JACOBIAN_LINE_MOVE
             return
