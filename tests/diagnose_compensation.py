@@ -278,6 +278,7 @@ def replay_case(
     timeout_s: float,
     trace_dir: pathlib.Path,
     adaptive_step: bool = False,
+    experimental_line_search: bool = False,
 ) -> None:
     if not 1 <= case_number <= cases:
         raise ValueError(
@@ -299,6 +300,7 @@ def replay_case(
         timeout_s=timeout_s,
         simulated_time=True,
         adaptive_step=adaptive_step,
+        experimental_line_search=experimental_line_search,
     )
 
     print(result.summary())
@@ -399,6 +401,11 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        '--experimental-line-search',
+        action='store_true',
+        help='Try one feedback-guided half-step or extension per Jacobian correction.',
+    )
+    parser.add_argument(
         '--adaptive-step',
         action='store_true',
         help='Enable adaptive Jacobian correction limits.',
@@ -417,6 +424,7 @@ def main() -> None:
         timeout_s=args.timeout,
         trace_dir=args.trace_dir,
         adaptive_step=args.adaptive_step,
+        experimental_line_search=args.experimental_line_search,
     )
 
 

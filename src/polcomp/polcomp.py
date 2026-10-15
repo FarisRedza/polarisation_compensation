@@ -61,6 +61,9 @@ class SearchState(enum.Enum):
     JACOBIAN_PROBE_MEASURE = enum.auto()
     JACOBIAN_PROBE_RETURN = enum.auto()
     JACOBIAN_APPLY = enum.auto()
+    JACOBIAN_LINE_MOVE = enum.auto()
+    JACOBIAN_LINE_MEASURE = enum.auto()
+    JACOBIAN_LINE_RETURN = enum.auto()
 
     # Existing rolling-jog SEARCH, retained as a fallback.
     JOG_POSITIVE = enum.auto()
@@ -208,6 +211,11 @@ class PolCompController:
         ) = None
 
         self._last_jacobian_correction: JacobianCorrection | None = None
+        # Experimental one-trial line search; the pending correction is
+        # finalised only after returning to the selected stationary point.
+        self._line_trial: tuple[float, tuple[float, float, float]] | None = None
+        self._line_trial_completed = False
+
 
     @property
     def search_measurements(self) -> int:
@@ -293,6 +301,8 @@ class PolCompController:
         self._jacobian_search.reset()
         self._pending_jacobian_correction = None
         self._last_jacobian_correction = None
+        self._line_trial = None
+        self._line_trial_completed = False
         self._using_jog_fallback = False
 
         self._jog_search.reset()
@@ -475,6 +485,45 @@ class PolCompController:
             self._reset_search_line()
             return
 
+        if self._search_state is SearchState.JACOBIAN_LINE_MOVE:
+            self._search_results.clear()
+            self._search_state = SearchState.JACOBIAN_LINE_MEASURE
+            return
+
+        if self._search_state is SearchState.JACOBIAN_LINE_RETURN:
+            self._search_results.clear()
+            self._search_state = SearchState.START
+            return
+
+        if self._search_state is SearchState.JACOBIAN_LINE_MEASURE:
+            self._search_results.append(result)
+            if len(self._search_results) < self.search_measurements:
+                return
+            observation = self._observe_results(self._search_results, search=True)
+            self._search_results.clear()
+            assert self._line_trial is not None
+            full_score, full_positions = self._line_trial
+            assert self._pending_jacobian_correction is not None
+            baseline_score = self._pending_jacobian_correction[1]
+            baseline_positions = self._jacobian_search.state.baseline_positions
+            assert baseline_positions is not None
+            # Choose the best measured point, without a noisy-score tolerance
+            # for this first experiment. A fresh stationary measurement follows.
+            if observation.score < min(full_score, baseline_score):
+                selected = self._motor_executor.positions()
+            elif full_score < baseline_score:
+                selected = full_positions
+            else:
+                selected = baseline_positions
+            self._line_trial = None
+            self._line_trial_completed = True
+            if selected != self._motor_executor.positions():
+                self._motor_executor.move_positions(selected)
+                self._search_state = SearchState.JACOBIAN_LINE_RETURN
+            else:
+                self._search_state = SearchState.START
+            return
+
         # Rolling-jog fallback return states.
         if self._search_state is SearchState.RETURN_FROM_POSITIVE:
             self._start_jog(
@@ -567,6 +616,29 @@ class PolCompController:
         self._search_results.clear()
 
         self._score = observation.score
+        if (
+            self.config.jacobian.experimental_line_search
+            and self._pending_jacobian_correction is not None
+            and not self._line_trial_completed
+            and self._line_trial is None
+            and not self.target_reached(qber=observation.qber, qx=observation.qx)
+        ):
+            _, baseline_score, _, step, _ = self._pending_jacobian_correction
+            baseline_positions = self._jacobian_search.state.baseline_positions
+            assert baseline_positions is not None
+            full_positions = tuple(
+                base + delta for base, delta in zip(baseline_positions, step)
+            )
+            alpha = 1.5 if observation.score < baseline_score else 0.5
+            trial_positions = tuple(
+                base + alpha * delta
+                for base, delta in zip(baseline_positions, step)
+            )
+            self._line_trial = (observation.score, full_positions)
+            self._motor_executor.move_positions(trial_positions)
+            self._search_state = SearchState.JACOBIAN_LINE_MOVE
+            return
+
         if self._pending_jacobian_correction is not None:
             (
                 iteration,
@@ -586,6 +658,7 @@ class PolCompController:
             )
 
             self._pending_jacobian_correction = None
+            self._line_trial_completed = False
 
             self._jacobian_search.record_correction(
                 self._last_jacobian_correction

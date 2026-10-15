@@ -12,6 +12,7 @@ class JacobianSearchConfig:
     max_step_deg: float = 10.0
     max_total_step_deg: float = 15.0
     adaptive_step: bool = False
+    experimental_line_search: bool = False
 
     min_determinant: float = 1e-6
     min_predicted_improvement: float = 0.02

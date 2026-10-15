@@ -420,6 +420,7 @@ def run_characterisation(
     timeout_s: float,
     output: pathlib.Path,
     adaptive_step: bool = False,
+    experimental_line_search: bool = False,
 ) -> CharacterisationSummary:
     disturbances = generate_disturbances(
         cases=cases,
@@ -470,6 +471,7 @@ def run_characterisation(
             timeout_s=timeout_s,
             simulated_time=True,
             adaptive_step=adaptive_step,
+            experimental_line_search=experimental_line_search,
         )
 
         results.append(
@@ -603,6 +605,11 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        '--experimental-line-search',
+        action='store_true',
+        help='Try one feedback-guided half-step or extension per Jacobian correction.',
+    )
+    parser.add_argument(
         '--adaptive-step',
         action='store_true',
         help='Enable adaptive Jacobian correction limits.',
@@ -620,6 +627,7 @@ def main() -> None:
         timeout_s=args.timeout,
         output=args.output,
         adaptive_step=args.adaptive_step,
+        experimental_line_search=args.experimental_line_search,
     )
 
 

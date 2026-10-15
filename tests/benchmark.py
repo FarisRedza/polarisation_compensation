@@ -244,6 +244,7 @@ def run_compensation_benchmark(
     coincidence_window_ps: int = COINCIDENCE_WINDOW_PS,
     simulated_time: bool = True,
     adaptive_step: bool = False,
+    experimental_line_search: bool = False,
 ) -> BenchmarkResult:
     """Run one accelerated end-to-end compensation benchmark.
 
@@ -374,6 +375,7 @@ def run_compensation_benchmark(
             config=PolCompConfig(
                 jacobian=JacobianSearchConfig(
                     adaptive_step=adaptive_step,
+                    experimental_line_search=experimental_line_search,
                 ),
             ),
         )

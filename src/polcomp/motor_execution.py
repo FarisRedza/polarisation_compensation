@@ -64,6 +64,11 @@ class MotorExecutor:
                 waveplate.position + delta
             )
 
+    def move_positions(self, positions: typing.Sequence[float]) -> None:
+        """Command an absolute coordinated target (not time-synchronised)."""
+        for waveplate, position in zip(self.motors, positions):
+            waveplate.move_to(position)
+
     def position(self, index: int) -> float:
         """Return the current position of one motor."""
         return self.motors[index].position
