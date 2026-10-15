@@ -1,9 +1,9 @@
-"""Tests for correction-specific diagnostics (Stage 5A.3.4)."""
-
 import pytest
 
 from polcomp.jacobian_search import JacobianCorrection
 from diagnose_compensation import sample_to_row
+
+from polcomp.polcomp import JacobianLineSearchResult
 
 
 def test_correction_preserves_condition_and_step():
@@ -49,6 +49,7 @@ def test_diagnostic_csv_exports_correction_fields():
         jacobian_step=None,
         compensation_positions=(0.0, 0.0, 0.0),
         jacobian_correction=correction,
+        line_search=None,
     )
     row = sample_to_row(sample)
     assert row['correction_condition'] == 4.5
@@ -56,3 +57,45 @@ def test_diagnostic_csv_exports_correction_fields():
     assert row['correction_step_hwp_deg'] == -10.0
     assert row['correction_step_qwp2_deg'] == 15.0
     assert row['jacobian_max_total_step_deg'] == 15.0
+
+def test_diagnostic_csv_exports_line_search_fields():
+    from types import SimpleNamespace
+
+    line_search = JacobianLineSearchResult(
+        iteration=3,
+        baseline_score=5.0,
+        full_score=3.0,
+        trial_score=2.0,
+        trial_alpha=1.5,
+        accepted_alpha=1.5,
+        extra_travel_deg=7.5,
+    )
+
+    sample = SimpleNamespace(
+        elapsed_s=1.0,
+        controller_state='SEARCH',
+        search_state='START',
+        qber=0.1,
+        qx=0.2,
+        search_score=2.0,
+        acceptance_score=3.0,
+        controller_score=2.0,
+        jacobian_iteration=3,
+        jacobian_condition=None,
+        jacobian_fallback_count=0,
+        jacobian_max_total_step_deg=15.0,
+        jacobian_predicted_score=None,
+        jacobian_step=None,
+        compensation_positions=(0.0, 0.0, 0.0),
+        jacobian_correction=None,
+        line_search=line_search,
+    )
+
+    row = sample_to_row(sample)
+
+    assert row['line_search_iteration'] == 3
+    assert row['line_search_trial_alpha'] == 1.5
+    assert row['line_search_accepted_alpha'] == 1.5
+    assert row['line_search_trial_improvement'] == 1.0
+    assert row['line_search_accepted_score'] == 2.0
+    assert row['line_search_extra_travel_deg'] == 7.5

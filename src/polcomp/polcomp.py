@@ -60,7 +60,7 @@ class JacobianLineSearchResult:
 
     @property
     def trial_improvement(self) -> float:
-        return self.full_score - self.trial_improvement
+        return self.full_score - self.trial_score
 
     @property
     def accepted_score(self) -> float:
