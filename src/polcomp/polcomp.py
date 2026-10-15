@@ -603,7 +603,15 @@ class PolCompController:
 
             improved = trial_score < self._line_best_score
 
-            if improved:
+            # Track the best score encountered during forward exploration.
+            if not self._line_trials[:-1]:
+                previous_explored_score = full_score
+            else:
+                previous_explored_score = self._line_trials[-2].score
+
+            improved = trial_score < previous_explored_score
+
+            if trial_alpha <= 1.5 and trial_score < self._line_best_score:
                 self._line_best_score = trial_score
                 self._line_best_alpha = trial_alpha
                 self._line_best_positions = trial_positions
