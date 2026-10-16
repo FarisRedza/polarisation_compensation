@@ -56,9 +56,6 @@ def main() -> None:
             seed=measurement_seed,
             timeout_s=args.timeout,
             simulated_time=True,
-            experimental_line_search=(
-                args.experimental_line_search
-            ),
             line_search_mode=args.line_search_mode,
         )
 
