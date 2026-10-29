@@ -29,6 +29,7 @@ from .objectives import (
     targets_satisfied,
 )
 from .lock import LockDecision, evaluate_lock
+from .line_search import create_line_search, LineSearchMode
 
 
 @dataclasses.dataclass(frozen=True)
@@ -221,6 +222,7 @@ class PolCompController:
             if config is not None
             else PolCompConfig()
         )
+        self._line_search = create_line_search(self.line_search_mode)
         self._jacobian_search = JacobianSearch(
             config=self.config.jacobian,
         )
@@ -396,12 +398,7 @@ class PolCompController:
                 else 'disabled'
             )
 
-        if mode not in ('disabled', 'single', 'extended', 'capped'):
-            raise ValueError(
-                f'Unknown line-search mode: {mode!r}'
-            )
-
-        return mode
+        return LineSearchMode(mode).value
 
     @property
     def status(
@@ -619,49 +616,35 @@ class PolCompController:
                 )
             )
 
-            mode = self.line_search_mode
+            assert self._line_search is not None
 
-            # For forward exploration, compare against the previous
-            # explored position, even if that position cannot be accepted.
-            if len(self._line_trials) == 1:
-                previous_explored_score = full_score
-            else:
-                previous_explored_score = self._line_trials[-2].score
-
-            improved = trial_score < previous_explored_score
-
-            # Capped mode may explore beyond alpha=1.5, but cannot
-            # accept those positions.
-            max_accepted_alpha = (
-                1.5 if mode == 'capped' else 2.5
+            # Forward exploration compares with the previous explored
+            # position, including trials that cannot be accepted.
+            previous_explored_score = (
+                full_score
+                if len(self._line_trials) == 1
+                else self._line_trials[-2].score
             )
 
             if (
-                trial_alpha <= max_accepted_alpha
+                self._line_search.accepts(alpha=trial_alpha)
                 and trial_score < self._line_best_score
             ):
                 self._line_best_score = trial_score
                 self._line_best_alpha = trial_alpha
                 self._line_best_positions = trial_positions
 
-            # The single-trial mode never extends beyond its first trial.
-            max_trial_alpha = (
-                1.5 if mode == 'single' else 2.5
-            )
-
-            continue_forward = (
-                mode in ('extended', 'capped')
-                and trial_alpha >= 1.5
-                and improved
-                and trial_alpha < max_trial_alpha
-                and not self.target_reached(
+            next_alpha = self._line_search.next_alpha(
+                alpha=trial_alpha,
+                score=trial_score,
+                previous_score=previous_explored_score,
+                target_reached=self.target_reached(
                     qber=observation.qber,
                     qx=observation.qx,
-                )
+                ),
             )
 
-            if continue_forward:
-                next_alpha = min(trial_alpha + 0.5, 2.5)
+            if next_alpha is not None:
 
                 next_positions = tuple(
                     base + next_alpha * delta
@@ -812,7 +795,7 @@ class PolCompController:
 
         self._score = observation.score
         if (
-            self.line_search_mode != 'disabled'
+            self._line_search is not None
             and self._pending_jacobian_correction is not None
             and not self._line_trial_completed
             and self._line_trial is None
@@ -837,16 +820,23 @@ class PolCompController:
 
             full_score = observation.score
 
+            assert self._line_search is not None
+            initial_alpha = self._line_search.begin(
+                baseline_score=baseline_score,
+                full_score=full_score,
+            )
+            if initial_alpha is None:
+                raise RuntimeError('Enabled line search returned no initial trial')
+
             if full_score < baseline_score:
                 self._line_best_alpha = 1.0
                 self._line_best_score = full_score
                 self._line_best_positions = full_positions
-                self._line_alpha = 1.5
             else:
                 self._line_best_alpha = 0.0
                 self._line_best_score = baseline_score
                 self._line_best_positions = baseline_positions
-                self._line_alpha = 0.5
+            self._line_alpha = initial_alpha
 
             self._line_trials = []
             self._line_extra_travel = 0.0

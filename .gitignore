@@ -235,3 +235,5 @@ logs/
 compensation_characterisation*.csv
 compensation_traces*/
 jacobian_analysis*/
+compensation_*.csv
+results/
