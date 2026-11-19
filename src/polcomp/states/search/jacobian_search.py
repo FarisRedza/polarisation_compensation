@@ -75,6 +75,7 @@ class JacobianSearch:
         reference=None,
         retain_probe_cost: bool = True,
     ) -> None:
+        self.diagnostic_sink = None
         self.reference = reference
         self.retain_probe_cost = retain_probe_cost
         self.config = config
@@ -232,6 +233,7 @@ class JacobianSearch:
         assert state.baseline_errors is not None
         assert state.baseline_score is not None
 
+        measured_columns = tuple(state.columns)
         if self.reference is not None:
             state.columns = list(self._reference_columns)
 
@@ -246,6 +248,9 @@ class JacobianSearch:
             baseline_score=state.baseline_score,
             max_total_step_deg=self.max_total_step_deg,
         )
+
+        if self.diagnostic_sink is not None:
+            self.diagnostic_sink(state, measured_columns, solution)
 
         state.condition = solution.condition
         state.predicted_score = solution.predicted_score

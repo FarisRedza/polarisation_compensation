@@ -251,6 +251,7 @@ def run_compensation_benchmark(
     line_search_min_relative_improvement: float = 0.2,
     jacobian_mode: str = "empirical",
     retain_probe_cost: bool = True,
+    jacobian_diagnostics: list | None = None,
 ) -> BenchmarkResult:
     """Run one accelerated end-to-end compensation benchmark.
 
@@ -392,6 +393,35 @@ def run_compensation_benchmark(
                 ),
             ),
         )
+
+        if jacobian_diagnostics is not None:
+            analytical = OpticalJacobianReference(system, 'analytical')
+            ideal_fd = OpticalJacobianReference(system, 'ideal_fd')
+            search = controller._jacobian_search
+
+            def record_jacobian(state, measured_columns, solution):
+                args = (state.baseline_positions, search.config.probe_deg,
+                        controller.config.target_qber, controller.config.target_qx)
+                exact = analytical(*args)
+                ideal = ideal_fd(*args)
+                matrix = np.asarray(state.columns).T
+                jacobian_diagnostics.append({
+                    'attempt': len(jacobian_diagnostics) + 1,
+                    'iteration_before': state.iteration,
+                    'clock_s': clock.time(),
+                    'positions': state.baseline_positions,
+                    'baseline_errors': state.baseline_errors,
+                    'baseline_score': state.baseline_score,
+                    'measured_columns': measured_columns,
+                    'ideal_fd_columns': ideal,
+                    'analytical_columns': exact,
+                    'used_columns': state.columns.copy(),
+                    'singular_values': np.linalg.svd(matrix, compute_uv=False).tolist(),
+                    'max_total_step_deg': search.max_total_step_deg,
+                    'solution': dataclasses.asdict(solution),
+                })
+
+            search.diagnostic_sink = record_jacobian
 
         samples: list[BenchmarkSample] = []
         max_jacobian_condition: typing.Optional[
