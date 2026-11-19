@@ -7,7 +7,7 @@ import qtoolkit
 from polcomp.acquisition import BB84MeasurementSource
 from polcomp.measurement import aggregate_bb84_measurements
 from polcomp.polcomp import BB84DetectionResult
-from polcomp.simulation import SimulatedTimetagger
+from polcomp.simulation.simulation import SimulatedTimetagger
 from polcomp.acquisition import (
     BB84MeasurementSource,
     BB84TimetagAcquisition,

@@ -1,6 +1,6 @@
 import pytest
 
-from polcomp.adaptive_step import AdaptiveStepPolicy
+from polcomp.states.search.adaptive_step import AdaptiveStepPolicy
 
 
 def test_starts_at_baseline_limit():

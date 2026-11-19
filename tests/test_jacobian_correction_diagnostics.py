@@ -1,9 +1,9 @@
 import pytest
 
-from polcomp.jacobian_search import JacobianCorrection
+from polcomp.states.search.jacobian_search import JacobianCorrection
 from diagnose_compensation import sample_to_row
 
-from polcomp.polcomp import JacobianLineSearchResult
+from polcomp.states.search.JacobianLineSearchResult import JacobianLineSearchResult
 
 
 def test_correction_preserves_condition_and_step():

@@ -2,7 +2,7 @@ from polcomp.config import (
     JacobianSearchConfig,
     PolCompConfig,
 )
-from polcomp.jacobian_search import JacobianSearch
+from polcomp.states.search.jacobian_search import JacobianSearch
 
 
 def test_fixed_step_status_limit():

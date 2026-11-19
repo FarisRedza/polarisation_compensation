@@ -2,7 +2,7 @@
 
 import pytest
 
-from polcomp.line_search import (
+from polcomp.states.search.line_search import (
     CappedLineSearch,
     ExtendedLineSearch,
     LineSearchMode,

@@ -4,7 +4,7 @@ from .polcomp import (
     PolCompController,
 )
 
-from .simulation import (
+from .simulation.simulation import (
     SimulatedMotor,
     SimulatedEPS,
     SimulatedPolCompSystem,

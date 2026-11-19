@@ -2,7 +2,7 @@ import dataclasses
 
 from polcomp.measurement import make_observation
 from polcomp.config import JogSearchConfig
-from polcomp.jog_search import (
+from polcomp.states.search.jog_search import (
     JogSearch,
     JogSearchState,
     JogActionType,

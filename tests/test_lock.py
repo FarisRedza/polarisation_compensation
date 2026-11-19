@@ -2,9 +2,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from polcomp.lock import LockDecision, evaluate_lock
+from polcomp.states.search.SearchState import SearchState
+from polcomp.states.lock.lock import LockDecision, evaluate_lock
 from polcomp.measurement import make_observation
-from polcomp.polcomp import CompensationState, SearchState
+from polcomp.states.states import CompensationState
 
 
 @pytest.mark.parametrize(

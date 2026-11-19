@@ -20,17 +20,17 @@ from polcomp import (
     SimulatedMotor,
     PolCompController,
 )
-from polcomp.simulation import (
+from polcomp.simulation.simulation import (
     Clock,
     RealTimeClock,
     SimulationClock
 )
-from polcomp.jacobian_search import JacobianCorrection
+from polcomp.states.search.jacobian_search import JacobianCorrection
 from polcomp.config import (
     PolCompConfig,
     JacobianSearchConfig,
 )
-from polcomp.polcomp import JacobianLineSearchResult
+from polcomp.states.search.JacobianLineSearchResult import JacobianLineSearchResult
 
 INTERVAL_S = 0.1
 PAIR_RATE_HZ = 40_000

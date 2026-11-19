@@ -2,7 +2,7 @@ import pytest
 
 from polcomp.measurement import make_observation
 from polcomp.config import JacobianSearchConfig
-from polcomp.jacobian_search import (
+from polcomp.states.search.jacobian_search import (
     JacobianCorrection,
     JacobianSearch,
     JacobianSearchState,

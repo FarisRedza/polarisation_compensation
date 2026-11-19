@@ -1,8 +1,8 @@
 import pytest
 
 from polcomp.config import JacobianSearchConfig
-from polcomp.jacobian import JacobianSolver
-from polcomp.jacobian_search import (
+from polcomp.states.search.jacobian import JacobianSolver
+from polcomp.states.search.jacobian_search import (
     JacobianCorrection,
     JacobianSearch,
 )

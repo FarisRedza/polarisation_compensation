@@ -1,9 +1,9 @@
+from polcomp.states.search.SearchState import SearchState
 from polcomp.motor_execution import MotorExecutor
-from polcomp.polcomp import (
+from polcomp.states.states import (
     CompensationState,
-    SearchState,
 )
-from polcomp.jacobian_search import (
+from polcomp.states.search.jacobian_search import (
     JacobianAction,
     JacobianActionType,
 )

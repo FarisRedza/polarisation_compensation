@@ -7,8 +7,9 @@ import numpy as np
 import pytest
 import qtoolkit
 
-from polcomp import measurement, simulation
+from polcomp import measurement
 from polcomp.polcomp import BB84DetectionResult
+from polcomp.simulation import simulation
 
 
 @pytest.fixture

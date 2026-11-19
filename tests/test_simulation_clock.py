@@ -4,7 +4,7 @@ import time
 
 import pytest
 from qtoolkit.polarisation import QuarterWaveplate
-from polcomp.simulation import RealTimeClock, SimulationClock, SimulatedMotor
+from polcomp.simulation.simulation import RealTimeClock, SimulationClock, SimulatedMotor
 
 
 def test_default_motor_clock_is_realtime():

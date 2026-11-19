@@ -2,8 +2,8 @@ import dataclasses
 import typing
 import enum
 
-from .config import JogSearchConfig
-from .measurement import Observation
+from ...config import JogSearchConfig
+from ...measurement import Observation
 
 
 class JogDirection(enum.Enum):

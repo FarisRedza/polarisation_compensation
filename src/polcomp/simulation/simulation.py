@@ -10,7 +10,7 @@ import motor
 import qtoolkit
 from qtoolkit.polarisation import Waveplate
 
-from .acquisition import BB84TimetagAcquisition, TimetagSource
+from ..acquisition import BB84TimetagAcquisition, TimetagSource
 
 
 class Clock:

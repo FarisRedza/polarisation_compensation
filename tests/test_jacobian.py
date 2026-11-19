@@ -3,7 +3,7 @@ import math
 import pytest
 
 from polcomp.config import JacobianSearchConfig
-from polcomp.jacobian import JacobianSolver
+from polcomp.states.search.jacobian import JacobianSolver
 
 
 def test_jacobian_solver_reduces_error():

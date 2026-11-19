@@ -2,7 +2,7 @@ import dataclasses
 import typing
 import math
 
-from .config import JacobianSearchConfig
+from ...config import JacobianSearchConfig
 
 
 Vector2 = tuple[float, float]

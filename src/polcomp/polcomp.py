@@ -1,18 +1,21 @@
 import dataclasses
-import typing
-import enum
+from typing import Optional, Sequence
 
 import motor
 import qtoolkit
 
+from polcomp.states.search.JacobianLineSearchResult import JacobianLineSearchResult, JacobianLineSearchTrial
+from polcomp.states.search.SearchState import SearchState
+from polcomp.states.states import CompensationState
+
 from .config import PolCompConfig
-from .jacobian_search import (
+from .states.search.jacobian_search import (
     JacobianCorrection,
     JacobianSearch,
     JacobianAction,
     JacobianActionType,
 )
-from .jog_search import (
+from .states.search.jog_search import (
     JogSearch,
     JogActionType,
     JogDirection,
@@ -28,8 +31,8 @@ from .objectives import (
     search_score,
     targets_satisfied,
 )
-from .lock import LockDecision, evaluate_lock
-from .line_search import create_line_search, LineSearchMode
+from .states.lock.lock import LockDecision, evaluate_lock
+from .states.search.line_search import create_line_search, LineSearchMode
 
 
 @dataclasses.dataclass(frozen=True)
@@ -40,92 +43,17 @@ class BB84DetectionResult:
     singles: dict[int, int]
     coincidences: dict[tuple[int, int], int]
 
-    counts: typing.Optional[
+    counts: Optional[
         qtoolkit.timetags.MeasurementCounts
     ] = None
 
 
 @dataclasses.dataclass(frozen=True)
-class JacobianLineSearchTrial:
-    alpha: float
-    score: float
-
-
-@dataclasses.dataclass(frozen=True)
-class JacobianLineSearchResult:
-    iteration: int
-
-    baseline_score: float
-    full_score: float
-    trial_score: float
-
-    trial_alpha: float
-    accepted_alpha: float
-    extra_travel_deg: float
-
-    trials: tuple[JacobianLineSearchTrial, ...] = ()
-
-    @property
-    def trial_improvement(self) -> float:
-        return self.full_score - self.trial_score
-
-    @property
-    def accepted_score(self) -> float:
-        if self.accepted_alpha == 0.0:
-            return self.baseline_score
-
-        if self.accepted_alpha == 1.0:
-            return self.full_score
-
-        if self.trials:
-            for trial in self.trials:
-                if trial.alpha == self.accepted_alpha:
-                    return trial.score
-
-        if self.accepted_alpha == self.trial_alpha:
-            return self.trial_score
-
-        raise ValueError(
-            f"No score recorded for accepted alpha "
-            f"{self.accepted_alpha}"
-        )
-
-
-class CompensationState(enum.Enum):
-    IDLE = enum.auto()
-    SEARCH = enum.auto()
-    LOCK = enum.auto()
-    TRACK = enum.auto()
-    RECOVER = enum.auto()
-    COMPLETE = enum.auto()
-
-
-class SearchState(enum.Enum):
-    START = enum.auto()
-
-    # Empirical Jacobian SEARCH.
-    JACOBIAN_PROBE_MOVE = enum.auto()
-    JACOBIAN_PROBE_MEASURE = enum.auto()
-    JACOBIAN_PROBE_RETURN = enum.auto()
-    JACOBIAN_APPLY = enum.auto()
-    JACOBIAN_LINE_MOVE = enum.auto()
-    JACOBIAN_LINE_MEASURE = enum.auto()
-    JACOBIAN_LINE_RETURN = enum.auto()
-
-    # Existing rolling-jog SEARCH, retained as a fallback.
-    JOG_POSITIVE = enum.auto()
-    RETURN_FROM_POSITIVE = enum.auto()
-    JOG_NEGATIVE = enum.auto()
-    RETURN_TO_BEST = enum.auto()
-    RETURN_TO_LOCK = enum.auto()
-
-
-@dataclasses.dataclass(frozen=True)
 class PolCompStatus:
     state: CompensationState
-    search_state: typing.Optional[SearchState]
+    search_state: Optional[SearchState]
 
-    score: typing.Optional[float]
+    score: Optional[float]
 
     search_waveplate_index: int
     search_measurement_count: int
@@ -133,39 +61,39 @@ class PolCompStatus:
 
     # Rolling-jog fallback diagnostics.
     search_cycle: int
-    search_cycle_start_score: typing.Optional[float]
-    search_cycle_best_score: typing.Optional[float]
-    search_cycle_improvement: typing.Optional[float]
+    search_cycle_start_score: Optional[float]
+    search_cycle_best_score: Optional[float]
+    search_cycle_improvement: Optional[float]
 
     # Empirical Jacobian diagnostics.
     jacobian_probe_index: int
     jacobian_iteration: int
-    jacobian_condition: typing.Optional[float]
-    jacobian_predicted_score: typing.Optional[float]
-    jacobian_step_qwp1: typing.Optional[float]
-    jacobian_step_hwp: typing.Optional[float]
-    jacobian_step_qwp2: typing.Optional[float]
+    jacobian_condition: Optional[float]
+    jacobian_predicted_score: Optional[float]
+    jacobian_step_qwp1: Optional[float]
+    jacobian_step_hwp: Optional[float]
+    jacobian_step_qwp2: Optional[float]
     jacobian_fallback_count: int
     jacobian_max_total_step_deg: float
 
     # Compatibility fields retained for the existing tools.
-    search_step_deg: typing.Optional[float]
-    search_retained_improvement: typing.Optional[float]
+    search_step_deg: Optional[float]
+    search_retained_improvement: Optional[float]
     search_stagnant: bool
     search_escape_count: int
     search_low_improvement_cycles: int
 
-    best_score: typing.Optional[float]
-    best_position: typing.Optional[float]
+    best_score: Optional[float]
+    best_position: Optional[float]
 
-    measurement_position: typing.Optional[float]
-    measurement_start_position: typing.Optional[float]
-    measurement_end_position: typing.Optional[float]
+    measurement_position: Optional[float]
+    measurement_start_position: Optional[float]
+    measurement_end_position: Optional[float]
 
     is_moving: bool
 
-    last_jacobian_correction: JacobianCorrection | None
-    last_line_search: JacobianLineSearchResult | None
+    last_jacobian_correction: Optional[JacobianCorrection]
+    last_line_search: Optional[JacobianLineSearchResult]
 
 
 class PolCompController:
@@ -202,7 +130,7 @@ class PolCompController:
         hwp: motor.Motor,
         qwp2: motor.Motor,
         measurements: qtoolkit.polarisation.BB84MeasurementPair,
-        config: typing.Optional[PolCompConfig] = None,
+        config: Optional[PolCompConfig] = None,
     ) -> None:
         self.qwp1 = qwp1
         self.hwp = hwp
@@ -233,7 +161,7 @@ class PolCompController:
         self.active = False
         self.state = CompensationState.IDLE
 
-        self._score: typing.Optional[float] = None
+        self._score: Optional[float] = None
 
         self._search_state = SearchState.START
 
@@ -254,17 +182,16 @@ class PolCompController:
             BB84DetectionResult
         ] = []
 
-        self._pending_jacobian_correction: (
-            tuple[int, float, float, tuple[float, float, float], float | None]
-            | None
-        ) = None
+        self._pending_jacobian_correction: Optional[
+            tuple[int, float, float, tuple[float, float, float], Optional[float]]
+        ] = None
 
-        self._last_jacobian_correction: JacobianCorrection | None = None
+        self._last_jacobian_correction: Optional[JacobianCorrection] = None
         # Experimental one-trial line search; the pending correction is
         # finalised only after returning to the selected stationary point.
-        self._line_trial: tuple[float, tuple[float, float, float]] | None = None
+        self._line_trial: Optional[tuple[float, tuple[float, float, float]]] = None
         self._line_trial_completed = False
-        self._last_line_search: JacobianLineSearchResult | None = None
+        self._last_line_search: Optional[JacobianLineSearchResult] = None
         self._line_alpha = 0.0
         self._line_best_alpha = 0.0
         self._line_best_score = float("inf")
@@ -1132,7 +1059,7 @@ class PolCompController:
 
     def _aggregate_results(
         self,
-        results: typing.Sequence[BB84DetectionResult],
+        results: Sequence[BB84DetectionResult],
     ) -> tuple[float, float]:
         measurement = aggregate_bb84_measurements(
             results=results,
@@ -1144,7 +1071,7 @@ class PolCompController:
 
     def _observe_results(
         self,
-        results: typing.Sequence[BB84DetectionResult],
+        results: Sequence[BB84DetectionResult],
         *,
         search: bool,
     ) -> Observation:

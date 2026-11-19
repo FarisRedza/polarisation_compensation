@@ -1,6 +1,7 @@
 import pytest
 
-from polcomp.polcomp import JacobianLineSearchResult
+from polcomp.states.search.JacobianLineSearchResult import JacobianLineSearchResult
+from polcomp.states.search.JacobianLineSearchResult import JacobianLineSearchResult
 
 
 def test_forward_extension_diagnostics():
@@ -48,8 +49,7 @@ def test_rejected_trial_diagnostics():
     assert result.accepted_score == pytest.approx(3.0)
 
 
-from polcomp.polcomp import (
-    JacobianLineSearchResult,
+from polcomp.states.search.JacobianLineSearchResult import (
     JacobianLineSearchTrial,
 )
 
