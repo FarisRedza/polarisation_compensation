@@ -14,6 +14,7 @@ class JacobianSearchConfig:
     adaptive_step: bool = False
     experimental_line_search: bool = False
     line_search_mode: str | None = None
+    line_search_min_relative_improvement: float = 0.2
 
     min_determinant: float = 1e-6
     min_predicted_improvement: float = 0.02

@@ -4,6 +4,7 @@ import pytest
 
 from polcomp.states.search.line_search import (
     CappedLineSearch,
+    ConditionalLineSearch,
     ExtendedLineSearch,
     LineSearchMode,
     SingleLineSearch,
@@ -13,6 +14,7 @@ from polcomp.states.search.line_search import (
 
 def test_factory():
     assert create_line_search('disabled') is None
+    assert isinstance(create_line_search('conditional'), ConditionalLineSearch)
     assert isinstance(create_line_search('single'), SingleLineSearch)
     assert isinstance(create_line_search('extended'), ExtendedLineSearch)
     assert isinstance(create_line_search('capped'), CappedLineSearch)
@@ -38,7 +40,7 @@ def test_single_stops_after_one_trial():
     ) is None
 
 
-@pytest.mark.parametrize('cls', [ExtendedLineSearch, CappedLineSearch])
+@pytest.mark.parametrize('cls', [ExtendedLineSearch, CappedLineSearch, ConditionalLineSearch])
 def test_forward_exploration(cls):
     strategy = cls()
     assert strategy.next_alpha(
@@ -68,3 +70,28 @@ def test_capped_acceptance():
     assert CappedLineSearch().accepts(alpha=1.5)
     assert not CappedLineSearch().accepts(alpha=2.0)
     assert not CappedLineSearch().accepts(alpha=2.5)
+
+
+@pytest.mark.parametrize('baseline, full, expected', [
+    (1.0, 0.7, None),
+    (1.0, 0.8, None),
+    (1.0, 0.9, 1.5),
+    (1.0, 1.0, 0.5),
+    (1.0, 1.1, 0.5),
+    (0.0, 0.0, 0.5),
+])
+def test_conditional_begin(baseline, full, expected):
+    strategy = ConditionalLineSearch()
+    assert strategy.begin(baseline_score=baseline, full_score=full) == expected
+
+
+def test_conditional_configurable_threshold():
+    strategy = create_line_search('conditional', min_relative_improvement=0.3)
+    assert strategy.begin(baseline_score=1.0, full_score=0.8) == 1.5
+    assert strategy.accepts(alpha=2.5)
+
+
+@pytest.mark.parametrize('threshold', [-0.1, 1.1, float('nan')])
+def test_invalid_conditional_threshold(threshold):
+    with pytest.raises(ValueError):
+        ConditionalLineSearch(threshold)

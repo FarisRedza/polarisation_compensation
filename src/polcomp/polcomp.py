@@ -150,7 +150,12 @@ class PolCompController:
             if config is not None
             else PolCompConfig()
         )
-        self._line_search = create_line_search(self.line_search_mode)
+        self._line_search = create_line_search(
+            self.line_search_mode,
+            min_relative_improvement=(
+                self.config.jacobian.line_search_min_relative_improvement
+            ),
+        )
         self._jacobian_search = JacobianSearch(
             config=self.config.jacobian,
         )
@@ -752,41 +757,39 @@ class PolCompController:
                 baseline_score=baseline_score,
                 full_score=full_score,
             )
-            if initial_alpha is None:
-                raise RuntimeError('Enabled line search returned no initial trial')
+            if initial_alpha is not None:
+                if full_score < baseline_score:
+                    self._line_best_alpha = 1.0
+                    self._line_best_score = full_score
+                    self._line_best_positions = full_positions
+                else:
+                    self._line_best_alpha = 0.0
+                    self._line_best_score = baseline_score
+                    self._line_best_positions = baseline_positions
+                self._line_alpha = initial_alpha
 
-            if full_score < baseline_score:
-                self._line_best_alpha = 1.0
-                self._line_best_score = full_score
-                self._line_best_positions = full_positions
-            else:
-                self._line_best_alpha = 0.0
-                self._line_best_score = baseline_score
-                self._line_best_positions = baseline_positions
-            self._line_alpha = initial_alpha
+                self._line_trials = []
+                self._line_extra_travel = 0.0
+                self._line_previous_positions = full_positions
 
-            self._line_trials = []
-            self._line_extra_travel = 0.0
-            self._line_previous_positions = full_positions
-
-            trial_positions = tuple(
-                base + self._line_alpha * delta
-                for base, delta in zip(baseline_positions, step)
-            )
-
-            self._line_trial = (full_score, full_positions)
-
-            self._line_extra_travel += sum(
-                abs(new - old)
-                for new, old in zip(
-                    trial_positions,
-                    full_positions,
+                trial_positions = tuple(
+                    base + self._line_alpha * delta
+                    for base, delta in zip(baseline_positions, step)
                 )
-            )
 
-            self._motor_executor.move_positions(trial_positions)
-            self._search_state = SearchState.JACOBIAN_LINE_MOVE
-            return
+                self._line_trial = (full_score, full_positions)
+
+                self._line_extra_travel += sum(
+                    abs(new - old)
+                    for new, old in zip(
+                        trial_positions,
+                        full_positions,
+                    )
+                )
+
+                self._motor_executor.move_positions(trial_positions)
+                self._search_state = SearchState.JACOBIAN_LINE_MOVE
+                return
 
         if self._pending_jacobian_correction is not None:
             (

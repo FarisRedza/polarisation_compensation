@@ -24,8 +24,11 @@ def main() -> None:
     parser.add_argument('--timeout', type=float, default=120.0)
     parser.add_argument(
         '--line-search-mode',
-        choices=('disabled', 'single', 'extended', 'capped'),
+        choices=('disabled', 'single', 'extended', 'capped', 'conditional'),
         default='disabled',
+    )
+    parser.add_argument(
+        '--line-search-min-relative-improvement', type=float, default=0.2,
     )
     parser.add_argument(
         '--output',
@@ -40,6 +43,9 @@ def main() -> None:
 
     if args.repetitions <= 0:
         parser.error('--repetitions must be positive')
+
+    if not 0.0 <= args.line_search_min_relative_improvement <= 1.0:
+        parser.error('line-search improvement threshold must be in [0, 1]')
 
     disturbance, _ = generate_cases(
         cases=args.cases,
@@ -57,6 +63,7 @@ def main() -> None:
             timeout_s=args.timeout,
             simulated_time=True,
             line_search_mode=args.line_search_mode,
+            line_search_min_relative_improvement=args.line_search_min_relative_improvement,
         )
 
         rows.append({
