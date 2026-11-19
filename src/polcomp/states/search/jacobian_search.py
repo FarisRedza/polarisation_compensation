@@ -72,7 +72,11 @@ class JacobianSearch:
     def __init__(
         self,
         config: JacobianSearchConfig,
+        reference=None,
+        retain_probe_cost: bool = True,
     ) -> None:
+        self.reference = reference
+        self.retain_probe_cost = retain_probe_cost
         self.config = config
         self.solver = JacobianSolver(config)
         self.state = JacobianSearchState()
@@ -152,6 +156,13 @@ class JacobianSearch:
         state.baseline_score = observation.score
         state.baseline_positions = baseline_positions
 
+        if self.reference is not None:
+            self._reference_columns = self.reference(
+                baseline_positions, self.config.probe_deg, target_qber, target_qx
+            )
+            if not self.retain_probe_cost:
+                return self.finish_iteration()
+
         return self.start_probe()
 
     def start_probe(self) -> JacobianAction:
@@ -220,6 +231,9 @@ class JacobianSearch:
 
         assert state.baseline_errors is not None
         assert state.baseline_score is not None
+
+        if self.reference is not None:
+            state.columns = list(self._reference_columns)
 
         if len(state.columns) != 3:
             return JacobianAction(

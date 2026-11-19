@@ -36,7 +36,11 @@ def main() -> None:
         default=pathlib.Path('repeated_noise.csv'),
     )
 
+    parser.add_argument("--jacobian-mode", choices=("empirical", "ideal_fd", "analytical"), default="empirical")
+    parser.add_argument("--skip-probe-cost", action="store_true")
     args = parser.parse_args()
+    if args.skip_probe_cost and args.jacobian_mode == "empirical":
+        parser.error("Empirical Jacobian requires probes")
 
     if not 1 <= args.case <= args.cases:
         parser.error('case must be between 1 and --cases')
@@ -59,6 +63,8 @@ def main() -> None:
 
         result = run_compensation_benchmark(
             disturbance=disturbance,
+            jacobian_mode=args.jacobian_mode,
+            retain_probe_cost=not args.skip_probe_cost,
             seed=measurement_seed,
             timeout_s=args.timeout,
             simulated_time=True,

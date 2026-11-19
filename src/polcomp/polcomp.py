@@ -131,6 +131,8 @@ class PolCompController:
         qwp2: motor.Motor,
         measurements: qtoolkit.polarisation.BB84MeasurementPair,
         config: Optional[PolCompConfig] = None,
+        jacobian_reference=None,
+        retain_probe_cost: bool = True,
     ) -> None:
         self.qwp1 = qwp1
         self.hwp = hwp
@@ -158,6 +160,8 @@ class PolCompController:
         )
         self._jacobian_search = JacobianSearch(
             config=self.config.jacobian,
+            reference=jacobian_reference,
+            retain_probe_cost=retain_probe_cost,
         )
         self._jog_search = JogSearch(
             config=self.config.jog,
@@ -832,7 +836,8 @@ class PolCompController:
         )
 
         self._execute_jacobian_action(action)
-        self._search_state = SearchState.JACOBIAN_PROBE_MOVE
+        if action.type is JacobianActionType.MOVE_TO:
+            self._search_state = SearchState.JACOBIAN_PROBE_MOVE
 
 
     def _update_jog_measurement(

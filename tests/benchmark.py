@@ -249,6 +249,8 @@ def run_compensation_benchmark(
     experimental_line_search: bool = False,
     line_search_mode: str | None = None,
     line_search_min_relative_improvement: float = 0.2,
+    jacobian_mode: str = "empirical",
+    retain_probe_cost: bool = True,
 ) -> BenchmarkResult:
     """Run one accelerated end-to-end compensation benchmark.
 
@@ -371,7 +373,12 @@ def run_compensation_benchmark(
             measurements=measurements,
         )
 
+        from polcomp.simulation.jacobian_reference import OpticalJacobianReference
+
         controller = PolCompController(
+            jacobian_reference=(None if jacobian_mode == "empirical" else
+                                OpticalJacobianReference(system, jacobian_mode)),
+            retain_probe_cost=retain_probe_cost,
             qwp1=compensation_motors[0],
             hwp=compensation_motors[1],
             qwp2=compensation_motors[2],
