@@ -150,3 +150,50 @@ def test_jacobian_correction_improvement():
 
     assert correction.predicted_improvement == pytest.approx(0.8)
     assert correction.actual_improvement == pytest.approx(0.5)
+
+@pytest.mark.parametrize("limit,alphas,expected", [
+    (0, [0, 0, 0], [False, False, False]),
+    (2, [0, 0], [False, True]),
+    (2, [0, 0.25, 0, 0], [False, False, False, True]),
+    (2, [0, None, 0], [False, False, False]),
+    (1, [0], [True]),
+])
+def test_rejection_recovery(limit, alphas, expected):
+    search = JacobianSearch(JacobianSearchConfig(rejection_limit=limit))
+    for alpha, decision in zip(alphas, expected):
+        search.reset_iteration()
+        assert search.record_line_search(alpha) is decision
+    search.reset_rejections()
+    assert search.state.consecutive_rejections == 0
+
+
+@pytest.mark.parametrize("limit", [-1, 1.5, True])
+def test_invalid_rejection_limit(limit):
+    with pytest.raises(ValueError):
+        JacobianSearchConfig(rejection_limit=limit)
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_cauchy_numerical_recovery_once(enabled):
+    search = JacobianSearch(JacobianSearchConfig(
+        cauchy_recovery=enabled, line_search_mode='extended', min_determinant=1.0))
+    search.state.columns = [(0.1, 0), (0, 0), (0, 0)]
+    search.state.baseline_errors = (1, 1)
+    search.state.baseline_score = 1
+    action = search.finish_iteration()
+    assert action.type is (JacobianActionType.APPLY_STEP if enabled else JacobianActionType.FALLBACK)
+    assert search.state.cauchy_count == int(enabled)
+    assert search.try_cauchy().type is JacobianActionType.FALLBACK
+    search.reset_iteration()
+    assert not search.state.cauchy_attempted
+    assert search.state.cauchy_count == int(enabled)
+
+
+def test_cauchy_after_accepted_dls_solution():
+    search = JacobianSearch(JacobianSearchConfig(cauchy_recovery=True, line_search_mode='extended'))
+    search.state.columns = [(0.1, 0), (0, 0.2), (0, 0)]
+    search.state.baseline_errors = (1, 1)
+    search.state.baseline_score = 1
+    assert search.finish_iteration().type is JacobianActionType.APPLY_STEP
+    assert search.state.cauchy_count == 0
+    assert search.try_cauchy().type is JacobianActionType.APPLY_STEP
+    assert search.try_cauchy().type is JacobianActionType.FALLBACK

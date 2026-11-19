@@ -60,6 +60,10 @@ class JacobianSearchState:
     step: typing.Optional[Vector3] = None
 
     fallback_count: int = 0
+    consecutive_rejections: int = 0
+    cauchy_attempted: bool = False
+    cauchy_count: int = 0
+    cauchy_accepted_count: int = 0
 
 
 class JacobianSearch:
@@ -112,6 +116,7 @@ class JacobianSearch:
         """Clear measurements and diagnostics for a new Jacobian."""
         state = self.state
 
+        state.cauchy_attempted = False
         state.probe_index = 0
         state.baseline_errors = None
         state.baseline_score = None
@@ -121,6 +126,21 @@ class JacobianSearch:
         state.condition = None
         state.predicted_score = None
         state.step = None
+
+    def record_line_search(self, accepted_alpha: float | None) -> bool:
+        """Return whether a completed correction requires recovery.
+
+        None denotes a correction without a completed line search.
+        """
+        limit = self.config.rejection_limit
+        if limit == 0 or accepted_alpha != 0.0:
+            self.state.consecutive_rejections = 0
+            return False
+        self.state.consecutive_rejections += 1
+        return self.state.consecutive_rejections >= limit
+
+    def reset_rejections(self) -> None:
+        self.state.consecutive_rejections = 0
 
     def record_correction(
         self,
@@ -257,9 +277,7 @@ class JacobianSearch:
         state.step = solution.step
 
         if not solution.accepted:
-            return JacobianAction(
-                type=JacobianActionType.FALLBACK,
-            )
+            return self.try_cauchy()
 
         assert solution.step is not None
 
@@ -267,6 +285,27 @@ class JacobianSearch:
             type=JacobianActionType.APPLY_STEP,
             step=solution.step,
         )
+
+    def try_cauchy(self) -> JacobianAction:
+        state = self.state
+        fallback = JacobianAction(type=JacobianActionType.FALLBACK)
+        if not self.config.cauchy_recovery or state.cauchy_attempted:
+            return fallback
+        state.cauchy_attempted = True
+        if len(state.columns) != 3 or state.baseline_errors is None or state.baseline_score is None:
+            return fallback
+        solution = self.solver.solve_cauchy(
+            columns=state.columns, baseline_errors=state.baseline_errors,
+            baseline_score=state.baseline_score,
+            max_total_step_deg=self.max_total_step_deg,
+            condition=state.condition if state.condition is not None else float("inf"),
+        )
+        if not solution.accepted:
+            return fallback
+        state.step = solution.step
+        state.predicted_score = solution.predicted_score
+        state.cauchy_count += 1
+        return JacobianAction(type=JacobianActionType.APPLY_STEP, step=solution.step)
 
     def _normalise_observation(
         self,

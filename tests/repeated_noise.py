@@ -24,7 +24,7 @@ def main() -> None:
     parser.add_argument('--timeout', type=float, default=120.0)
     parser.add_argument(
         '--line-search-mode',
-        choices=('disabled', 'single', 'extended', 'capped', 'conditional'),
+        choices=('disabled', 'single', 'extended', 'capped', 'conditional', 'backtracking'),
         default='disabled',
     )
     parser.add_argument(
@@ -38,7 +38,11 @@ def main() -> None:
 
     parser.add_argument("--jacobian-mode", choices=("empirical", "ideal_fd", "analytical"), default="empirical")
     parser.add_argument("--skip-probe-cost", action="store_true")
+    parser.add_argument("--rejection-limit", type=int, default=0)
+    parser.add_argument("--cauchy-recovery", action="store_true")
     args = parser.parse_args()
+    if args.rejection_limit < 0:
+        parser.error("--rejection-limit must be non-negative")
     if args.skip_probe_cost and args.jacobian_mode == "empirical":
         parser.error("Empirical Jacobian requires probes")
 
@@ -69,6 +73,8 @@ def main() -> None:
             timeout_s=args.timeout,
             simulated_time=True,
             line_search_mode=args.line_search_mode,
+            rejection_limit=args.rejection_limit,
+            cauchy_recovery=args.cauchy_recovery,
             line_search_min_relative_improvement=args.line_search_min_relative_improvement,
         )
 
@@ -86,6 +92,9 @@ def main() -> None:
             'final_qx': result.final_qx,
             'jacobian_iterations': result.jacobian_iterations,
             'fallback_count': result.jacobian_fallback_count,
+            'cauchy_recovery': args.cauchy_recovery,
+            'cauchy_count': result.cauchy_count,
+            'cauchy_accepted_count': result.cauchy_accepted_count,
             'motor_travel_deg': result.total_motor_travel_deg,
         })
 

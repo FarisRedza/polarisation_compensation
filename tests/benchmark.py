@@ -92,6 +92,8 @@ class BenchmarkResult:
     total_motor_travel_deg: float
 
     samples: tuple[BenchmarkSample, ...]
+    cauchy_count: int = 0
+    cauchy_accepted_count: int = 0
 
     def summary(self) -> str:
         condition = (
@@ -252,6 +254,8 @@ def run_compensation_benchmark(
     jacobian_mode: str = "empirical",
     retain_probe_cost: bool = True,
     jacobian_diagnostics: list | None = None,
+    rejection_limit: int = 0,
+    cauchy_recovery: bool = False,
 ) -> BenchmarkResult:
     """Run one accelerated end-to-end compensation benchmark.
 
@@ -389,6 +393,8 @@ def run_compensation_benchmark(
                     adaptive_step=adaptive_step,
                     experimental_line_search=experimental_line_search,
                     line_search_mode=line_search_mode,
+                    rejection_limit=rejection_limit,
+                    cauchy_recovery=cauchy_recovery,
                     line_search_min_relative_improvement=line_search_min_relative_improvement,
                 ),
             ),
@@ -641,6 +647,8 @@ def run_compensation_benchmark(
                 total_motor_travel_deg
             ),
             samples=tuple(samples),
+            cauchy_count=final_status.cauchy_count,
+            cauchy_accepted_count=final_status.cauchy_accepted_count,
         )
 
     finally:

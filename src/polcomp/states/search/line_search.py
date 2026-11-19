@@ -14,6 +14,7 @@ class LineSearchMode(str, enum.Enum):
     EXTENDED = 'extended'
     CAPPED = 'capped'
     CONDITIONAL = 'conditional'
+    BACKTRACKING = 'backtracking'
 
 
 class LineSearchStrategy(abc.ABC):
@@ -35,6 +36,7 @@ class LineSearchStrategy(abc.ABC):
         score: float,
         previous_score: float,
         target_reached: bool,
+        baseline_score: float | None = None,
     ) -> float | None:
         """Choose the next trial scale, or finish the line search."""
 
@@ -43,6 +45,7 @@ class SingleLineSearch(LineSearchStrategy):
     def next_alpha(
         self, *, alpha: float, score: float,
         previous_score: float, target_reached: bool,
+        baseline_score: float | None = None,
     ) -> float | None:
         return None
 
@@ -51,6 +54,7 @@ class ExtendedLineSearch(LineSearchStrategy):
     def next_alpha(
         self, *, alpha: float, score: float,
         previous_score: float, target_reached: bool,
+        baseline_score: float | None = None,
     ) -> float | None:
         if (
             alpha >= 1.5
@@ -60,6 +64,28 @@ class ExtendedLineSearch(LineSearchStrategy):
         ):
             return min(alpha + 0.5, 2.5)
         return None
+
+
+class BacktrackingLineSearch(ExtendedLineSearch):
+    """Extended forward search with additional rejected-step backtracking."""
+
+    def next_alpha(
+        self, *, alpha: float, score: float,
+        previous_score: float, target_reached: bool,
+        baseline_score: float | None = None,
+    ) -> float | None:
+        if target_reached:
+            return None
+        if alpha < 1.0:
+            if baseline_score is None:
+                raise ValueError('Backtracking requires the baseline score')
+            if score < baseline_score or alpha <= 0.125:
+                return None
+            return max(alpha / 2.0, 0.125)
+        return super().next_alpha(
+            alpha=alpha, score=score, previous_score=previous_score,
+            target_reached=target_reached, baseline_score=baseline_score,
+        )
 
 
 class ConditionalLineSearch(ExtendedLineSearch):
@@ -97,6 +123,8 @@ def create_line_search(
             return SingleLineSearch()
         case LineSearchMode.EXTENDED:
             return ExtendedLineSearch()
+        case LineSearchMode.BACKTRACKING:
+            return BacktrackingLineSearch()
         case LineSearchMode.CAPPED:
             return CappedLineSearch()
         case LineSearchMode.CONDITIONAL:

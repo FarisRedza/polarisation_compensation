@@ -155,3 +155,36 @@ class JacobianSolver:
             predicted_improvement=predicted_improvement,
             accepted=accepted,
         )
+
+    def solve_cauchy(
+        self, *, columns: typing.Sequence[Vector2], baseline_errors: Vector2,
+        baseline_score: float, max_total_step_deg: float | None = None,
+        condition: float = float("inf"),
+    ) -> JacobianSolution:
+        """Minimise the linear least-squares model along steepest descent."""
+        rejected = JacobianSolution(None, condition, None, None, False)
+        if len(columns) != 3:
+            raise ValueError("Expected three Jacobian columns")
+        limit = self.config.max_total_step_deg if max_total_step_deg is None else max_total_step_deg
+        axis = self.config.max_step_deg
+        if not all(math.isfinite(v) and v > 0 for v in (limit, axis)):
+            raise ValueError("Movement limits must be finite and positive")
+        ez, ex = baseline_errors
+        if not all(math.isfinite(v) for v in (ez, ex, baseline_score, *(v for c in columns for v in c))):
+            return rejected
+        g = tuple(z * ez + x * ex for z, x in columns)
+        norm = math.hypot(*g)
+        if not math.isfinite(norm) or norm <= 0 or baseline_score <= 0:
+            return rejected
+        direction = tuple(-v / norm for v in g)
+        jz, jx = (sum(c[i] * v for c, v in zip(columns, direction)) for i in range(2))
+        curvature = jz ** 2 + jx ** 2
+        if not math.isfinite(curvature) or curvature <= 0:
+            return rejected
+        distance = min(norm / curvature, limit, axis / max(map(abs, direction)))
+        step = tuple(distance * v for v in direction)
+        score = math.hypot(ez + distance * jz, ex + distance * jx) / math.sqrt(2)
+        improvement = (baseline_score - score) / baseline_score
+        return JacobianSolution(step, condition, score, improvement,
+                                math.isfinite(improvement) and improvement > 0
+                                and improvement >= self.config.min_predicted_improvement)

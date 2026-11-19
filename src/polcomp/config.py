@@ -18,6 +18,16 @@ class JacobianSearchConfig:
 
     min_determinant: float = 1e-6
     min_predicted_improvement: float = 0.02
+    rejection_limit: int = 0
+    cauchy_recovery: bool = False
+
+    def __post_init__(self) -> None:
+        if self.cauchy_recovery and self.line_search_mode not in (
+            "extended", "backtracking"
+        ):
+            raise ValueError("Cauchy recovery requires extended or backtracking line search")
+        if type(self.rejection_limit) is not int or self.rejection_limit < 0:
+            raise ValueError("rejection_limit must be a non-negative integer")
 
 
 @dataclasses.dataclass(frozen=True)

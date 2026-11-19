@@ -3,6 +3,7 @@
 import pytest
 
 from polcomp.states.search.line_search import (
+    BacktrackingLineSearch,
     CappedLineSearch,
     ConditionalLineSearch,
     ExtendedLineSearch,
@@ -14,6 +15,7 @@ from polcomp.states.search.line_search import (
 
 def test_factory():
     assert create_line_search('disabled') is None
+    assert isinstance(create_line_search('backtracking'), BacktrackingLineSearch)
     assert isinstance(create_line_search('conditional'), ConditionalLineSearch)
     assert isinstance(create_line_search('single'), SingleLineSearch)
     assert isinstance(create_line_search('extended'), ExtendedLineSearch)
@@ -95,3 +97,31 @@ def test_conditional_configurable_threshold():
 def test_invalid_conditional_threshold(threshold):
     with pytest.raises(ValueError):
         ConditionalLineSearch(threshold)
+
+
+@pytest.mark.parametrize('alpha, score, reached, expected', [
+    (0.5, 1.1, False, 0.25),
+    (0.25, 1.05, False, 0.125),
+    (0.125, 1.01, False, None),
+    (0.5, 1.0, False, 0.25),
+    (0.5, 0.99, False, None),
+    (0.25, 0.99, False, None),
+    (0.5, 1.1, True, None),
+    (1.5, 0.7, False, 2.0),
+    (2.0, 0.7, False, 2.5),
+    (2.5, 0.7, False, None),
+    (1.5, 0.9, False, None),
+])
+def test_backtracking(alpha, score, reached, expected):
+    strategy = BacktrackingLineSearch()
+    assert strategy.next_alpha(
+        alpha=alpha, score=score, previous_score=0.8 if alpha >= 1.0 else 1.2,
+        baseline_score=1.0, target_reached=reached,
+    ) == expected
+
+
+def test_backtracking_requires_baseline():
+    with pytest.raises(ValueError):
+        BacktrackingLineSearch().next_alpha(
+            alpha=0.5, score=1.1, previous_score=1.2, target_reached=False,
+        )

@@ -94,6 +94,8 @@ class PolCompStatus:
 
     last_jacobian_correction: Optional[JacobianCorrection]
     last_line_search: Optional[JacobianLineSearchResult]
+    cauchy_count: int = 0
+    cauchy_accepted_count: int = 0
 
 
 class PolCompController:
@@ -385,6 +387,8 @@ class PolCompController:
             is_moving=self.is_moving,
             last_jacobian_correction=self._last_jacobian_correction,
             last_line_search=self._last_line_search,
+            cauchy_count=self._jacobian_search.state.cauchy_count,
+            cauchy_accepted_count=self._jacobian_search.state.cauchy_accepted_count,
         )
 
     def objective(
@@ -574,6 +578,7 @@ class PolCompController:
                 alpha=trial_alpha,
                 score=trial_score,
                 previous_score=previous_explored_score,
+                baseline_score=baseline_score,
                 target_reached=self.target_reached(
                     qber=observation.qber,
                     qx=observation.qx,
@@ -795,6 +800,8 @@ class PolCompController:
                 self._search_state = SearchState.JACOBIAN_LINE_MOVE
                 return
 
+        recovery_required = False
+        accepted_alpha = None
         if self._pending_jacobian_correction is not None:
             (
                 iteration,
@@ -813,6 +820,24 @@ class PolCompController:
                 condition=condition,
             )
 
+            accepted_alpha = (
+                self._last_line_search.accepted_alpha
+                if self._line_trial_completed
+                and self._last_line_search is not None
+                and self._last_line_search.iteration == iteration
+                else None
+            )
+            was_cauchy = self._jacobian_search.state.cauchy_attempted
+            if was_cauchy and (
+                (accepted_alpha is not None and accepted_alpha > 0)
+                or (accepted_alpha is None and self.target_reached(
+                    qber=observation.qber, qx=observation.qx
+                ))
+            ):
+                self._jacobian_search.state.cauchy_accepted_count += 1
+            recovery_required = self._jacobian_search.record_line_search(
+                accepted_alpha
+            )
             self._pending_jacobian_correction = None
             self._line_trial_completed = False
 
@@ -826,6 +851,15 @@ class PolCompController:
         ):
             self._lock_results.clear()
             self.state = CompensationState.LOCK
+            return
+
+        if self.config.jacobian.cauchy_recovery and accepted_alpha == 0.0:
+            # The line search has already returned to the original baseline.
+            self._execute_jacobian_action(self._jacobian_search.try_cauchy())
+            return
+
+        if recovery_required:
+            self._start_jog_fallback()
             return
 
         action = self._jacobian_search.begin_iteration(
@@ -958,6 +992,7 @@ class PolCompController:
             self._search_state = SearchState.JACOBIAN_PROBE_MOVE
 
     def _start_jog_fallback(self) -> None:
+        self._jacobian_search.reset_rejections()
         self._jacobian_search.state.fallback_count += 1
         self._using_jog_fallback = True
 
@@ -1052,6 +1087,7 @@ class PolCompController:
             self.state = CompensationState.COMPLETE
 
         elif decision is LockDecision.RETRY_SEARCH:
+            self._jacobian_search.reset_rejections()
             # A failed LOCK returns to a fresh line search from the
             # current, stationary position.
             self._using_jog_fallback = False
